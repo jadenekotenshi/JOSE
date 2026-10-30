@@ -1,11 +1,11 @@
 # build output
 build/
 dist/
-StepEdit.app/
+JOSE.app/
 *.o
 *.dSYM/
 
 # macOS
 .DS_Store
-StepEdit-*.tar.gz
-StepEdit.pkg/
+JOSE-*.tar.gz
+JOSE.pkg/

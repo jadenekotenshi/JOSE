@@ -27,7 +27,7 @@ void SSTrace(const char *fmt, ...)
     va_list ap;
 
     va_start(ap, fmt);
-    SSTraceV([NSHomeDirectory() stringByAppendingPathComponent:@".StepEdit.trace"], fmt, ap);
+    SSTraceV([NSHomeDirectory() stringByAppendingPathComponent:@".JOSE.trace"], fmt, ap);
     va_end(ap);
 }
 

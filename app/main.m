@@ -9,12 +9,12 @@
 
 /*
  * Startup is narrated with NSLog so a launch that "does nothing" can be diagnosed:
- * run  ./StepEdit.app/StepEdit  from a Terminal and see how far it gets.
+ * run  ./JOSE.app/JOSE  from a Terminal and see how far it gets.
  * Workspace throws a launched application's stderr away, so the same narration is also written
- * to ~/.StepEdit.trace when that file exists:   touch ~/.StepEdit.trace
+ * to ~/.JOSE.trace when that file exists:   touch ~/.JOSE.trace
  * then launch from Workspace and read the file.
  */
-/* A crash must not be silent: while ~/.StepEdit.trace exists a fatal signal writes one line to it (using only write(),
+/* A crash must not be silent: while ~/.JOSE.trace exists a fatal signal writes one line to it (using only write(),
  * which is safe in a signal handler) before the process dies as it would have. */
 static int traceFD = -1;
 
@@ -55,7 +55,7 @@ int main(int argc, char *argv[])
     }
     pool = [[NSAutoreleasePool alloc] init];
     SSCrumb("starting up");
-    NSLog(@"StepEdit: starting");
+    NSLog(@"JOSE: starting");
     SSTrace("---- starting, argc=%d", argc);
     for (i = 0; i < argc; i++) SSTrace("  argv[%d] = %s", i, argv[i]);
     SSTrace("  cwd  = %s", SSCS([[NSFileManager defaultManager] currentDirectoryPath]));
@@ -65,7 +65,7 @@ int main(int argc, char *argv[])
     SSTrace("  NSUserName()      = %s", SSCS(NSUserName()));
     signal(SIGPIPE, SIG_IGN);
     {
-        NSString *tp = [NSHomeDirectory() stringByAppendingPathComponent:@".StepEdit.trace"];
+        NSString *tp = [NSHomeDirectory() stringByAppendingPathComponent:@".JOSE.trace"];
         traceFD = open(UI_CPATH(tp), O_WRONLY | O_APPEND);        /* only if the file exists: tracing is opt-in */
         if (traceFD >= 0) {
             signal(SIGSEGV, fatal_signal); signal(SIGBUS, fatal_signal); signal(SIGILL, fatal_signal);
@@ -77,10 +77,10 @@ int main(int argc, char *argv[])
 
     NS_DURING
         [NSApplication sharedApplication];
-        NSLog(@"StepEdit: NSApplication created");
+        NSLog(@"JOSE: NSApplication created");
         SSTrace("NSApplication created");
         controller = [[AppController alloc] init];
-        NSLog(@"StepEdit: controller created");
+        NSLog(@"JOSE: controller created");
         SSTrace("controller created");
         [NSApp setDelegate:controller];
         [controller buildMenu];
@@ -88,13 +88,13 @@ int main(int argc, char *argv[])
             for (i = 1; i < argc; i++)
                 if (argv[i][0] != '-') [controller openPath:[NSString stringWithCString:argv[i]]];
         }
-        NSLog(@"StepEdit: menu built, entering the event loop");
+        NSLog(@"JOSE: menu built, entering the event loop");
         SSTrace("menu built, entering the event loop");
         [NSApp run];
-        NSLog(@"StepEdit: event loop ended");
+        NSLog(@"JOSE: event loop ended");
         SSTrace("event loop ended");
     NS_HANDLER
-        NSLog(@"StepEdit: uncaught exception: %@ -- %@", [localException name], [localException reason]);
+        NSLog(@"JOSE: uncaught exception: %@ -- %@", [localException name], [localException reason]);
         SSTrace("uncaught exception: %s -- %s", SSCS([localException name]), SSCS([localException reason]));
     NS_ENDHANDLER
 

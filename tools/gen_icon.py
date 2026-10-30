@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Generate app/StepEdit.tiff, the application icon, in the layout NeXT's own tools write.
+"""Generate app/JOSE.tiff, the application icon, in the layout NeXT's own tools write.
 
-    python3 tools/gen_icon.py                      # writes app/StepEdit.tiff
+    python3 tools/gen_icon.py                      # writes app/JOSE.tiff
     python3 tools/gen_icon.py --preview out.png    # also writes an 8x preview of both images
     python3 tools/gen_icon.py --show FILE.tiff out.png   # decode any NeXT icon TIFF to a PNG
 
@@ -244,7 +244,7 @@ def main(argv):
     if len(argv) == 4 and argv[1] == '--show':
         preview(decode(open(argv[2], 'rb').read()), argv[3])
         return 0
-    out = 'app/StepEdit.tiff'
+    out = 'app/JOSE.tiff'
     data = build_tiff(draw())
     open(out, 'wb').write(data)
     print("wrote %s (%d bytes)" % (out, len(data)))

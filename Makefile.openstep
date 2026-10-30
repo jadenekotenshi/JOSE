@@ -1,14 +1,14 @@
-# Build StepEdit on OPENSTEP 4.2 (gcc 2.7.2).  Works with NeXT make or GNU make.
+# Build JOSE on OPENSTEP 4.2 (gcc 2.7.2).  Works with NeXT make or GNU make.
 #
 #   make -f Makefile.openstep test     # FIRST: run the C unit tests on the real compiler
-#   make -f Makefile.openstep          # build StepEdit.app
+#   make -f Makefile.openstep          # build JOSE.app
 #   make -f Makefile.openstep install  # into /LocalApps (see below)
-#   make -f Makefile.openstep pkg      # StepEdit.pkg for Installer.app (see below)
-#   make -f Makefile.openstep dist     # StepEdit.pkg, gzipped as StepEdit-<VERSION>-<letter>.tar.gz
-#   make -f Makefile.openstep fat          # StepEdit.app as an i386+m68k+sparc fat binary (see below)
+#   make -f Makefile.openstep pkg      # JOSE.pkg for Installer.app (see below)
+#   make -f Makefile.openstep dist     # JOSE.pkg, gzipped as JOSE-<VERSION>-<letter>.tar.gz
+#   make -f Makefile.openstep fat          # JOSE.app as an i386+m68k+sparc fat binary (see below)
 #   make -f Makefile.openstep install-fat  # fat app into /LocalApps
-#   make -f Makefile.openstep pkg-fat      # StepEdit.pkg with the fat build
-#   make -f Makefile.openstep dist-fat     # fat StepEdit.pkg, gzipped as StepEdit-<VERSION>-NIS.tar.gz
+#   make -f Makefile.openstep pkg-fat      # JOSE.pkg with the fat build
+#   make -f Makefile.openstep dist-fat     # fat JOSE.pkg, gzipped as JOSE-<VERSION>-NIS.tar.gz
 #   make -f Makefile.openstep clean
 #
 # No GNU-make features are used (no wildcard, no pattern rules) so the stock
@@ -20,18 +20,18 @@ DEFS     = -DOPENSTEP
 ARCHS    =                        # e.g. -arch i386 -arch m68k -arch sparc; see `fat` below
 CFLAGS   = $(OPT) -Wall $(DEFS) $(ARCHS) -Ihk -Icore -Iapp
 LIBS     = -framework AppKit -framework Foundation
-APP      = StepEdit.app
+APP      = JOSE.app
 VERSION  = 0.0.1
 
 # Workspace takes an application's icon (and its file-type table) from a read-only __ICON segment
 # linked into the executable, not from a file in the .app folder (compare /NextApps/Edit.app, whose
 # only non-language files are the executable and some TIFFs) -- and, on real hardware, Workspace
 # Manager silently refuses to launch a bundle lacking one at all (confirmed: neither `open` nor a
-# Workspace double-click did anything for StepEdit.app until this was added -- the exact same failure
-# StepSSH hit before it got its own icon). app/StepEdit.iconheader says which icon belongs to the
-# app; app/StepEdit.tiff is the icon (regenerate: python3 tools/gen_icon.py).
-ICONHDR   = app/StepEdit.iconheader
-ICONTIFF  = app/StepEdit.tiff
+# Workspace double-click did anything for JOSE.app until this was added -- the exact same failure
+# StepSSH hit before it got its own icon). app/JOSE.iconheader says which icon belongs to the
+# app; app/JOSE.tiff is the icon (regenerate: python3 tools/gen_icon.py).
+ICONHDR   = app/JOSE.iconheader
+ICONTIFF  = app/JOSE.tiff
 SYNTAXFILES = syntax/C.syntax
 ICONFLAGS = -sectcreate __ICON __header $(ICONHDR) -segprot __ICON r r -sectcreate __ICON app $(ICONTIFF)
 
@@ -51,21 +51,21 @@ HEADERS   = hk/HKCompat.h hk/HKSyntaxDefinition.h hk/HKSyntaxHighlighter.h hk/HK
 .m.o:
 	$(CC) $(CFLAGS) -c $< -o $@
 
-all: $(APP)/StepEdit
+all: $(APP)/JOSE
 
 # (After "all", which has to be the first rule so that a plain "make" builds the application.)
 $(HK_OBJS) $(CORE_OBJS) $(APP_OBJS): $(HEADERS)
 
-$(APP)/StepEdit: $(HK_OBJS) $(CORE_OBJS) $(APP_OBJS) $(ICONHDR) $(ICONTIFF) $(SYNTAXFILES)
+$(APP)/JOSE: $(HK_OBJS) $(CORE_OBJS) $(APP_OBJS) $(ICONHDR) $(ICONTIFF) $(SYNTAXFILES)
 	-mkdir $(APP)
 	-mkdir $(APP)/syntax
 	cp syntax/*.syntax $(APP)/syntax
 	@( cd $(APP) ) >/dev/null 2>&1 || { echo "make: $(APP) is missing or is not a directory:"; ls -ld $(APP); echo "remove it and run make again"; exit 1; }
-	$(CC) $(ARCHS) -o $(APP)/StepEdit $(HK_OBJS) $(CORE_OBJS) $(APP_OBJS) $(ICONFLAGS) $(LIBS) || { echo "make: linking with the __ICON segment failed; retrying without an icon"; $(CC) $(ARCHS) -o $(APP)/StepEdit $(HK_OBJS) $(CORE_OBJS) $(APP_OBJS) $(LIBS); }
+	$(CC) $(ARCHS) -o $(APP)/JOSE $(HK_OBJS) $(CORE_OBJS) $(APP_OBJS) $(ICONFLAGS) $(LIBS) || { echo "make: linking with the __ICON segment failed; retrying without an icon"; $(CC) $(ARCHS) -o $(APP)/JOSE $(HK_OBJS) $(CORE_OBJS) $(APP_OBJS) $(LIBS); }
 
 # Show what was linked in: expect a segment __ICON with sections __header and app.
 iconcheck:
-	otool -l $(APP)/StepEdit | grep -A 3 __ICON
+	otool -l $(APP)/JOSE | grep -A 3 __ICON
 
 # ---- unit tests (plain C, no AppKit) ----
 # NOTE: OPENSTEP's mkdir has no -p option (it would create a directory named "-p").
@@ -105,11 +105,11 @@ install-fat: clean
 # /NextAdmin/Installer.app/package, that takes a "fake root" tree (the payload, laid out under
 # DefaultLocation as if it were /) and a plain-text ".info" file (single "Keyword value" lines,
 # NOT a "{ Key = value; }" property list) and does everything else itself: the compressed archive,
-# the .bom, the .sizes file, and the finished .pkg. DefaultLocation /LocalApps with StepEdit.app as
+# the .bom, the .sizes file, and the finished .pkg. DefaultLocation /LocalApps with JOSE.app as
 # the only payload -- matching a real shipped single-app package's own layout exactly (Lighthouse
 # Design's OpenWrite.pkg), so (unlike StepSSH, which needed a second /usr/local-rooted package for
 # its command-line tools) there's no reason to split this into more than one .pkg. LongFileNames
-# NO (StepEdit.app's own path is nowhere near the 100-character ustar limit, and YES was the actual
+# NO (JOSE.app's own path is nowhere near the 100-character ustar limit, and YES was the actual
 # root cause of a hard-to-diagnose StepSSH install failure -- it silently selects a buggy bundled
 # tar variant for small archives). chgrp nogroup and chmod 444 on .sizes match a known-good
 # reference package's own structure exactly, though neither turned out to be load-bearing for
@@ -118,26 +118,26 @@ install-fat: clean
 # UNVERIFIED: not yet tested on real OPENSTEP hardware. If it fails, compare against a real
 # package's actual .bom/.info/.sizes contents (lsbom(8)) before guessing -- that, not
 # documentation, is what actually cracked StepSSH's version of this.
-PKG     = StepEdit.pkg
+PKG     = JOSE.pkg
 PKGROOT = pkgroot
-PKGINFO = StepEdit.info
+PKGINFO = JOSE.info
 
 pkg-assemble:
 	rm -rf $(PKG) $(PKGROOT) $(PKGINFO)
 	mkdir $(PKGROOT)
 	chgrp nogroup $(PKGROOT)
 	cp -r $(APP) $(PKGROOT)/
-	echo "Title StepEdit" > $(PKGINFO)
+	echo "Title JOSE" > $(PKGINFO)
 	echo "Version $(VERSION)" >> $(PKGINFO)
 	echo "Description A programmer's text editor with syntax highlighting." >> $(PKGINFO)
 	echo "DefaultLocation /LocalApps" >> $(PKGINFO)
-	echo "DiskName StepEdit" >> $(PKGINFO)
+	echo "DiskName JOSE" >> $(PKGINFO)
 	echo "Relocatable YES" >> $(PKGINFO)
 	echo "Application YES" >> $(PKGINFO)
 	echo "UseUserMask YES" >> $(PKGINFO)
 	echo "LongFileNames NO" >> $(PKGINFO)
 	/NextAdmin/Installer.app/package $(PKGROOT)/ $(PKGINFO)
-	-chmod 444 $(PKG)/StepEdit.sizes
+	-chmod 444 $(PKG)/JOSE.sizes
 	rm -rf $(PKGROOT) $(PKGINFO)
 	@echo "built $(PKG) via the real Installer.app/package tool"
 
@@ -148,7 +148,7 @@ pkg-fat: clean
 	$(MAKE) -f Makefile.openstep pkg-assemble
 
 # ---- distributable archive of the .pkg ----
-# Gzipped into StepEdit-<VERSION>-<letter(s)>.tar.gz for handing out. The letter convention
+# Gzipped into JOSE-<VERSION>-<letter(s)>.tar.gz for handing out. The letter convention
 # (N=m68k, I=i386, S=sparc) matches StepSSH's own (in turn matching "Making Packages I"'s example
 # naming, diff-2.7-N.tar.gz, "N - NeXT hardware") -- NIS for `dist-fat` (always, since that's
 # exactly what `fat`/`pkg-fat` build), or whichever single letter matches the machine `dist` (thin)
@@ -161,12 +161,12 @@ dist: pkg
 	    sparc) suf=S ;; \
 	    *) suf="`arch`" ;; \
 	esac; \
-	tar -cvf - $(PKG) | gzip -9c > StepEdit-$(VERSION)-$$suf.tar.gz; \
-	echo "built StepEdit-$(VERSION)-$$suf.tar.gz"
+	tar -cvf - $(PKG) | gzip -9c > JOSE-$(VERSION)-$$suf.tar.gz; \
+	echo "built JOSE-$(VERSION)-$$suf.tar.gz"
 
 dist-fat: pkg-fat
-	tar -cvf - $(PKG) | gzip -9c > StepEdit-$(VERSION)-NIS.tar.gz
-	@echo "built StepEdit-$(VERSION)-NIS.tar.gz"
+	tar -cvf - $(PKG) | gzip -9c > JOSE-$(VERSION)-NIS.tar.gz
+	@echo "built JOSE-$(VERSION)-NIS.tar.gz"
 
 # ---- optional multi-architecture ("fat") build ----
 # NeXT's cc accepts several -arch flags in one invocation: each source is compiled once per
@@ -176,11 +176,11 @@ dist-fat: pkg-fat
 # the m68k/sparc components were separate from a plain Intel install on some OPENSTEP CD sets.
 #
 #   make -f Makefile.openstep fat-check    # fast: does cc even accept these -arch flags here?
-#   make -f Makefile.openstep fat          # full: StepEdit.app as an i386+m68k+sparc fat binary
+#   make -f Makefile.openstep fat          # full: JOSE.app as an i386+m68k+sparc fat binary
 #   make -f Makefile.openstep fat FATARCHS="-arch i386 -arch m68k"   # a different arch set
 #
 # UNVERIFIED: StepSSH confirmed this exact mechanism works, including m68k actually executing (not
-# just linking) on a real Previous-emulated 68040 -- but that was StepSSH's own binary; StepEdit's
+# just linking) on a real Previous-emulated 68040 -- but that was StepSSH's own binary; JOSE's
 # hasn't been tried on anything but i386 (the dev host, via the ptmx test path, not even that for
 # real) yet. sparc remains unconfirmed for either project.
 FATARCHS = -arch i386 -arch m68k -arch sparc
@@ -194,10 +194,10 @@ fat-check:
 
 fat: clean
 	$(MAKE) -f Makefile.openstep all ARCHS="$(FATARCHS)"
-	@echo "== fat link done; architectures actually present in $(APP)/StepEdit: =="
-	lipo -info $(APP)/StepEdit
+	@echo "== fat link done; architectures actually present in $(APP)/JOSE: =="
+	lipo -info $(APP)/JOSE
 
 clean:
 	rm -f hk/*.o core/*.o app/*.o
 	rm -rf build $(APP) $(PKG) $(PKGROOT) $(PKGINFO)
-	rm -f StepEdit-*.tar.gz
+	rm -f JOSE-*.tar.gz

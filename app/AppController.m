@@ -74,7 +74,7 @@
     NSMenu *main;
     id item;
 
-    main = [self keepMenu:[[[NSMenu alloc] initWithTitle:@"StepEdit"] autorelease]];
+    main = [self keepMenu:[[[NSMenu alloc] initWithTitle:@"JOSE"] autorelease]];
     item = [main addItemWithTitle:@"Quit" action:@selector(terminate:) keyEquivalent:@"q"];
     [item setTarget:NSApp];
     [NSApp setMainMenu:main];
@@ -82,7 +82,7 @@
 
 - (void)buildFullMenu
 {
-    NSMenu *main = [self keepMenu:[[[NSMenu alloc] initWithTitle:@"StepEdit"] autorelease]];
+    NSMenu *main = [self keepMenu:[[[NSMenu alloc] initWithTitle:@"JOSE"] autorelease]];
     NSMenu *m;
     NSArray *names;
     unsigned int i;

@@ -60,10 +60,10 @@ for h in hk/*.h core/*.h app/*.h; do
 done
 
 # --- the application icon: Workspace reads it from a __ICON segment linked into the executable ---
-if [ ! -f app/StepEdit.iconheader ] || [ ! -f app/StepEdit.tiff ]; then
-    echo "LINT: app/StepEdit.iconheader and app/StepEdit.tiff are both required (Workspace icon)"; status=1
-elif ! awk -F'\t' 'NF != 4 || ($1 != "F" && $1 != "S") { bad = 1 } END { exit bad }' app/StepEdit.iconheader; then
-    echo "LINT: app/StepEdit.iconheader lines must be 4 TAB-separated fields starting F or S"; status=1
+if [ ! -f app/JOSE.iconheader ] || [ ! -f app/JOSE.tiff ]; then
+    echo "LINT: app/JOSE.iconheader and app/JOSE.tiff are both required (Workspace icon)"; status=1
+elif ! awk -F'\t' 'NF != 4 || ($1 != "F" && $1 != "S") { bad = 1 } END { exit bad }' app/JOSE.iconheader; then
+    echo "LINT: app/JOSE.iconheader lines must be 4 TAB-separated fields starting F or S"; status=1
 fi
 grep -q "__ICON" Makefile.openstep || { echo "LINT: Makefile.openstep does not link the __ICON segment"; status=1; }
 

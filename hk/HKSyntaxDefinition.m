@@ -213,7 +213,7 @@ SearchBundlesForSyntaxFile (NSArray *bundles, NSString *type)
  */
 static NSString *explicitSyntaxDirectory = nil;
 
-/* StepEdit keeps its syntax files in one directory of its own and says where it is. */
+/* JOSE keeps its syntax files in one directory of its own and says where it is. */
 + (void) setSyntaxDirectory: (NSString *) directory
 {
   ASSIGNCOPY (explicitSyntaxDirectory, directory);

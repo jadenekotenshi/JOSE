@@ -15,7 +15,7 @@ NSString *ui_string_from_utf8(const char *bytes);
 NSData   *ui_utf8_cstring(NSString *s);              /* bytes of s in UTF-8 plus a trailing NUL */
 #define UI_CPATH(s) ((const char *)[ui_utf8_cstring(s) bytes])
 
-/* Startup diagnostics.  If the file ~/.StepEdit.trace exists (create it with `touch`), SSTrace()
+/* Startup diagnostics.  If the file ~/.JOSE.trace exists (create it with `touch`), SSTrace()
  * appends printf-style lines to it; otherwise it does nothing.  Workspace discards a launched
  * application's stderr, so this is how to see how far a launch from Workspace got. */
 void SSTrace(const char *fmt, ...);
