@@ -141,42 +141,6 @@ MarkTextPatternBeginningCharacters (HKTextPattern * pattern,
 static NSMutableDictionary * syntaxDefinitions = nil;
 
 /**
- * Tries to find a syntax file in any of the passed bundles.
- *
- * @param bundles An array of bundles to search for the syntax file.
- * @param type The syntax type name to look for. The lookup is done by
- *      taking all the resources with a .syntax extension from each
- *      bundle and comparing their file-extension stripped basename
- *      case-insensitively with the passed syntax type name.
- *
- * @return An absolute path to the syntax file if it is found, otherwise `nil'.
- */
-static NSString *
-SearchBundlesForSyntaxFile (NSArray *bundles, NSString *type)
-{
-  NSEnumerator *e = [bundles objectEnumerator];
-  NSBundle *bundle;
-
-  while ((bundle = [e nextObject]) != nil)
-    {
-      NSString * file;
-
-      NSEnumerator *e2 = [[bundle pathsForResourcesOfType: @"syntax" inDirectory: nil]
-        objectEnumerator];
-      while ((file = [e2 nextObject]) != nil)
-        {
-          if ([[[[file lowercaseString] lastPathComponent]
-            stringByDeletingPathExtension] isEqualToString: type])
-            {
-              return file;
-            }
-        }
-    }
-
-  return nil;
-}
-
-/**
  * This class representas a compiled syntax definition file and is needed
  * by the HighlighterKit internals in order to do any syntax highlighting.
  */
@@ -221,11 +185,7 @@ static NSString *explicitSyntaxDirectory = nil;
 
 + (NSString *) findSyntaxFileForType: (NSString *) type
 {
-  NSEnumerator * e;
-  NSString *directory;
-  NSString *file;
   NSFileManager * fm = [NSFileManager defaultManager];
-  NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
 
   /* make the search case insensitive */
   type = [type lowercaseString];
@@ -242,81 +202,6 @@ static NSString *explicitSyntaxDirectory = nil;
             return [explicitSyntaxDirectory stringByAppendingPathComponent: name];
         }
       return nil;
-    }
-
-  if ([defaults stringForKey: @"HKTheme"] == nil)
-    {
-      /* first we look into all the app's bundles, as they might contain */
-      /* the latest version of the syntax file */
-      file = SearchBundlesForSyntaxFile ([NSBundle allBundles], type);
-      if (file)
-	return file;
-      
-      /* search all domains for the matching .syntax file */
-      e = [NSSearchPathForDirectoriesInDomains (NSLibraryDirectory,
-						NSAllDomainsMask, YES) objectEnumerator];
-      while ((directory = [e nextObject]) != nil)
-	{
-	  NSString * subpath = [directory stringByAppendingPathComponent:
-					    @"SyntaxDefinitions"];
-	  BOOL dir;
-	  
-	  if ([fm fileExistsAtPath: subpath isDirectory: &dir] && dir)
-	    {
-	      NSDirectoryEnumerator * de = [fm enumeratorAtPath: subpath];
-	      NSString * origPath;
-	      
-	      while ((origPath = [de nextObject]) != nil)
-		{
-		  NSString *path;
-		  origPath = [subpath stringByAppendingPathComponent: origPath];
-		  
-		  path = [origPath lowercaseString];
-		  
-		  if ([[path pathExtension] isEqualToString: @"syntax"] &&
-		      [[[path lastPathComponent] stringByDeletingPathExtension]
-			isEqualToString: type] &&
-		      [[[de fileAttributes] fileType] isEqualToString:
-							NSFileTypeRegular])
-		    {
-		      return origPath;
-		    }
-		}
-	    }
-	}
-      
-      /* frameworks are search last */
-      file = SearchBundlesForSyntaxFile ([NSBundle allFrameworks], type);
-      if (file)
-	return file;
-    }
-  else
-    {
-      NSString *subpath = [defaults stringForKey: @"HKTheme"];
-      BOOL dir;
-
-      if ([fm fileExistsAtPath: subpath isDirectory: &dir] && dir)
-	{
-	  NSDirectoryEnumerator *de = [fm enumeratorAtPath: subpath];
-	  NSString *origPath;
-	  
-	  while ((origPath = [de nextObject]) != nil)
-	    {
-	      NSString *path;
-	      origPath = [subpath stringByAppendingPathComponent: origPath];
-	      
-	      path = [origPath lowercaseString];
-	      
-	      if ([[path pathExtension] isEqualToString: @"syntax"] &&
-		  [[[path lastPathComponent] stringByDeletingPathExtension]
-			isEqualToString: type] &&
-		  [[[de fileAttributes] fileType] isEqualToString:
-						    NSFileTypeRegular])
-		{
-		  return origPath;
-		}
-	    }
-	}
     }
 
   /* not found */
