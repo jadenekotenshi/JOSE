@@ -51,6 +51,9 @@ static void line_col(NSString *s, unsigned int loc, unsigned int *line, unsigned
 }
 
 @interface EditorDoc (Private)
+- (void)applyStep:(const UndoStep *)step undoing:(BOOL)undoing;
+- (void)markEdited;
+- (unsigned long)nowMillis;
 - (void)updateTitle;
 - (void)updateStatus;
 - (void)buildWindow;
@@ -70,6 +73,8 @@ static void line_col(NSString *s, unsigned int loc, unsigned int *line, unsigned
     if (self) {
         owner = anOwner;
         wrap = NO;
+        undo = undo_new(2000, 2000000UL);
+        clockBase = [NSDate timeIntervalSinceReferenceDate];
         [self buildWindow];
         [self setMode:nil];
         [self updateTitle];
@@ -83,6 +88,7 @@ static void line_col(NSString *s, unsigned int loc, unsigned int *line, unsigned
     [[NSNotificationCenter defaultCenter] removeObserver:self];
     [highlighter detach];
     [highlighter release];
+    undo_free(undo);
     [path release];
     [mode release];
     [super dealloc];
@@ -168,18 +174,92 @@ static void line_col(NSString *s, unsigned int loc, unsigned int *line, unsigned
                             mode != nil ? mode : @"Plain Text", eol == 1 ? @"CRLF" : (eol == 2 ? @"CR" : @"LF")]];
 }
 
-- (void)textDidChange:(NSNotification *)notification
+- (unsigned long)nowMillis
 {
-    if (!dirty) {
-        dirty = YES;
+    return (unsigned long)(([NSDate timeIntervalSinceReferenceDate] - clockBase) * 1000.0);
+}
+
+/* The change is about to happen: remember what it replaces, so that it can be undone. */
+- (BOOL)textView:(NSTextView *)tv shouldChangeTextInRange:(NSRange)range replacementString:(NSString *)replacement
+{
+    unsigned int nrem = range.length, nins = replacement != nil ? [replacement length] : 0;
+    u16 *rem = NULL, *ins = NULL;
+
+    if (replacement == nil) return YES;                        /* attributes only */
+    if (nrem > 0) {
+        rem = (u16 *)malloc(nrem * sizeof(u16));
+        if (rem != NULL) [[tv string] getCharacters:rem range:range];
+        else nrem = 0;
+    }
+    if (nins > 0) {
+        ins = (u16 *)malloc(nins * sizeof(u16));
+        if (ins != NULL) [replacement getCharacters:ins];
+        else nins = 0;
+    }
+    undo_record(undo, range.location, rem, nrem, ins, nins, [self nowMillis]);
+    free(rem);
+    free(ins);
+    expectedCaret = range.location + nins;
+    return YES;
+}
+
+- (void)markEdited
+{
+    BOOL d = undo_version(undo) != savedVersion;
+
+    if (d != dirty) {
+        dirty = d;
         [self updateTitle];
     }
+}
+
+- (void)textDidChange:(NSNotification *)notification
+{
+    [self markEdited];
     [self updateStatus];
 }
 
+/* Moving the insertion point away from where the typing was ends the step being built. */
 - (void)textViewDidChangeSelection:(NSNotification *)notification
 {
+    NSRange sel = [textView selectedRange];
+
+    if (sel.length > 0 || sel.location != expectedCaret) undo_break(undo);
     [self updateStatus];
+}
+
+- (BOOL)canUndo { return undo_can_undo(undo); }
+- (BOOL)canRedo { return undo_can_redo(undo); }
+
+/* Puts the text back as the step describes: replace the units it inserted by the ones it removed (undoing), or the reverse. */
+- (void)applyStep:(const UndoStep *)step undoing:(BOOL)undoing
+{
+    NSTextStorage *ts = [textView textStorage];
+    const u16 *with = undoing ? step->removed : step->inserted;
+    unsigned int nwith = undoing ? step->nremoved : step->ninserted;
+    unsigned int nold = undoing ? step->ninserted : step->nremoved;
+    NSString *str = nwith > 0 ? [NSString stringWithCharacters:with length:nwith] : @"";
+
+    [ts replaceCharactersInRange:NSMakeRange(step->pos, nold) withString:str];
+    expectedCaret = step->pos + nwith;
+    [textView setSelectedRange:NSMakeRange(expectedCaret, 0)];
+    [textView scrollRangeToVisible:NSMakeRange(expectedCaret, 0)];
+    [self markEdited];
+    [self updateStatus];
+}
+
+- (void)undo
+{
+    UndoStep step;
+
+    if (undo_undo(undo, &step)) [self applyStep:&step undoing:YES];
+}
+
+- (void)redo
+{
+    UndoStep step;
+
+    if (undo_redo(undo, &step)) [self applyStep:&step undoing:NO];
 }
 
 /* ---- language mode ---- */
@@ -259,6 +339,8 @@ static void line_col(NSString *s, unsigned int loc, unsigned int *line, unsigned
     [path release];
     path = [aPath copy];
     [textView setString:text];
+    undo_clear(undo);
+    savedVersion = undo_version(undo);
     dirty = NO;
     r = [text lineRangeForRange:NSMakeRange(0, 0)];
     firstLine = [text substringWithRange:r];
@@ -291,6 +373,8 @@ static void line_col(NSString *s, unsigned int loc, unsigned int *line, unsigned
 {
     if (path == nil) return [self saveAs];
     if (![self writeTo:path]) return NO;
+    undo_break(undo);
+    savedVersion = undo_version(undo);
     dirty = NO;
     [self updateTitle];
     return YES;
@@ -306,6 +390,8 @@ static void line_col(NSString *s, unsigned int loc, unsigned int *line, unsigned
     if (![self writeTo:[panel filename]]) return NO;
     [path release];
     path = [[panel filename] copy];
+    undo_break(undo);
+    savedVersion = undo_version(undo);
     dirty = NO;
     if (mode == nil) {
         const char *m = lang_mode_for(UI_CPATH(path), NULL);

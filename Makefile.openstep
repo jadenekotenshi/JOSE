@@ -36,12 +36,12 @@ SYNTAXFILES = syntax/C.syntax
 ICONFLAGS = -sectcreate __ICON __header $(ICONHDR) -segprot __ICON r r -sectcreate __ICON app $(ICONTIFF)
 
 HK_OBJS   = hk/HKTextPattern.o hk/HKSyntaxDefinition.o hk/HKSyntaxHighlighter.o
-CORE_OBJS = core/langmodes.o core/eol.o
+CORE_OBJS = core/langmodes.o core/eol.o core/undo.o
 APP_OBJS  = app/AppController.o app/EditorDoc.o app/UIHelpers.o app/main.o
 
 # Every header, so that a changed one rebuilds what includes it.  tools/lint_openstep.sh checks the list is complete.
 HEADERS   = hk/HKCompat.h hk/HKSyntaxDefinition.h hk/HKSyntaxHighlighter.h hk/HKTextPattern.h \
-            core/eol.h core/langmodes.h \
+            core/eol.h core/langmodes.h core/undo.h \
             app/AppController.h app/Compat.h app/EditorDoc.h app/UIHelpers.h
 .SUFFIXES: .c .m .o
 

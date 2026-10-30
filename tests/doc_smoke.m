@@ -65,6 +65,30 @@ int main(void)
     [doc goToLine:3];
     CHECK([[doc textView] selectedRange].location == [[ts string] rangeOfString:@"    /* hi"].location);
 
+    {   /* undo and redo, and what they do to the modified mark */
+        NSString *before = [[[ts string] copy] autorelease];
+        unsigned int len = [ts length];
+
+        CHECK(![doc isDirty]);
+        [[doc textView] setSelectedRange:NSMakeRange(0, 0)];
+        [[doc textView] insertText:@"a"];
+        [[doc textView] insertText:@"b"];
+        [[doc textView] insertText:@"c"];
+        CHECK([doc isDirty] && [ts length] == len + 3 && [[ts string] hasPrefix:@"abcint"]);
+        CHECK([doc canUndo]);
+        [doc undo];
+        CHECK([[ts string] isEqualToString:before] && ![doc isDirty]);       /* typed in one go: one undo; and clean again */
+        CHECK([doc canRedo]);
+        [doc redo];
+        CHECK([[ts string] hasPrefix:@"abcint"] && [doc isDirty]);
+        [doc undo];
+        [[doc textView] setSelectedRange:NSMakeRange(4, 4)];
+        [[doc textView] insertText:@"MAIN"];                                 /* a replacement */
+        CHECK([[ts string] hasPrefix:@"int MAIN"]);
+        [doc undo];
+        CHECK([[ts string] isEqualToString:before]);
+    }
+
     [[NSFileManager defaultManager] removeItemAtPath:dir error:NULL];
     printf(failures ? "doc: FAILED\n" : "doc: ok\n");
     [pool release];

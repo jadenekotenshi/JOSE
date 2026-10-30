@@ -100,6 +100,8 @@
     [self addItem:@"Close" action:@selector(closeDoc:) key:@"w" target:self toMenu:m];
 
     m = [self submenuNamed:@"Edit" inMenu:main];
+    [self addItem:@"Undo" action:@selector(undoDoc:) key:@"z" target:self toMenu:m];
+    [self addItem:@"Redo" action:@selector(redoDoc:) key:@"Z" target:self toMenu:m];
     [self addItem:@"Cut" action:@selector(cut:) key:@"x" target:nil toMenu:m];
     [self addItem:@"Copy" action:@selector(copy:) key:@"c" target:nil toMenu:m];
     [self addItem:@"Paste" action:@selector(paste:) key:@"v" target:nil toMenu:m];
@@ -153,6 +155,8 @@
     if (a == @selector(saveDoc:) || a == @selector(saveDocAs:) || a == @selector(closeDoc:) || a == @selector(gotoLine:)
         || a == @selector(toggleWrap:) || a == @selector(setMode:))
         if (d == nil) return NO;
+    if (a == @selector(undoDoc:)) return d != nil && [d canUndo];
+    if (a == @selector(redoDoc:)) return d != nil && [d canRedo];
     if (a == @selector(revertDoc:)) return d != nil && [d path] != nil;
     if (a == @selector(toggleWrap:)) [item setState:(d != nil && [d wrap]) ? NSOnState : NSOffState];
     if (a == @selector(setMode:)) {
@@ -225,6 +229,8 @@
     [d revert];
 }
 
+- (void)undoDoc:(id)sender { [[self frontDocument] undo]; }
+- (void)redoDoc:(id)sender { [[self frontDocument] redo]; }
 - (void)closeDoc:(id)sender { [[self frontDocument] closeWindow]; }
 
 - (void)setMode:(id)sender

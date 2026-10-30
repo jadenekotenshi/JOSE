@@ -9,9 +9,9 @@ CFLAGS  = -std=c89 -pedantic -Wall -Wextra -Wdeclaration-after-statement \
 test: $(BUILD)/test_core
 	$(BUILD)/test_core
 
-$(BUILD)/test_core: tests/test_core.c tests/test.h core/langmodes.c core/eol.c core/langmodes.h core/eol.h
+$(BUILD)/test_core: tests/test_core.c tests/test.h core/langmodes.c core/eol.c core/undo.c core/langmodes.h core/eol.h core/undo.h
 	mkdir -p $(BUILD)
-	$(CC) $(CFLAGS) tests/test_core.c core/langmodes.c core/eol.c -o $@
+	$(CC) $(CFLAGS) tests/test_core.c core/langmodes.c core/eol.c core/undo.c -o $@
 
 lint:
 	sh tools/lint_openstep.sh

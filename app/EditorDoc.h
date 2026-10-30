@@ -1,5 +1,6 @@
 #import "Compat.h"
 #import "HKSyntaxHighlighter.h"
+#include "undo.h"
 
 @class EditorDoc;
 
@@ -24,6 +25,10 @@
     id                   owner;            /* the AppController: told when the window closes */
     BOOL                 dirty;
     BOOL                 wrap;
+    Undo                *undo;
+    unsigned long        savedVersion;     /* undo_version() when the file was last read or written */
+    unsigned             expectedCaret;    /* where the insertion point should be after the last edit (to see when it moves away) */
+    NSTimeInterval       clockBase;
     int                  eol;              /* 0 = LF, 1 = CRLF, 2 = CR: what the file used, kept on save */
 }
 - (id)initWithOwner:(id)anOwner;
@@ -41,5 +46,9 @@
 - (NSWindow *)window;
 - (EditTextView *)textView;
 - (void)goToLine:(int)line;
+- (BOOL)canUndo;
+- (BOOL)canRedo;
+- (void)undo;
+- (void)redo;
 - (void)showWindow;
 @end
