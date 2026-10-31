@@ -1,0 +1,234 @@
+/*
+ * Highlighting rules for sh, ksh and bash scripts.
+ */
+{
+  Contexts = (
+    {
+      Keywords = (
+        {
+          Pattern = "<if>";
+          ForegroundColor = "0.6 0.45 0.75";
+          Bold = YES;
+        },
+        {
+          Pattern = "<then>";
+          ForegroundColor = "0.6 0.45 0.75";
+          Bold = YES;
+        },
+        {
+          Pattern = "<else>";
+          ForegroundColor = "0.6 0.45 0.75";
+          Bold = YES;
+        },
+        {
+          Pattern = "<elif>";
+          ForegroundColor = "0.6 0.45 0.75";
+          Bold = YES;
+        },
+        {
+          Pattern = "<fi>";
+          ForegroundColor = "0.6 0.45 0.75";
+          Bold = YES;
+        },
+        {
+          Pattern = "<for>";
+          ForegroundColor = "0.6 0.45 0.75";
+          Bold = YES;
+        },
+        {
+          Pattern = "<while>";
+          ForegroundColor = "0.6 0.45 0.75";
+          Bold = YES;
+        },
+        {
+          Pattern = "<until>";
+          ForegroundColor = "0.6 0.45 0.75";
+          Bold = YES;
+        },
+        {
+          Pattern = "<do>";
+          ForegroundColor = "0.6 0.45 0.75";
+          Bold = YES;
+        },
+        {
+          Pattern = "<done>";
+          ForegroundColor = "0.6 0.45 0.75";
+          Bold = YES;
+        },
+        {
+          Pattern = "<case>";
+          ForegroundColor = "0.6 0.45 0.75";
+          Bold = YES;
+        },
+        {
+          Pattern = "<esac>";
+          ForegroundColor = "0.6 0.45 0.75";
+          Bold = YES;
+        },
+        {
+          Pattern = "<in>";
+          ForegroundColor = "0.6 0.45 0.75";
+          Bold = YES;
+        },
+        {
+          Pattern = "<function>";
+          ForegroundColor = "0.6 0.45 0.75";
+          Bold = YES;
+        },
+        {
+          Pattern = "<select>";
+          ForegroundColor = "0.6 0.45 0.75";
+          Bold = YES;
+        },
+        {
+          Pattern = "<time>";
+          ForegroundColor = "0.6 0.45 0.75";
+          Bold = YES;
+        },
+        {
+          Pattern = "<echo>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<cd>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<exit>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<export>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<read>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<set>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<unset>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<shift>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<test>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<return>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<eval>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<exec>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<trap>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<wait>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<local>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<printf>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<pwd>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<umask>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<ulimit>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<alias>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<unalias>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<source>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<break>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<continue>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<true>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<false>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<let>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<typeset>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<readonly>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "\\$[A-Za-z_][A-Za-z0-9_]*";
+          ForegroundColor = "0.2 0.4 0.8";
+        }
+      );
+    },
+
+    {
+      Beginning = "\"";
+      Ending = "\"";
+      ContextSkips = (
+        "\\\\\\\\",
+        "\\\\\""
+      );
+      ForegroundColor = "0 0.7 0";
+    },
+
+    {
+      Beginning = "'";
+      Ending = "'";
+      ForegroundColor = "0 0.7 0";
+    },
+
+    {
+      Beginning = "#";
+      Ending = "\n";
+      ForegroundColor = "0 0.5 0";
+      Italic = YES;
+    }
+  );
+}

@@ -1,0 +1,200 @@
+/*
+ * Highlighting rules for csh and tcsh scripts.
+ */
+{
+  Contexts = (
+    {
+      Keywords = (
+        {
+          Pattern = "<if>";
+          ForegroundColor = "0.6 0.45 0.75";
+          Bold = YES;
+        },
+        {
+          Pattern = "<then>";
+          ForegroundColor = "0.6 0.45 0.75";
+          Bold = YES;
+        },
+        {
+          Pattern = "<else>";
+          ForegroundColor = "0.6 0.45 0.75";
+          Bold = YES;
+        },
+        {
+          Pattern = "<endif>";
+          ForegroundColor = "0.6 0.45 0.75";
+          Bold = YES;
+        },
+        {
+          Pattern = "<foreach>";
+          ForegroundColor = "0.6 0.45 0.75";
+          Bold = YES;
+        },
+        {
+          Pattern = "<end>";
+          ForegroundColor = "0.6 0.45 0.75";
+          Bold = YES;
+        },
+        {
+          Pattern = "<while>";
+          ForegroundColor = "0.6 0.45 0.75";
+          Bold = YES;
+        },
+        {
+          Pattern = "<switch>";
+          ForegroundColor = "0.6 0.45 0.75";
+          Bold = YES;
+        },
+        {
+          Pattern = "<case>";
+          ForegroundColor = "0.6 0.45 0.75";
+          Bold = YES;
+        },
+        {
+          Pattern = "<breaksw>";
+          ForegroundColor = "0.6 0.45 0.75";
+          Bold = YES;
+        },
+        {
+          Pattern = "<default>";
+          ForegroundColor = "0.6 0.45 0.75";
+          Bold = YES;
+        },
+        {
+          Pattern = "<endsw>";
+          ForegroundColor = "0.6 0.45 0.75";
+          Bold = YES;
+        },
+        {
+          Pattern = "<goto>";
+          ForegroundColor = "0.6 0.45 0.75";
+          Bold = YES;
+        },
+        {
+          Pattern = "<repeat>";
+          ForegroundColor = "0.6 0.45 0.75";
+          Bold = YES;
+        },
+        {
+          Pattern = "<set>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<setenv>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<unset>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<unsetenv>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<alias>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<unalias>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<source>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<exit>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<echo>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<cd>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<pushd>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<popd>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<eval>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<exec>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<rehash>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<umask>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<limit>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<shift>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<history>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<glob>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<nohup>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<onintr>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "\\$[A-Za-z_][A-Za-z0-9_]*";
+          ForegroundColor = "0.2 0.4 0.8";
+        }
+      );
+    },
+
+    {
+      Beginning = "\"";
+      Ending = "\"";
+      ContextSkips = (
+        "\\\\\\\\",
+        "\\\\\""
+      );
+      ForegroundColor = "0 0.7 0";
+    },
+
+    {
+      Beginning = "'";
+      Ending = "'";
+      ContextSkips = (
+        "\\\\\\\\",
+        "\\\\'"
+      );
+      ForegroundColor = "0 0.7 0";
+    },
+
+    {
+      Beginning = "#";
+      Ending = "\n";
+      ForegroundColor = "0 0.5 0";
+      Italic = YES;
+    }
+  );
+}

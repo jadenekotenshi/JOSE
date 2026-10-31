@@ -1,0 +1,419 @@
+/*
+ * Highlighting rules for Perl.
+ */
+{
+  Contexts = (
+    {
+      Keywords = (
+        {
+          Pattern = "<my>";
+          ForegroundColor = "0.6 0.45 0.75";
+          Bold = YES;
+        },
+        {
+          Pattern = "<our>";
+          ForegroundColor = "0.6 0.45 0.75";
+          Bold = YES;
+        },
+        {
+          Pattern = "<local>";
+          ForegroundColor = "0.6 0.45 0.75";
+          Bold = YES;
+        },
+        {
+          Pattern = "<sub>";
+          ForegroundColor = "0.6 0.45 0.75";
+          Bold = YES;
+        },
+        {
+          Pattern = "<if>";
+          ForegroundColor = "0.6 0.45 0.75";
+          Bold = YES;
+        },
+        {
+          Pattern = "<elsif>";
+          ForegroundColor = "0.6 0.45 0.75";
+          Bold = YES;
+        },
+        {
+          Pattern = "<else>";
+          ForegroundColor = "0.6 0.45 0.75";
+          Bold = YES;
+        },
+        {
+          Pattern = "<unless>";
+          ForegroundColor = "0.6 0.45 0.75";
+          Bold = YES;
+        },
+        {
+          Pattern = "<while>";
+          ForegroundColor = "0.6 0.45 0.75";
+          Bold = YES;
+        },
+        {
+          Pattern = "<until>";
+          ForegroundColor = "0.6 0.45 0.75";
+          Bold = YES;
+        },
+        {
+          Pattern = "<for>";
+          ForegroundColor = "0.6 0.45 0.75";
+          Bold = YES;
+        },
+        {
+          Pattern = "<foreach>";
+          ForegroundColor = "0.6 0.45 0.75";
+          Bold = YES;
+        },
+        {
+          Pattern = "<do>";
+          ForegroundColor = "0.6 0.45 0.75";
+          Bold = YES;
+        },
+        {
+          Pattern = "<return>";
+          ForegroundColor = "0.6 0.45 0.75";
+          Bold = YES;
+        },
+        {
+          Pattern = "<last>";
+          ForegroundColor = "0.6 0.45 0.75";
+          Bold = YES;
+        },
+        {
+          Pattern = "<next>";
+          ForegroundColor = "0.6 0.45 0.75";
+          Bold = YES;
+        },
+        {
+          Pattern = "<redo>";
+          ForegroundColor = "0.6 0.45 0.75";
+          Bold = YES;
+        },
+        {
+          Pattern = "<use>";
+          ForegroundColor = "0.6 0.45 0.75";
+          Bold = YES;
+        },
+        {
+          Pattern = "<no>";
+          ForegroundColor = "0.6 0.45 0.75";
+          Bold = YES;
+        },
+        {
+          Pattern = "<package>";
+          ForegroundColor = "0.6 0.45 0.75";
+          Bold = YES;
+        },
+        {
+          Pattern = "<require>";
+          ForegroundColor = "0.6 0.45 0.75";
+          Bold = YES;
+        },
+        {
+          Pattern = "<and>";
+          ForegroundColor = "0.6 0.45 0.75";
+          Bold = YES;
+        },
+        {
+          Pattern = "<or>";
+          ForegroundColor = "0.6 0.45 0.75";
+          Bold = YES;
+        },
+        {
+          Pattern = "<not>";
+          ForegroundColor = "0.6 0.45 0.75";
+          Bold = YES;
+        },
+        {
+          Pattern = "<eq>";
+          ForegroundColor = "0.6 0.45 0.75";
+          Bold = YES;
+        },
+        {
+          Pattern = "<ne>";
+          ForegroundColor = "0.6 0.45 0.75";
+          Bold = YES;
+        },
+        {
+          Pattern = "<lt>";
+          ForegroundColor = "0.6 0.45 0.75";
+          Bold = YES;
+        },
+        {
+          Pattern = "<gt>";
+          ForegroundColor = "0.6 0.45 0.75";
+          Bold = YES;
+        },
+        {
+          Pattern = "<le>";
+          ForegroundColor = "0.6 0.45 0.75";
+          Bold = YES;
+        },
+        {
+          Pattern = "<ge>";
+          ForegroundColor = "0.6 0.45 0.75";
+          Bold = YES;
+        },
+        {
+          Pattern = "<cmp>";
+          ForegroundColor = "0.6 0.45 0.75";
+          Bold = YES;
+        },
+        {
+          Pattern = "<xor>";
+          ForegroundColor = "0.6 0.45 0.75";
+          Bold = YES;
+        },
+        {
+          Pattern = "<BEGIN>";
+          ForegroundColor = "0.6 0.45 0.75";
+          Bold = YES;
+        },
+        {
+          Pattern = "<END>";
+          ForegroundColor = "0.6 0.45 0.75";
+          Bold = YES;
+        },
+        {
+          Pattern = "<print>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<printf>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<defined>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<undef>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<die>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<warn>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<open>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<close>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<push>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<pop>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<shift>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<unshift>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<splice>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<keys>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<values>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<each>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<delete>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<exists>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<join>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<split>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<map>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<grep>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<sort>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<reverse>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<sprintf>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<length>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<substr>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<index>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<rindex>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<lc>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<uc>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<lcfirst>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<ucfirst>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<chomp>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<chop>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<chr>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<ord>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<scalar>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<ref>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<bless>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<eval>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<exit>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<sleep>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<time>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<localtime>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<wantarray>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<sprintf>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<abs>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<int>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "<sqrt>";
+          ForegroundColor = "0.2 0.5 0.6";
+        },
+        {
+          Pattern = "[\\$@][A-Za-z_][A-Za-z0-9_]*";
+          ForegroundColor = "0.2 0.4 0.8";
+        }
+      );
+    },
+
+    {
+      Beginning = "^=[a-z]";
+      Ending = "^=cut";
+      ForegroundColor = "0 0.5 0";
+      Italic = YES;
+    },
+
+    {
+      Beginning = "\"";
+      Ending = "\"";
+      ContextSkips = (
+        "\\\\\\\\",
+        "\\\\\""
+      );
+      ForegroundColor = "0 0.7 0";
+    },
+
+    {
+      Beginning = "'";
+      Ending = "'";
+      ContextSkips = (
+        "\\\\\\\\",
+        "\\\\'"
+      );
+      ForegroundColor = "0 0.7 0";
+    },
+
+    {
+      Beginning = "#";
+      Ending = "\n";
+      ForegroundColor = "0 0.5 0";
+      Italic = YES;
+    }
+  );
+}

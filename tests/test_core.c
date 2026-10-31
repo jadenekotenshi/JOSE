@@ -19,6 +19,13 @@ int main(void)
     CHECK(str_eq(lang_mode_for("/a.b/x.cpp", NULL), "C++"));
     CHECK(str_eq(lang_mode_for("Thing.m", NULL), "ObjC"));
     CHECK(str_eq(lang_mode_for("tool.py", NULL), "Python"));
+    CHECK(str_eq(lang_mode_for("a.sh", NULL), "Shell"));
+    CHECK(str_eq(lang_mode_for("/home/me/.profile", NULL), "Shell"));
+    CHECK(str_eq(lang_mode_for("run", "#!/bin/ksh"), "Shell"));
+    CHECK(str_eq(lang_mode_for("run", "#!/bin/csh -f"), "Csh"));
+    CHECK(str_eq(lang_mode_for("/root/.cshrc", NULL), "Csh"));
+    CHECK(str_eq(lang_mode_for("t.pl", NULL), "Perl"));
+    CHECK(str_eq(lang_mode_for("t", "#!/usr/bin/perl -w"), "Perl"));
     CHECK(str_eq(lang_mode_for("tool", "#!/usr/bin/env python"), "Python"));
     CHECK(str_eq(lang_mode_for("Thing.mm", NULL), "ObjC++"));
     CHECK(str_eq(lang_mode_for("/usr/src/Makefile", NULL), "GNUmakefile"));

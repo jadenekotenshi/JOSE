@@ -53,6 +53,27 @@ int main(int argc, char **argv)
                [[colourAt(pts, [py rangeOfString:@"note"].location) description] cString],
                [[colourAt(pts, [py rangeOfString:@"more"].location) description] cString]);
     }
+    {   /* shell, csh and perl each colour a keyword, a comment and a string */
+        static const char *const modes[] = { "Shell", "Csh", "Perl" };
+        static NSString *const texts[] = { @"if true; then\n  # note\n  echo \"hi $X\"\nfi\n",
+                                           @"if ($x) then\n  # note\n  echo \"hi $x\"\nendif\n",
+                                           @"my $x = 1;\n# note\nprint \"hi $x\";\n=pod\nmore\n=cut\n" };
+        int mi;
+        for (mi = 0; mi < 3; mi++) {
+            NSTextStorage *mts = [[[NSTextStorage alloc] initWithString:texts[mi]] autorelease];
+            HKSyntaxHighlighter *mh = [[HKSyntaxHighlighter alloc]
+                initWithHighlighterType:[NSString stringWithCString:modes[mi]] textStorage:mts defaultTextColor:[NSColor blackColor]];
+            NSColor *a, *b, *c;
+            CHECK(mh != nil);
+            [mh highlightRange:NSMakeRange(0, [mts length])];
+            a = colourAt(mts, 0);
+            b = colourAt(mts, [texts[mi] rangeOfString:@"note"].location);
+            c = colourAt(mts, [texts[mi] rangeOfString:@"hi"].location);
+            CHECK(a != nil && b != nil && c != nil);
+            CHECK(![a isEqual:b] && ![b isEqual:c]);
+            printf("%s ok\n", modes[mi]);
+        }
+    }
     printf("int=%s comment=%s string=%s main=%s\n", [[kw description] cString], [[cm description] cString],
            [[str description] cString], [[plain description] cString]);
 

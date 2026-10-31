@@ -13,12 +13,17 @@ static const ExtMode EXTS[] = {
     { "gsmarkup", "GSmarkup" },
     { "mk", "GNUmakefile" },
     { "py", "Python" }, { "pyw", "Python" },
+    { "sh", "Shell" }, { "ksh", "Shell" }, { "bash", "Shell" },
+    { "csh", "Csh" }, { "tcsh", "Csh" },
+    { "pl", "Perl" }, { "pm", "Perl" }, { "pod", "Perl" },
     { NULL, NULL }
 };
 
 static const NameMode NAMES[] = {
     { "ChangeLog", "ChangeLog" }, { "Changelog", "ChangeLog" },
     { "Makefile", "GNUmakefile" }, { "makefile", "GNUmakefile" }, { "GNUmakefile", "GNUmakefile" },
+    { ".profile", "Shell" }, { ".kshrc", "Shell" }, { ".bashrc", "Shell" }, { ".bash_profile", "Shell" }, { ".xinitrc", "Shell" },
+    { ".cshrc", "Csh" }, { ".tcshrc", "Csh" }, { ".login", "Csh" }, { ".logout", "Csh" },
     { "Makefile.openstep", "GNUmakefile" }, { "Makefile.preamble", "GNUmakefile" }, { "Makefile.postamble", "GNUmakefile" },
     { NULL, NULL }
 };
@@ -57,8 +62,10 @@ const char *lang_mode_for(const char *path, const char *first_line)
     mode = lang_mode_for_name(base);
     if (mode != NULL) return mode;
     if (first_line != NULL && first_line[0] == '#' && first_line[1] == '!') {
-        /* only Python among the scripts so far (no shell mode yet) */
         if (strstr(first_line, "python") != NULL) return "Python";
+        if (strstr(first_line, "perl") != NULL) return "Perl";
+        if (strstr(first_line, "csh") != NULL) return "Csh";            /* csh and tcsh, before the "sh" test */
+        if (strstr(first_line, "sh") != NULL) return "Shell";           /* sh, ksh, bash, zsh */
         return NULL;
     }
     return NULL;
