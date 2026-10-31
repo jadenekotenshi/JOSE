@@ -1,12 +1,27 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
-#include <unistd.h>
-#include <fcntl.h>
 #include <signal.h>
 #include <sys/types.h>
 #include <sys/time.h>
+#ifdef OPENSTEP
+/* OPENSTEP's <unistd.h> declares little: the system calls come from <libc.h>, O_NONBLOCK may only be FNDELAY, and wait
+ * statuses are a `union wait', so they are taken apart by hand below. */
+#include <libc.h>
+#include <sys/file.h>
 #include <sys/wait.h>
+#ifndef O_NONBLOCK
+#ifdef FNDELAY
+#define O_NONBLOCK FNDELAY
+#else
+#define O_NONBLOCK 0x0004
+#endif
+#endif
+#else
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/wait.h>
+#endif
 #include "shellrun.h"
 
 typedef struct { char *p; size_t n, cap; } Grow;
@@ -140,14 +155,15 @@ int shell_run(const char *cmd, const char *dir, const char *in, size_t nin, unsi
     if (out_open) close(outp[0]);
     if (err_open) close(errp[0]);
     while (!reaped) {
-        int w = waitpid(pid, &status, 0);
+        int w = waitpid(pid, (void *)&status, 0);
         if (w == pid) reaped = 1;
         else if (w < 0 && errno != EINTR) break;
     }
     signal(SIGPIPE, old_pipe);
     if (reaped) {
-        if (WIFEXITED(status)) r->status = WEXITSTATUS(status);
-        else if (WIFSIGNALED(status)) r->status = 128 + WTERMSIG(status);
+        /* the classic encoding: the low 7 bits are the signal (0: it exited), the next 8 the exit code */
+        if ((status & 0x7f) == 0) r->status = (status >> 8) & 0xff;
+        else if ((status & 0xff) != 0x7f) r->status = 128 + (status & 0x7f);
     }
     if (!go.p) grow_add(&go, "", 0, 0, &r->truncated);
     if (!ge.p) grow_add(&ge, "", 0, 0, &r->truncated);
