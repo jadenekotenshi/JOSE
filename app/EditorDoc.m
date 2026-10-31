@@ -225,6 +225,7 @@
     macroSuppress++;
     if (rectOn) [(EditorDoc *)editor rectDeleteBackward:YES];
     else if ([self selectedRange].length == 0 && [self selectedRange].location == 0) NSBeep();     /* nothing before the start */
+    else if ([(EditorDoc *)editor deleteAtEnd]) {}
     else [super deleteBackward:sender];
     macroSuppress--;
 }
@@ -2067,6 +2068,22 @@ static NSString *rect_clip;                 /* what Copy last took from a rectan
     prevSel = [textView selectedRange];
     expectedCaret = prevSel.location;
     [self updateStatus];
+}
+
+/* Deleting the last character of the text through the text view crashed on 4.2 (an exception from the run storage while the view
+ * redrew the last line in the middle of its own change).  Our own edits do not, so a deletion that reaches the end of the text is
+ * done here: the selection, or the character before the insertion point. */
+- (BOOL)deleteAtEnd
+{
+    NSRange sel = [textView selectedRange], r = sel;
+    unsigned int n = [[textView string] length];
+
+    if (r.length == 0 && r.location > 0) r = NSMakeRange(r.location - 1, 1);
+    if (r.length == 0 || NSMaxRange(r) != n) return NO;
+    SSTrace("deleteAtEnd: %u+%u of %u", (unsigned)r.location, (unsigned)r.length, n);
+    [textView rectClear];
+    [self replaceRange:r with:@"" select:NSMakeRange(r.location, 0)];
+    return YES;
 }
 
 - (void)splitPane

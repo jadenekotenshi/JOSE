@@ -132,6 +132,7 @@
 - (void)macroNoteAction:(NSString *)selectorName;
 - (void)macroStateChanged;                 /* learning began or ended: the status line says so */
 - (void)applyAppearance;                   /* the font or colours changed */
+- (BOOL)deleteAtEnd;                        /* Backspace/Delete that reaches the end of the text, done by hand: YES if it was (see EditTextView) */
 - (void)splitPane;                          /* a second view of the same text under (or over) the first */
 - (void)closePane;                         /* closes the pane with the insertion point; the other one fills the window */
 - (BOOL)hasSplit;

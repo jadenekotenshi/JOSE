@@ -793,6 +793,32 @@ int main(void)
         }
         CHECK(bad == 0);
     }
+    {   /* Backspace at the very end is done by hand: same result, one undo step each, caret and dirty flag right */
+        EditorDoc *ed = [[[EditorDoc alloc] initWithOwner:nil] autorelease];
+        EditTextView *tv = [ed textView];
+
+        [tv setString:@"ab\ncd\n"];
+        [tv setSelectedRange:NSMakeRange(6, 0)];
+        [tv deleteBackward:nil];
+        CHECK([[tv string] isEqualToString:@"ab\ncd"] && [tv selectedRange].location == 5 && [ed isDirty]);
+        [tv deleteBackward:nil];
+        [tv deleteBackward:nil];
+        [tv deleteBackward:nil];
+        CHECK([[tv string] isEqualToString:@"ab"] && [tv selectedRange].location == 2);
+        [ed undo];
+        CHECK([[tv string] isEqualToString:@"ab\n"]);
+        [tv setSelectedRange:NSMakeRange(1, 2)];                                 /* a selection that reaches the end */
+        [tv deleteBackward:nil];
+        CHECK([[tv string] isEqualToString:@"a"] && [tv selectedRange].location == 1);
+        [tv deleteBackward:nil];
+        CHECK([[tv string] isEqualToString:@""]);
+        [tv deleteBackward:nil];                                                 /* nothing left: a beep, no crash */
+        [ed undo];
+        CHECK([[tv string] isEqualToString:@"a"]);
+        [tv setSelectedRange:NSMakeRange(0, 0)];
+        [tv deleteForward:nil];                                                  /* not at the end: the text view's own */
+        CHECK([[tv string] isEqualToString:@""]);
+    }
     [[NSFileManager defaultManager] removeItemAtPath:dir error:NULL];
     printf(failures ? "doc: FAILED\n" : "doc: ok\n");
     [pool release];
