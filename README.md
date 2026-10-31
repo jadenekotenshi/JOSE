@@ -74,15 +74,19 @@ and replacements with their settings, and filters and executed commands.  Nothin
 place that a key or a search can find again.  Because the result is a short text, macros can be read, edited and written by hand:
 
     # JOSE macro
-    find fcp "TODO"                     f/b = forward/backward; c case, r regular expression, w whole word, p wrap
+    # find: f or b (forward/backward), c case sensitive, r regular expression, w whole word, p wrap around
+    find fcp "TODO"
     action moveToEndOfLine:
     insert "  /* done */"
-    replace-all fcp "foo" "bar"         also replace-sel; \\1 in a regular expression replacement is a group
-    command shift-right                 shift-left comment uncomment fill-paragraph fold-toggle fold-all expand-all
-                                        match-bracket select-bracket undo redo
-    filter "sort -r"                    exec "date"
+    # replace-all (or replace-sel): in a regular expression replacement \\1 is a group
+    replace-all fcp "foo" "bar"
+    # commands: shift-left shift-right comment uncomment fill-paragraph fold-toggle fold-all expand-all
+    #           match-bracket select-bracket undo redo
+    command shift-right
+    filter "sort -r"
+    exec "date"
 
-Strings take \\ \" \n \t \r \xHH, so a backslash in a regular expression is written twice.  A macro stops at the first line that cannot
+A line may end with a # comment after its last string.  Strings take \\ \" \n \t \r \xHH, so a backslash in a regular expression is written twice.  A macro stops at the first line that cannot
 be done.  Only text-view actions (keys) may appear in `action` lines.
 
 ## Language modes
