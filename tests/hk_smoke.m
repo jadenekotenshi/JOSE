@@ -36,6 +36,59 @@ int main(int argc, char **argv)
     CHECK(![kw isEqual:cm]);
     CHECK(![cm isEqual:str]);
     CHECK(![kw isEqual:plain] || plain == nil);
+    {   /* nested contexts: <header> and a comment inside a preprocessor line, ${var} inside a shell string */
+        NSString *cp = @"#include <stdio.h> /* c */\nint x;\n#define A 1\n";
+        NSTextStorage *cts = [[[NSTextStorage alloc] initWithString:cp] autorelease];
+        HKSyntaxHighlighter *ch = [[HKSyntaxHighlighter alloc] initWithHighlighterType:@"C" textStorage:cts
+                                                                      defaultTextColor:[NSColor blackColor]];
+        NSColor *dir, *hdr, *cmt, *after;
+        [ch highlightRange:NSMakeRange(0, [cts length])];
+        dir = colourAt(cts, 1);
+        hdr = colourAt(cts, [cp rangeOfString:@"stdio"].location);
+        cmt = colourAt(cts, [cp rangeOfString:@"c */"].location);
+        after = colourAt(cts, [cp rangeOfString:@"int"].location);
+        CHECK(dir != nil && hdr != nil && cmt != nil);
+        CHECK(![dir isEqual:hdr]);
+        CHECK(![hdr isEqual:cmt]);
+        CHECK(![dir isEqual:after]);
+        CHECK(![hdr isEqual:after]);
+        CHECK([dir isEqual:colourAt(cts, [cp rangeOfString:@"define"].location + 1)]);
+        CHECK([dir isEqual:colourAt(cts, [cp rangeOfString:@"A 1"].location)]);        /* the directive resumes after the child */
+        printf("nested C: directive=%s header=%s comment=%s\n", [[dir description] cString], [[hdr description] cString],
+               [[cmt description] cString]);
+        {
+            NSString *sh = @"echo \"a ${HOME} b $(pwd) c\"\nls\n";
+            NSTextStorage *sts = [[[NSTextStorage alloc] initWithString:sh] autorelease];
+            HKSyntaxHighlighter *sh2 = [[HKSyntaxHighlighter alloc] initWithHighlighterType:@"Shell" textStorage:sts
+                                                                           defaultTextColor:[NSColor blackColor]];
+            NSColor *plainStr, *var, *cmd, *ls;
+            [sh2 highlightRange:NSMakeRange(0, [sts length])];
+            plainStr = colourAt(sts, [sh rangeOfString:@"a "].location);
+            var = colourAt(sts, [sh rangeOfString:@"HOME"].location);
+            cmd = colourAt(sts, [sh rangeOfString:@"pwd"].location);
+            ls = colourAt(sts, [sh rangeOfString:@"ls"].location);
+            CHECK(![plainStr isEqual:var]);
+            CHECK(![plainStr isEqual:cmd]);
+            CHECK([plainStr isEqual:colourAt(sts, [sh rangeOfString:@" b "].location + 1)]);   /* back in the string after } */
+            CHECK([plainStr isEqual:colourAt(sts, [sh rangeOfString:@" c"].location + 1)]);    /* ... and after ) */
+            CHECK(![plainStr isEqual:ls]);
+        }
+        /* an unterminated child is closed by the end of the line around it */
+        {
+            NSString *u = @"#include <std\nint y;\n";
+            NSTextStorage *uts = [[[NSTextStorage alloc] initWithString:u] autorelease];
+            HKSyntaxHighlighter *uh = [[HKSyntaxHighlighter alloc] initWithHighlighterType:@"C" textStorage:uts
+                                                                          defaultTextColor:[NSColor blackColor]];
+            [uh highlightRange:NSMakeRange(0, [uts length])];
+            CHECK(![colourAt(uts, [u rangeOfString:@"std"].location) isEqual:colourAt(uts, [u rangeOfString:@"int"].location)]);
+            CHECK(![colourAt(uts, [u rangeOfString:@"y;"].location) isEqual:colourAt(uts, 1)]);
+        }
+        /* editing inside the nested context re-highlights it consistently */
+        [cts replaceCharactersInRange:NSMakeRange([cp rangeOfString:@"stdio"].location, 5) withString:@"stdlib"];
+        [ch highlightRange:NSMakeRange(0, [cts length])];
+        CHECK([colourAt(cts, [[cts string] rangeOfString:@"stdlib"].location) isEqual:hdr]);
+        CHECK(![colourAt(cts, [[cts string] rangeOfString:@"int"].location) isEqual:hdr]);
+    }
     {   /* Python: keyword, comment, string and triple-quoted string get colours */
         NSString *py = @"def f(x):\n    # note\n    s = 'abc'\n    \"\"\"doc\n    more\"\"\"\n    return None\n";
         NSTextStorage *pts = [[[NSTextStorage alloc] initWithString:py] autorelease];

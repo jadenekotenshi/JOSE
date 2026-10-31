@@ -46,6 +46,16 @@
   HKTextPattern *** keywords;
 
   NSArray * keywordGraphics;
+
+  /* Nested contexts.  A context may name a Parent (default: the default context 0), so the contexts form a tree, and the
+     context stored for a character also identifies the whole stack of enclosing contexts.  For every context, the
+     contexts that may begin inside it: their beginning patterns (not owned, shared with contextBeginnings), numbers and
+     first characters. */
+  unsigned int numContexts;
+  int * contextParents;
+  HKTextPattern *** childBeginnings;
+  int ** childContexts;
+  char ** childChars;
 }
 
 + (void) setSyntaxDirectory: (NSString *) directory;
@@ -59,6 +69,11 @@
 - (HKTextPattern **) contextBeginnings;
 - (const char *) contextBeginningCharacters;
 - (unsigned int) numberOfContextBeginningCharacters;
+
+- (int) parentOfContext: (unsigned int) ctxt;      /* -1 for the default context */
+- (HKTextPattern **) childBeginningsForContext: (unsigned int) ctxt;   /* NULL terminated */
+- (const int *) childContextsForContext: (unsigned int) ctxt;          /* context number for each of the above */
+- (const char *) childBeginningCharactersForContext: (unsigned int) ctxt;   /* 128 flags */
 
 - (const char *) contextSkipCharactersForContext: (unsigned int) ctxt;
 - (unsigned int) numberOfContextSkipCharactersForContext: (unsigned int) ctxt;

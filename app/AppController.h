@@ -2,6 +2,7 @@
 
 @class EditorDoc;
 @class FindController;
+@class ShellController;
 
 /* Owns every open document and the menus. */
 @interface AppController : NSObject
@@ -12,6 +13,8 @@
     NSString       *syntaxDir;         /* where the .syntax files are */
     NSTextField    *gotoField;
     FindController *finder;
+    ShellController *shell;
+    int             prefFillWidth;      /* the right margin of Fill Paragraph */
     BOOL            prefAutoIndent;     /* indentation settings, applied to every document */
     BOOL            prefUseSpaces;
     int             prefIndentWidth;

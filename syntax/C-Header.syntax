@@ -682,6 +682,34 @@
           Bold = YES;
         }
       );
+    },
+
+    /* nested in the preprocessor line: <header>, "header", comments */
+    {
+      Parent = 4;
+      Beginning = "\\<[abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_./]";
+      Ending = "\\>";
+      ForegroundColor = "0.55 0.2 0.55";
+    },
+    {
+      Parent = 4;
+      Beginning = "\"";
+      Ending = "\"";
+      ForegroundColor = "0.55 0.2 0.55";
+    },
+    {
+      Parent = 4;
+      Beginning = "/\\*";
+      Ending = "\\*/";
+      ForegroundColor = "0 0.5 0";
+      Italic = YES;
+    },
+    {
+      Parent = 4;
+      Beginning = "//";
+      Ending = "\n";
+      ForegroundColor = "0 0.5 0";
+      Italic = YES;
     }
   );
 }

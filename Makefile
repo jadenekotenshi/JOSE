@@ -6,11 +6,21 @@ OBJCFLAGS = -x objective-c -fno-objc-arc -w -g -Ihk -Icore -Iapp
 CFLAGS  = -std=c89 -pedantic -Wall -Wextra -Wdeclaration-after-statement \
           -Wno-long-long -Wno-unused-parameter -O2 -g -Icore
 
-test: $(BUILD)/test_core $(BUILD)/test_search $(BUILD)/test_edit $(BUILD)/test_brace
+test: $(BUILD)/test_core $(BUILD)/test_search $(BUILD)/test_edit $(BUILD)/test_brace $(BUILD)/test_fill $(BUILD)/test_shell
 	$(BUILD)/test_core
 	$(BUILD)/test_search
 	$(BUILD)/test_edit
 	$(BUILD)/test_brace
+	$(BUILD)/test_fill
+	$(BUILD)/test_shell
+
+$(BUILD)/test_fill: tests/test_fill.c tests/test.h core/fill.c core/fill.h core/rect.c core/rect.h
+	mkdir -p $(BUILD)
+	$(CC) $(CFLAGS) tests/test_fill.c core/fill.c core/rect.c -o $@
+
+$(BUILD)/test_shell: tests/test_shell.c tests/test.h core/shellrun.c core/shellrun.h
+	mkdir -p $(BUILD)
+	$(CC) -std=gnu89 -Wall -Wextra -Wno-unused-parameter -O2 -g -Icore tests/test_shell.c core/shellrun.c -o $@
 
 $(BUILD)/test_brace: tests/test_brace.c tests/test.h core/brace.c core/brace.h
 	mkdir -p $(BUILD)
@@ -49,7 +59,7 @@ hk-smoke:
 
 doc-smoke:
 	mkdir -p $(BUILD)
-	for f in tests/doc_smoke.m app/EditorDoc.m app/UIHelpers.m app/LineNumberView.m hk/*.m; do \
+	for f in tests/doc_smoke.m app/EditorDoc.m app/UIHelpers.m app/LineNumberView.m app/ShellController.m hk/*.m; do \
 	  $(CC) -c $(OBJCFLAGS) -fsanitize=address,undefined $$f -o $(BUILD)/dc_$$(basename $$f .m).o || exit 1; \
 	done
 	for f in core/*.c; do $(CC) -c -w -g -Icore -fsanitize=address,undefined $$f -o $(BUILD)/dc_c_$$(basename $$f .c).o || exit 1; done

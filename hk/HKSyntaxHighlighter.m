@@ -162,10 +162,6 @@ LocateString(NSString * str,
  */
 - (void) fixUpContextsInRange: (NSRange) r
 {
-  HKTextPattern ** beginnings = [syntax contextBeginnings];
-  const char * beginningChars = [syntax contextBeginningCharacters];
-  unsigned numBeginningChars = [syntax numberOfContextBeginningCharacters];
-
   unsigned int i;
   unichar * string;
   unsigned int context;
@@ -177,59 +173,34 @@ LocateString(NSString * str,
   context = [self contextBeforeRange: r];
   while (i < r.length)
     {
-       /* marks the beginning of the currently processed range */
+      /* marks the beginning of the text in the current context */
       unsigned int mark = i;
+      HKTextPattern ** skips = [syntax contextSkipsForContext: context];
+      const char * skipChars = [syntax contextSkipCharactersForContext: context];
+      unsigned int numSkipChars = [syntax
+        numberOfContextSkipCharactersForContext: context];
+      HKTextPattern ** children = [syntax childBeginningsForContext: context];
+      const int * childIds = [syntax childContextsForContext: context];
+      const char * childChars = [syntax childBeginningCharactersForContext: context];
+      int l = 0;
+      int endsContext = -1;     /* the context whose ending was found; -1: a child begins */
+      int childFound = 0;
+      NSRange ctxtRange;
 
-      /* default context - look for beginning symbols */
-      if (context == 0)
+      for (; i < r.length; i++)
         {
-          unsigned int j = 0;
-          HKTextPattern * pattern = NULL;
-          NSRange ctxtRange;
-          int l = 0;
-          HKTextPattern ** skips = [syntax contextSkipsForContext: 0];
-          const char * skipChars = [syntax contextSkipCharactersForContext: 0];
-          unsigned int numSkipChars = [syntax
-            numberOfContextSkipCharactersForContext: 0];
+          unichar c = string[i];
+          unsigned int j;
+          HKTextPattern * pattern;
+          int anc;
 
-          for (;i < r.length; i++)
+          /* the patterns that must not end (or begin) anything */
+          if (c < numSkipChars && skipChars[c])
             {
-              unichar c = string[i];
-
-              /* Optimize - look into the skip characters array if the */
-              /* character could be the beginning of a skip sequence. */
-              /* If not, don't perform skip sequence recognition at all. */
-              if (c < numSkipChars && skipChars[c])
-                {
-                  for (j = 0; (pattern = skips[j]) != NULL; j++)
-                    {
-                      l = HKCheckTextPatternPresenceInString (pattern,
-                                                              string,
-                                                              r.length,
-                                                              i);
-                      if (l > 0)
-                        {
-                          break;
-                        }
-                    }
-
-                  if (l > 0)
-                    {
-                      i += l - 1;
-                      continue;
-                    }
-                }
-
-              /* optimize - skip unneeded characters */
-              if (c < numBeginningChars && !beginningChars[c])
-                {
-                  continue;
-                }
-
-              for (j = 0; (pattern = beginnings[j]) != NULL; j++)
+              for (j = 0; (pattern = skips[j]) != NULL; j++)
                 {
                   l = HKCheckTextPatternPresenceInString(pattern, string,
-                                                       r.length, i);
+                                                         r.length, i);
                   if (l > 0)
                     {
                       break;
@@ -238,109 +209,85 @@ LocateString(NSString * str,
 
               if (l > 0)
                 {
-                  break;
+                  i += l - 1;
+                  l = 0;
+                  continue;
                 }
             }
 
-          /* non-default contexts begin with number 1, not zero */
-          j++;
-
-          ctxtRange = NSMakeRange(r.location + mark, i - mark);
-          if (ctxtRange.length > 0)
+          /* the ending of this context, or of one around it (which also */
+          /* closes everything nested in between) */
+          for (anc = (int) context; anc > 0; anc = [syntax parentOfContext: anc])
             {
-              /* add an attribute telling the context into the text storage */
-              [textStorage addAttribute: ContextAttributeName
-                                  value: [NSNumber numberWithInt: 0]
-                                  range: ctxtRange];
-              [self assignGraphicalAttributesOfContext: 0 toRange: ctxtRange];
-            }
-
-          ctxtRange = NSMakeRange(r.location + i, l);
-          if (ctxtRange.length > 0)
-            {
-              [textStorage addAttribute: ContextAttributeName
-                                  value: [NSNumber numberWithInt: j]
-                                  range: ctxtRange];
-              [self assignGraphicalAttributesOfContext: j
-                                               toRange: ctxtRange];
-            }
-          i += l;
-
-          /* switch to the found context again */
-          context = j;
-        }
-      /* specific context - look for it's terminator, but skip it's */
-      /* exceptions */
-      else
-        {
-          int l = 0;
-          HKTextPattern * ending = [syntax contextEndingForContext: context - 1];
-          NSRange ctxtRange;
-          HKTextPattern ** skips = [syntax contextSkipsForContext: context];
-          const char * skipChars = [syntax contextSkipCharactersForContext:
-            context];
-          unsigned int numSkipChars = [syntax
-            numberOfContextSkipCharactersForContext: context];
-
-          for (;i < r.length; i++)
-            {
-              unichar c = string[i];
-
-              if (c < numSkipChars && skipChars[c])
-                {
-                  unsigned int j;
-                  HKTextPattern * pattern;
-
-                  for (j = 0; (pattern = skips[j]) != NULL; j++)
-                    {
-                      l = HKCheckTextPatternPresenceInString(pattern, string,
-                                                           r.length, i);
-                      if (l > 0)
-                        {
-                          break;
-                        }
-                    }
-
-                  if (l > 0)
-                    {
-                      i += l - 1;
-                      continue;
-                    }
-                }
-
-              l = HKCheckTextPatternPresenceInString(ending, string,
-                                                   r.length, i);
+              l = HKCheckTextPatternPresenceInString([syntax contextEndingForContext: anc - 1],
+                                                     string, r.length, i);
               if (l > 0)
                 {
+                  endsContext = anc;
                   break;
                 }
             }
-
-          ctxtRange = NSMakeRange(r.location + mark, i - mark);
-          if (ctxtRange.length > 0)
+          if (endsContext >= 0)
             {
-              /* add an attribute telling the context into the */
-              /* text storage */
-              [textStorage addAttribute: ContextAttributeName
-                                  value: [NSNumber numberWithInt: context]
-                                  range: ctxtRange];
-              [self assignGraphicalAttributesOfContext: context
-                                               toRange: ctxtRange];
+              break;
             }
 
+          /* a context beginning inside this one */
+          if (c < 128 && !childChars[c])
+            {
+              continue;
+            }
+          for (j = 0; (pattern = children[j]) != NULL; j++)
+            {
+              l = HKCheckTextPatternPresenceInString(pattern, string,
+                                                     r.length, i);
+              if (l > 0)
+                {
+                  childFound = childIds[j];
+                  break;
+                }
+            }
+          if (childFound)
+            {
+              break;
+            }
+        }
+
+      /* the text up to the beginning or ending symbol */
+      ctxtRange = NSMakeRange(r.location + mark, i - mark);
+      if (ctxtRange.length > 0)
+        {
+          [textStorage addAttribute: ContextAttributeName
+                              value: [NSNumber numberWithInt: context]
+                              range: ctxtRange];
+          [self assignGraphicalAttributesOfContext: context toRange: ctxtRange];
+        }
+
+      if (childFound)
+        {
+          /* the symbol belongs to the context it opens */
           ctxtRange = NSMakeRange(r.location + i, l);
-          if (ctxtRange.length > 0)
-            {
-              [textStorage addAttribute: ContextAttributeName
-                                  value: [NSNumber numberWithInt: 0]
-                                  range: ctxtRange];
-              [self assignGraphicalAttributesOfContext: context
-                                               toRange: ctxtRange];
-            }
+          [textStorage addAttribute: ContextAttributeName
+                              value: [NSNumber numberWithInt: childFound]
+                              range: ctxtRange];
+          [self assignGraphicalAttributesOfContext: childFound
+                                           toRange: ctxtRange];
           i += l;
-
-          /* switch to the default context again */
-          context = 0;
+          context = childFound;
+        }
+      else if (endsContext >= 0)
+        {
+          /* the symbol is coloured as the context it closes, but what follows */
+          /* it belongs to that context's parent */
+          ctxtRange = NSMakeRange(r.location + i, l);
+          [textStorage addAttribute: ContextAttributeName
+                              value: [NSNumber numberWithInt:
+                                       [syntax parentOfContext: endsContext]]
+                              range: ctxtRange];
+          [self assignGraphicalAttributesOfContext: endsContext
+                                           toRange: ctxtRange];
+          i += l;
+          context = [syntax parentOfContext: endsContext];
         }
     }
 

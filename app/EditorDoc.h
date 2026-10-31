@@ -10,9 +10,22 @@
 {
     HKSyntaxHighlighter *highlighter;      /* not retained: the document owns it */
     id                   editor;           /* the EditorDoc, not retained: asked about Return, Tab and typing a brace */
+    BOOL                 rectOn;           /* a rectangular selection (Option-drag) is showing */
+    BOOL                 rectBusy;         /* the rectangle itself is moving the insertion point: do not take that for a click */
+    unsigned int         rectAnchorLine;   /* the start of the line, and the column, where the drag began ... */
+    unsigned int         rectAnchorCol;
+    unsigned int         rectCurLine;      /* ... and where it is now */
+    unsigned int         rectCurCol;
 }
 - (void)setHighlighter:(HKSyntaxHighlighter *)h;
 - (void)setEditor:(id)anEditor;
+- (BOOL)rectActive;
+- (void)rectClear;
+- (void)rectSelectionMoved;                /* the selection changed: forget the rectangle unless it caused it */
+/* The rectangle: the whole lines it covers (without the final newline) and the columns [*c0, *c1).  NO if there is none. */
+- (BOOL)rectLines:(NSRange *)lines columns:(unsigned int *)c0 :(unsigned int *)c1;
+/* Shows a rectangle over the lines of `region` (a range of whole lines) and puts the insertion point at its top. */
+- (void)rectShowLines:(NSRange)region columns:(unsigned int)c0 :(unsigned int)c1;
 @end
 
 /* One open file: a window, its text, the file it came from, and its language mode. */
@@ -73,5 +86,13 @@
 - (BOOL)newlineWithIndent;                 /* YES if it inserted the new line itself */
 - (void)willInsertText:(NSString *)str;    /* a typed '}' takes its line back a level first */
 - (BOOL)tabInsertedSpaces;                 /* YES if it inserted spaces for a Tab itself */
+- (void)fillWithWidth:(int)width;          /* re-flow the selected lines, or the paragraph with the insertion point */
+- (BOOL)rectActive;                        /* a rectangular selection is showing */
+- (BOOL)rectCopyAndCut:(BOOL)cut;          /* the rectangle to the pasteboard (and out of the text, with cut) */
+- (void)rectType:(NSString *)str;          /* typed text goes into every line of the rectangle */
+- (void)rectDeleteBackward:(BOOL)backward; /* the rectangle's text, or the column before/after a zero-width one */
+- (BOOL)rectPaste;                         /* the pasteboard as a block at the rectangle or the insertion point; NO if it is not */
+- (BOOL)pasteIsRectangle;                  /* the pasteboard holds what Copy last took from a rectangle */
+- (NSString *)workingDirectory;            /* the file's folder, or the home folder */
 - (void)showWindow;
 @end

@@ -315,6 +315,26 @@ static NSString *explicitSyntaxDirectory = nil;
               return nil;
             }
 
+          /* the enclosing context */
+          contextParents = realloc(contextParents, (i + 1) * sizeof(int));
+          contextParents[i] = -1;
+          if (i > 0)
+            {
+              id parentValue = [context objectForKey: @"Parent"];
+              int parent = 0;
+
+              if (parentValue != nil)
+                {
+                  parent = [parentValue intValue];
+                }
+              if (parent < 0 || parent >= (int) i)
+                {
+                  NSLog(@"Syntax compilation: context %u has a bad Parent; using the default context.", i);
+                  parent = 0;
+                }
+              contextParents[i] = parent;
+            }
+
           /* process context beginnings/endings */
           if (i > 0)
             {
@@ -418,6 +438,39 @@ static NSString *explicitSyntaxDirectory = nil;
       contextSkipChars = realloc(contextSkipChars, (i + 1) * sizeof(char *));
       contextSkipChars[i] = NULL;
 
+      /* the contexts that may begin inside each context */
+      numContexts = i;
+      childBeginnings = calloc(i, sizeof(HKTextPattern **));
+      childContexts = calloc(i, sizeof(int *));
+      childChars = calloc(i, sizeof(char *));
+      {
+        unsigned int c, k, count;
+
+        for (c = 0; c < i; c++)
+          {
+            for (count = 0, k = 1; k < i; k++)
+              {
+                if (contextParents[k] == (int) c)
+                  {
+                    count++;
+                  }
+              }
+            childBeginnings[c] = calloc(count + 1, sizeof(HKTextPattern *));
+            childContexts[c] = calloc(count + 1, sizeof(int));
+            childChars[c] = calloc(128, sizeof(char));
+            for (count = 0, k = 1; k < i; k++)
+              {
+                if (contextParents[k] == (int) c)
+                  {
+                    childBeginnings[c][count] = contextBeginnings[k - 1];
+                    childContexts[c][count] = (int) k;
+                    MarkTextPatternBeginningCharacters(contextBeginnings[k - 1], childChars[c], 128);
+                    count++;
+                  }
+              }
+          }
+      }
+
       ASSIGNCOPY (contextGraphics, contextGraphicsTmp);
       ASSIGNCOPY (keywordGraphics, keywordGraphicsTmp);
 
@@ -484,6 +537,18 @@ static NSString *explicitSyntaxDirectory = nil;
     }
   free (keywords);
 
+  /* free the nesting tables (the patterns belong to contextBeginnings) */
+  for (i = 0; i < numContexts; i++)
+    {
+      free (childBeginnings[i]);
+      free (childContexts[i]);
+      free (childChars[i]);
+    }
+  free (childBeginnings);
+  free (childContexts);
+  free (childChars);
+  free (contextParents);
+
   TEST_RELEASE (contextGraphics);
   TEST_RELEASE (keywordGraphics);
 
@@ -513,6 +578,26 @@ static NSString *explicitSyntaxDirectory = nil;
 - (unsigned int) numberOfContextBeginningCharacters
 {
   return sizeof(contextBeginningChars);
+}
+
+- (int) parentOfContext: (unsigned int) ctxt
+{
+  return ctxt < numContexts ? contextParents[ctxt] : -1;
+}
+
+- (HKTextPattern **) childBeginningsForContext: (unsigned int) ctxt
+{
+  return childBeginnings[ctxt];
+}
+
+- (const int *) childContextsForContext: (unsigned int) ctxt
+{
+  return childContexts[ctxt];
+}
+
+- (const char *) childBeginningCharactersForContext: (unsigned int) ctxt
+{
+  return childChars[ctxt];
 }
 
 /**

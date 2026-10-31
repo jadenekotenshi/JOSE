@@ -6,6 +6,8 @@
 #include "eol.h"
 #include "edit.h"
 #include "brace.h"
+#include "fill.h"
+#include "rect.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -27,6 +29,7 @@
 
 - (void)insertNewline:(id)sender
 {
+    if (rectOn) [self rectClear];
     if (![(EditorDoc *)editor newlineWithIndent]) [super insertNewline:sender];
 }
 
@@ -37,8 +40,184 @@
 
 - (void)insertText:(id)str
 {
+    if (rectOn && [str isKindOfClass:[NSString class]]) { [(EditorDoc *)editor rectType:str]; return; }
     if ([str isKindOfClass:[NSString class]]) [(EditorDoc *)editor willInsertText:str];
     [super insertText:str];
+}
+
+/* ---- rectangular selection: Option-drag; everything is done in columns of a fixed-pitch font ---- */
+
+- (BOOL)rectActive { return rectOn; }
+
+- (void)rectClear
+{
+    if (rectOn) {
+        rectOn = NO;
+        [self setNeedsDisplay:YES];
+    }
+}
+
+- (void)rectSelectionMoved
+{
+    if (rectOn && !rectBusy) [self rectClear];
+}
+
+- (float)rectCharWidth
+{
+    float w = [[self font] widthOfString:@"0"];
+
+    return w >= 1.0 ? w : 7.0;
+}
+
+- (float)rectLeft
+{
+    return [self textContainerOrigin].x + [[self textContainer] lineFragmentPadding];
+}
+
+/* The line (its first character) and the column at a point of this view. */
+- (void)rectPoint:(NSPoint)p line:(unsigned int *)ls column:(unsigned int *)col
+{
+    NSString *s = [self string];
+    NSLayoutManager *lm = [self layoutManager];
+    NSPoint o = [self textContainerOrigin];
+    NSRange g;
+    unsigned int ci, n = [s length];
+    float c;
+
+    g = [lm glyphRangeForBoundingRect:NSMakeRect(0.0, p.y - o.y, 1.0, 1.0) inTextContainer:[self textContainer]];
+    if (g.length == 0 || ![lm respondsToSelector:@selector(characterIndexForGlyphAtIndex:)]) ci = p.y - o.y < 0.0 ? 0 : n;
+    else ci = [lm characterIndexForGlyphAtIndex:g.location];
+    if (ci > n) ci = n;
+    *ls = [s lineRangeForRange:NSMakeRange(ci, 0)].location;
+    c = (p.x - [self rectLeft]) / [self rectCharWidth] + 0.5;
+    *col = c < 0.0 ? 0 : (unsigned int)c;
+}
+
+- (void)mouseDown:(NSEvent *)event
+{
+    if (([event modifierFlags] & NSAlternateKeyMask) == 0) {
+        [self rectClear];
+        [super mouseDown:event];
+        return;
+    }
+    {
+        NSPoint p = [self convertPoint:[event locationInWindow] fromView:nil];
+        unsigned int ls, col;
+
+        rectBusy = YES;
+        [self rectPoint:p line:&ls column:&col];
+        rectAnchorLine = rectCurLine = ls;
+        rectAnchorCol = rectCurCol = col;
+        rectOn = YES;
+        [self setSelectedRange:NSMakeRange(ls, 0)];
+        for (;;) {
+            NSEvent *e = [[self window] nextEventMatchingMask:(NSLeftMouseDraggedMask | NSLeftMouseUpMask)];
+
+            if ([e type] == NSLeftMouseUp) break;
+            [self autoscroll:e];
+            p = [self convertPoint:[e locationInWindow] fromView:nil];
+            [self rectPoint:p line:&rectCurLine column:&rectCurCol];
+            [self setNeedsDisplay:YES];
+        }
+        [self setNeedsDisplay:YES];
+        rectBusy = NO;
+    }
+}
+
+- (BOOL)rectLines:(NSRange *)lines columns:(unsigned int *)c0 :(unsigned int *)c1
+{
+    NSString *s = [self string];
+    unsigned int a = rectAnchorLine < rectCurLine ? rectAnchorLine : rectCurLine;
+    unsigned int b = rectAnchorLine < rectCurLine ? rectCurLine : rectAnchorLine;
+    NSRange last;
+
+    if (!rectOn || b > [s length]) return NO;
+    last = [s lineRangeForRange:NSMakeRange(b, 0)];
+    if (last.length > 0 && [s characterAtIndex:NSMaxRange(last) - 1] == '\n') last.length--;
+    *lines = NSMakeRange(a, NSMaxRange(last) - a);
+    *c0 = rectAnchorCol < rectCurCol ? rectAnchorCol : rectCurCol;
+    *c1 = rectAnchorCol < rectCurCol ? rectCurCol : rectAnchorCol;
+    return YES;
+}
+
+- (void)rectShowLines:(NSRange)region columns:(unsigned int)c0 :(unsigned int)c1
+{
+    NSString *s = [self string];
+    unsigned int end = NSMaxRange(region);
+
+    if (end > [s length]) end = [s length];
+    rectAnchorLine = region.location;
+    rectCurLine = [s lineRangeForRange:NSMakeRange(end, 0)].location;
+    rectAnchorCol = c0;
+    rectCurCol = c1;
+    rectOn = YES;
+    rectBusy = YES;
+    [self setSelectedRange:NSMakeRange(region.location, 0)];
+    rectBusy = NO;
+    [self setNeedsDisplay:YES];
+}
+
+- (void)copy:(id)sender
+{
+    if (rectOn) [(EditorDoc *)editor rectCopyAndCut:NO]; else [super copy:sender];
+}
+
+- (void)cut:(id)sender
+{
+    if (rectOn) [(EditorDoc *)editor rectCopyAndCut:YES]; else [super cut:sender];
+}
+
+- (void)delete:(id)sender
+{
+    if (rectOn) [(EditorDoc *)editor rectDeleteBackward:NO]; else [super delete:sender];
+}
+
+- (void)deleteBackward:(id)sender
+{
+    if (rectOn) [(EditorDoc *)editor rectDeleteBackward:YES]; else [super deleteBackward:sender];
+}
+
+- (void)deleteForward:(id)sender
+{
+    if (rectOn) [(EditorDoc *)editor rectDeleteBackward:NO]; else [super deleteForward:sender];
+}
+
+- (void)paste:(id)sender
+{
+    if ((rectOn || [(EditorDoc *)editor pasteIsRectangle]) && [(EditorDoc *)editor rectPaste]) return;
+    [super paste:sender];
+}
+
+/* The rectangle, drawn over the text as a highlight. */
+- (void)drawRectangle:(NSRect)frame
+{
+    NSLayoutManager *lm = [self layoutManager];
+    NSString *s = [self string];
+    NSRange lines, glyphs;
+    unsigned int c0, c1, g;
+    NSPoint o = [self textContainerOrigin];
+    float cw = [self rectCharWidth], left = [self rectLeft];
+
+    if (![self rectLines:&lines columns:&c0 :&c1]) return;
+    if (![lm respondsToSelector:@selector(lineFragmentRectForGlyphAtIndex:effectiveRange:)] ||
+        ![lm respondsToSelector:@selector(characterIndexForGlyphAtIndex:)]) return;
+    glyphs = [lm glyphRangeForBoundingRect:NSMakeRect(frame.origin.x - o.x, frame.origin.y - o.y, frame.size.width, frame.size.height)
+                           inTextContainer:[self textContainer]];
+    g = glyphs.location;
+    while (g < NSMaxRange(glyphs)) {
+        NSRange eff;
+        NSRect fr = [lm lineFragmentRectForGlyphAtIndex:g effectiveRange:&eff];
+        unsigned int ch = [lm characterIndexForGlyphAtIndex:eff.location];
+
+        if (ch >= lines.location && ch <= NSMaxRange(lines) && (ch == 0 || [s characterAtIndex:ch - 1] == '\n')) {
+            NSRect r = NSMakeRect(left + c0 * cw, fr.origin.y + o.y, (c1 - c0) * cw, fr.size.height);
+
+            if (c1 == c0) { r.size.width = 1.0; [[NSColor blackColor] set]; NSRectFill(r); }
+            else NSHighlightRect(r);
+        }
+        if (eff.length == 0) break;
+        g = NSMaxRange(eff);
+    }
 }
 
 /* Colour what is about to be drawn (and only that: a big file is never coloured as a whole). */
@@ -55,6 +234,7 @@
         SSTrace("draw: highlighted");
     }
     [super drawRect:frame];
+    if (rectOn) [self drawRectangle:frame];
 }
 
 @end
@@ -271,6 +451,7 @@ static void line_col(NSString *s, unsigned int loc, unsigned int *line, unsigned
 
 - (void)textDidChange:(NSNotification *)notification
 {
+    [textView rectClear];
     [self markEdited];
     [self updateStatus];
 }
@@ -281,6 +462,7 @@ static void line_col(NSString *s, unsigned int loc, unsigned int *line, unsigned
     NSRange sel = [textView selectedRange];
 
     if (sel.length > 0 || sel.location != expectedCaret) undo_break(undo);
+    [textView rectSelectionMoved];
     [self updateStatus];
 }
 
@@ -710,6 +892,190 @@ static void line_col(NSString *s, unsigned int loc, unsigned int *line, unsigned
     [textView scrollRangeToVisible:sel];
     [self markEdited];
     [self updateStatus];
+}
+
+/* ---- fill paragraph ---- */
+
+- (void)fillWithWidth:(int)width
+{
+    NSString *s = [textView string];
+    NSRange sel = [textView selectedRange], region;
+    u16 *text, *out = NULL;
+    unsigned int n = [s length], outlen = 0, ps, pe;
+    NSString *str;
+    BOOL changed;
+
+    if (n == 0) { NSBeep(); return; }
+    text = (u16 *)malloc(n * sizeof(u16));
+    if (text == NULL) return;
+    [s getCharacters:text];
+    if (sel.length > 0) {
+        region = [self selectedLines:sel];
+    } else if (fill_find_paragraph(text, n, sel.location, &ps, &pe)) {
+        region = NSMakeRange(ps, pe - ps);
+    } else {
+        free(text);
+        NSBeep();
+        return;
+    }
+    changed = fill_text(text + region.location, region.length, (unsigned int)width, &out, &outlen) != 0;
+    free(text);
+    if (!changed) { NSBeep(); return; }
+    str = [NSString stringWithCharacters:out length:outlen];
+    free(out);
+    [self replaceRange:region with:str
+                select:sel.length > 0 ? NSMakeRange(region.location, outlen) : NSMakeRange(region.location + outlen, 0)];
+}
+
+/* ---- rectangular selection ---- */
+
+static NSString *rect_clip;                 /* what Copy last took from a rectangle: pasting it again puts back a rectangle */
+
+- (BOOL)rectActive { return [textView rectActive]; }
+
+- (NSString *)pasteboardString
+{
+    NSPasteboard *pb = [NSPasteboard generalPasteboard];
+
+    if ([[pb types] indexOfObject:NSStringPboardType] == NSNotFound) return nil;
+    return [pb stringForType:NSStringPboardType];
+}
+
+- (BOOL)pasteIsRectangle
+{
+    NSString *clip = [self pasteboardString];
+
+    return rect_clip != nil && clip != nil && [clip isEqualToString:rect_clip];
+}
+
+/* The text of the lines the rectangle covers (malloc'd; the caller frees it), its range, and its columns. */
+- (u16 *)rectText:(NSRange *)lines columns:(unsigned int *)c0 :(unsigned int *)c1
+{
+    u16 *t;
+
+    if (![textView rectLines:lines columns:c0 :c1]) return NULL;
+    t = (u16 *)malloc((lines->length + 1) * sizeof(u16));
+    if (t == NULL) return NULL;
+    if (lines->length > 0) [[textView string] getCharacters:t range:*lines];
+    return t;
+}
+
+/* Replaces what the rectangle covers by `ins` (on every line, or line by line), as one edit, and shows the rectangle again
+ * with the columns given. */
+- (void)rectReplaceInLines:(NSRange)lines text:(u16 *)t columns:(unsigned int)c0 :(unsigned int)c1
+                    insert:(NSString *)ins perLine:(BOOL)perLine result:(unsigned int)r0 :(unsigned int)r1
+{
+    unsigned int nins = [ins length], outlen = 0;
+    u16 *iu = (u16 *)malloc((nins + 1) * sizeof(u16)), *out = NULL;
+    NSString *str;
+
+    if (iu == NULL) return;
+    if (nins > 0) [ins getCharacters:iu];
+    if (!rect_replace(t, lines.length, c0, c1, iu, nins, perLine, &out, &outlen)) { free(iu); return; }
+    free(iu);
+    str = [NSString stringWithCharacters:out length:outlen];
+    free(out);
+    [self replaceRange:lines with:str select:NSMakeRange(lines.location, 0)];
+    [textView rectShowLines:NSMakeRange(lines.location, outlen) columns:r0 :r1];
+}
+
+- (BOOL)rectCopyAndCut:(BOOL)cut
+{
+    NSRange lines;
+    unsigned int c0, c1, outlen = 0;
+    u16 *t = [self rectText:&lines columns:&c0 :&c1], *out = NULL;
+    NSString *str;
+    NSPasteboard *pb;
+
+    if (t == NULL) return NO;
+    if (!rect_extract(t, lines.length, c0, c1, &out, &outlen)) { free(t); return NO; }
+    str = [NSString stringWithCharacters:out length:outlen];
+    free(out);
+    pb = [NSPasteboard generalPasteboard];
+    [pb declareTypes:[NSArray arrayWithObject:NSStringPboardType] owner:nil];
+    [pb setString:str forType:NSStringPboardType];
+    [rect_clip release];
+    rect_clip = [str copy];
+    if (cut) [self rectReplaceInLines:lines text:t columns:c0 :c1 insert:@"" perLine:NO result:c0 :c0];
+    free(t);
+    return YES;
+}
+
+- (void)rectType:(NSString *)str
+{
+    NSRange lines;
+    unsigned int c0, c1, i, col;
+    u16 *t = [self rectText:&lines columns:&c0 :&c1];
+
+    if (t == NULL) return;
+    if ([str rangeOfString:@"\n"].length > 0 || [str rangeOfString:@"\r"].length > 0) { free(t); [textView rectClear]; return; }
+    col = c0;
+    for (i = 0; i < [str length]; i++) col = [str characterAtIndex:i] == '\t' ? (col / 8 + 1) * 8 : col + 1;
+    [self rectReplaceInLines:lines text:t columns:c0 :c1 insert:str perLine:NO result:col :col];
+    free(t);
+}
+
+- (void)rectDeleteBackward:(BOOL)backward
+{
+    NSRange lines;
+    unsigned int c0, c1;
+    u16 *t = [self rectText:&lines columns:&c0 :&c1];
+
+    if (t == NULL) return;
+    if (c0 == c1) {                                             /* no width: the column before (Backspace) or after (Delete) */
+        if (backward && c0 == 0) { free(t); NSBeep(); return; }
+        if (backward) c0--; else c1++;
+        [self rectReplaceInLines:lines text:t columns:c0 :c1 insert:@"" perLine:NO result:c0 :c0];
+    } else {
+        [self rectReplaceInLines:lines text:t columns:c0 :c1 insert:@"" perLine:NO result:c0 :c0];
+    }
+    free(t);
+}
+
+- (BOOL)rectPaste
+{
+    NSString *clip = [self pasteboardString];
+    NSString *s = [textView string];
+    NSRange lines;
+    unsigned int c0, c1, nl = 1, i, width = 0, run = 0, k;
+    u16 *t;
+
+    if (clip == nil || [clip length] == 0) return NO;
+    if ([clip characterAtIndex:[clip length] - 1] == '\n') clip = [clip substringToIndex:[clip length] - 1];
+    for (i = 0; i < [clip length]; i++) {
+        if ([clip characterAtIndex:i] == '\n') { nl++; run = 0; }
+        else if (++run > width) width = run;
+    }
+    if ([textView rectLines:&lines columns:&c0 :&c1]) {
+        /* it goes where the rectangle is, in place of what that covers */
+    } else {
+        NSRange sel = [textView selectedRange];
+        NSRange lr = [s lineRangeForRange:NSMakeRange(sel.location, 0)];
+        unsigned int end;
+
+        c0 = c1 = 0;
+        for (i = lr.location; i < sel.location; i++) c0 = [s characterAtIndex:i] == '\t' ? (c0 / 8 + 1) * 8 : c0 + 1;
+        c1 = c0;
+        end = lr.location;
+        for (k = 0; k < nl; k++) {                              /* as many lines as the block has, if the text has that many */
+            NSRange l = [s lineRangeForRange:NSMakeRange(end, 0)];
+            end = NSMaxRange(l);
+            if (end >= [s length]) break;
+        }
+        if (end > lr.location && [s characterAtIndex:end - 1] == '\n') end--;
+        lines = NSMakeRange(lr.location, end - lr.location);
+    }
+    t = (u16 *)malloc((lines.length + 1) * sizeof(u16));
+    if (t == NULL) return NO;
+    if (lines.length > 0) [s getCharacters:t range:lines];
+    [self rectReplaceInLines:lines text:t columns:c0 :c1 insert:clip perLine:YES result:c0 :c0 + width];
+    free(t);
+    return YES;
+}
+
+- (NSString *)workingDirectory
+{
+    return path != nil ? [path stringByDeletingLastPathComponent] : NSHomeDirectory();
 }
 
 - (void)goToLine:(int)line

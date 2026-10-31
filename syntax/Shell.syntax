@@ -229,6 +229,21 @@
       Ending = "\n";
       ForegroundColor = "0 0.5 0";
       Italic = YES;
+    },
+
+    /* nested in a double-quoted string: ${variable} and $(command) */
+    {
+      Parent = 1;
+      Beginning = "\\$\\{";
+      Ending = "\\}";
+      ForegroundColor = "0.1 0.3 0.8";
+      Bold = YES;
+    },
+    {
+      Parent = 1;
+      Beginning = "\\$\\(";
+      Ending = "\\)";
+      ForegroundColor = "0.1 0.3 0.8";
     }
   );
 }

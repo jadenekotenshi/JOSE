@@ -1,6 +1,7 @@
 #import "AppController.h"
 #import "EditorDoc.h"
 #import "FindController.h"
+#import "ShellController.h"
 #import "UIHelpers.h"
 #import "HKSyntaxDefinition.h"
 
@@ -57,6 +58,9 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
     if (prefIndentWidth < 1 || prefIndentWidth > 16) prefIndentWidth = 4;
     prefWrap = pref_bool(ud, @"WrapLines", NO);
     prefLineNumbers = pref_bool(ud, @"LineNumbers", NO);
+    w = [ud stringForKey:@"FillWidth"];
+    prefFillWidth = w != nil ? [w intValue] : 72;
+    if (prefFillWidth < 20 || prefFillWidth > 200) prefFillWidth = 72;
 }
 
 - (void)savePreferences
@@ -68,6 +72,7 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
     [ud setObject:[NSString stringWithFormat:@"%d", prefIndentWidth] forKey:@"IndentWidth"];
     set_pref_bool(ud, @"WrapLines", prefWrap);
     set_pref_bool(ud, @"LineNumbers", prefLineNumbers);
+    [ud setObject:[NSString stringWithFormat:@"%d", prefFillWidth] forKey:@"FillWidth"];
     [ud synchronize];
 }
 
@@ -156,6 +161,7 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
     [self addItem:@"Shift Right" action:@selector(shiftRight:) key:@"]" target:self toMenu:m];
     [self addItem:@"Comment" action:@selector(commentLines:) key:@"/" target:self toMenu:m];
     [self addItem:@"Uncomment" action:@selector(uncommentLines:) key:@"\\" target:self toMenu:m];
+    [self addItem:@"Fill Paragraph" action:@selector(fillParagraph:) key:@"j" target:self toMenu:m];
 
     m = [self submenuNamed:@"Search" inMenu:main];
     [self addItem:@"Find..." action:@selector(showFind:) key:@"f" target:self toMenu:m];
@@ -181,6 +187,15 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
             [[self addItem:t action:@selector(setIndentWidth:) key:@"" target:self toMenu:wm] setTag:widths[wi]];
         }
     }
+    {
+        NSMenu *fm = [self submenuNamed:@"Fill Width" inMenu:m];
+        static const int fills[] = { 60, 66, 72, 76, 79, 100 };
+        int fi;
+        for (fi = 0; fi < 6; fi++) {
+            NSString *t = [NSString stringWithFormat:@"%d", fills[fi]];
+            [[self addItem:t action:@selector(setFillWidth:) key:@"" target:self toMenu:fm] setTag:fills[fi]];
+        }
+    }
     modeMenu = [self submenuNamed:@"Language Mode" inMenu:m];
     item = [self addItem:@"Plain Text" action:@selector(setMode:) key:@"" target:self toMenu:modeMenu];
     [item setTag:TAG_MODE_BASE - 1];
@@ -189,6 +204,11 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
         item = [self addItem:[names objectAtIndex:i] action:@selector(setMode:) key:@"" target:self toMenu:modeMenu];
         [item setTag:TAG_MODE_BASE + (int)i];
     }
+
+    m = [self submenuNamed:@"Shell" inMenu:main];
+    [self addItem:@"Filter Selection..." action:@selector(filterSelection:) key:@"|" target:self toMenu:m];
+    [self addItem:@"Execute Command..." action:@selector(executeCommand:) key:@"!" target:self toMenu:m];
+    [self addItem:@"Sort Lines" action:@selector(sortLines:) key:@"" target:self toMenu:m];
 
     m = [self submenuNamed:@"Windows" inMenu:main];
     [self addItem:@"Arrange in Front" action:@selector(arrangeInFront:) key:@"" target:nil toMenu:m];
@@ -231,8 +251,10 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
     if (a == @selector(saveDoc:) || a == @selector(saveDocAs:) || a == @selector(closeDoc:) || a == @selector(gotoLine:) || a == @selector(showFind:) || a == @selector(findAgain:)
         || a == @selector(findPrevious:) || a == @selector(findSelection:)
         || a == @selector(toggleWrap:) || a == @selector(setMode:)
-        || a == @selector(gotoBracket:) || a == @selector(selectBracket:) || a == @selector(shiftLeft:) || a == @selector(shiftRight:) || a == @selector(commentLines:) || a == @selector(uncommentLines:))
+        || a == @selector(gotoBracket:) || a == @selector(selectBracket:) || a == @selector(shiftLeft:) || a == @selector(shiftRight:) || a == @selector(commentLines:) || a == @selector(uncommentLines:)
+        || a == @selector(fillParagraph:) || a == @selector(filterSelection:) || a == @selector(executeCommand:) || a == @selector(sortLines:))
         if (d == nil) return NO;
+    if (a == @selector(setFillWidth:)) [item setState:tag == prefFillWidth ? NSOnState : NSOffState];
     if (a == @selector(toggleLineNumbers:)) [item setState:prefLineNumbers ? NSOnState : NSOffState];
     if (a == @selector(toggleAutoIndent:)) [item setState:prefAutoIndent ? NSOnState : NSOffState];
     if (a == @selector(toggleUseSpaces:)) [item setState:prefUseSpaces ? NSOnState : NSOffState];
@@ -379,6 +401,23 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
 {
     if (finder == nil) finder = [[FindController alloc] initWithOwner:self];
     return finder;
+}
+
+- (ShellController *)shellController
+{
+    if (shell == nil) shell = [[ShellController alloc] initWithOwner:self];
+    return shell;
+}
+
+- (void)filterSelection:(id)sender { [[self shellController] filterSelection]; }
+- (void)executeCommand:(id)sender { [[self shellController] executeCommand]; }
+- (void)sortLines:(id)sender { [[self shellController] sortLines]; }
+- (void)fillParagraph:(id)sender { [[self frontDocument] fillWithWidth:prefFillWidth]; }
+
+- (void)setFillWidth:(id)sender
+{
+    prefFillWidth = [sender tag];
+    [self savePreferences];
 }
 
 - (void)showFind:(id)sender { [[self finder] showPanel]; }
