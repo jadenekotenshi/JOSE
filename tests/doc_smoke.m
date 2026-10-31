@@ -3,6 +3,9 @@
 #import "LineNumberView.h"
 #import "ShellController.h"
 #import "Appearance.h"
+#import "FindController.h"
+#import "MacroController.h"
+#import "AppController.h"
 #import "HKSyntaxDefinition.h"
 #include <stdio.h>
 
@@ -11,7 +14,47 @@
 @end
 
 @interface ShellController (SmokeTest)
-- (void)filter:(NSString *)command in:(EditorDoc *)doc;
+- (BOOL)filter:(NSString *)command in:(EditorDoc *)doc;
+@end
+
+/* Stands in for the AppController: the macro recorder and the Find panel only ask it a few things. */
+@interface MacroOwner : NSObject
+{
+    EditorDoc *doc;
+    FindController *finder;
+    ShellController *shell;
+    MacroController *mc;
+}
+- (void)setDoc:(EditorDoc *)d;
+- (MacroController *)mc;
+@end
+
+@implementation MacroOwner
+- (void)setDoc:(EditorDoc *)d { doc = d; }
+- (id)init
+{
+    self = [super init];
+    finder = [[FindController alloc] initWithOwner:self];
+    shell = [[ShellController alloc] initWithOwner:self];
+    mc = [[MacroController alloc] initWithOwner:self];
+    return self;
+}
+- (MacroController *)mc { return mc; }
+- (EditorDoc *)frontDocument { return doc; }
+- (FindController *)finder { return finder; }
+- (ShellController *)shellController { return shell; }
+- (BOOL)macroRecording { return [mc recording]; }
+- (BOOL)macroReplaying { return [mc replaying]; }
+- (void)macroNoteInsert:(NSString *)t { [mc noteInsert:t]; }
+- (void)macroNoteAction:(NSString *)n { [mc noteAction:n]; }
+- (void)macroNoteFind:(NSString *)p flags:(NSString *)f { [mc noteFind:p flags:f]; }
+- (void)macroNoteReplace:(NSString *)v pattern:(NSString *)p replacement:(NSString *)r flags:(NSString *)f { [mc noteReplace:v pattern:p replacement:r flags:f]; }
+- (void)macroNoteFilter:(NSString *)v command:(NSString *)c { [mc noteFilter:v command:c]; }
+- (BOOL)macroCommand:(NSString *)name
+{
+    if ([name isEqualToString:@"shift-right"]) { [mc noteCommand:name]; [doc shiftSelection:1]; return YES; }
+    return NO;
+}
 @end
 
 static int failures = 0;
@@ -398,6 +441,70 @@ int main(void)
         [tv setSelectedRange:NSMakeRange([rb rangeOfString:@"class"].location + 1, 0)];
         [jd gotoMatchingBracket:NO];
         CHECK([tv selectedRange].location == [rb length] - 1);                  /* just after the last end */
+    }
+    {   /* macros: learn keys, typing and a search; replay them; save, hand-write and repeat */
+        MacroOwner *own = [[[MacroOwner alloc] init] autorelease];
+        EditorDoc *md = [[[EditorDoc alloc] initWithOwner:own] autorelease];
+        MacroController *mc;
+        EditTextView *tv;
+        NSString *base = @"foo(1)\nfoo(2)\nfoo(3)\n", *saved;
+        NSString *mdir = [dir stringByAppendingPathComponent:@"macros"];
+        [own setDoc:md];
+        mc = [own mc];
+        [mc setFolderPath:mdir];
+        tv = [md textView];
+        [tv setString:base];
+        [tv setSelectedRange:NSMakeRange(0, 0)];
+
+        [mc toggleLearning];
+        CHECK([mc recording]);
+        [tv moveRight:nil];
+        [tv insertText:@"A"];
+        [tv insertText:@"B"];                                                    /* typed one after the other: one insert */
+        [tv moveToEndOfLine:nil];
+        [[own finder] macroFind:@"foo" flags:@"fp"];
+        [mc toggleLearning];
+        CHECK(![mc recording] && [mc hasMacro]);
+        saved = [mc lastAsText];
+        CHECK([saved isEqualToString:@"action moveRight:\ninsert \"AB\"\naction moveToEndOfLine:\nfind fp \"foo\"\n"]);
+
+        [tv setString:base];
+        [tv setSelectedRange:NSMakeRange(0, 0)];
+        CHECK([mc replay]);
+        CHECK([[tv string] isEqualToString:@"fABoo(1)\nfoo(2)\nfoo(3)\n"]);
+        CHECK([tv selectedRange].location == [[tv string] rangeOfString:@"foo(2)"].location && [tv selectedRange].length == 3);
+        CHECK(![mc replaying]);
+
+        /* a macro that cannot finish stops: the search finds nothing */
+        CHECK((![mc runLines:[NSArray arrayWithObjects:@"insert \"X\"", @"find fp \"zzz\"", @"insert \"Y\"", nil]]));
+        CHECK([[tv string] rangeOfString:@"Y"].location == NSNotFound && [[tv string] rangeOfString:@"X"].location != NSNotFound);
+
+        /* hand-written: comments, a menu command, replace-all with a group, a filter */
+        [tv setString:base];
+        [tv setSelectedRange:NSMakeRange(0, 0)];
+        CHECK(([mc runLines:[NSArray arrayWithObjects:@"# a macro", @"", @"replace-all frp \"foo\\\\((\\\\d)\\\\)\" \"bar<\\\\1>\"", nil]]));
+        CHECK([[tv string] isEqualToString:@"bar<1>\nbar<2>\nbar<3>\n"]);
+        [tv setSelectedRange:NSMakeRange(0, 7)];
+        CHECK(([mc runLines:[NSArray arrayWithObjects:@"command shift-right", @"filter \"tr a-z A-Z\"", nil]]));
+        CHECK([[tv string] hasPrefix:@"\tBAR<1>\n"] || [[tv string] hasPrefix:@"    BAR<1>\n"]);
+        CHECK(![mc runLines:[NSArray arrayWithObject:@"action terminate:"]]);                    /* only text-view keys are allowed */
+        CHECK(![mc runLines:[NSArray arrayWithObject:@"command not-a-command"]]);
+
+        /* save, list, run */
+        CHECK([mc saveLastAs:@"first"]);
+        CHECK(![mc saveLastAs:@"../evil"] && ![mc saveLastAs:@".hidden"] && ![mc saveLastAs:@""]);
+        CHECK([[mc savedNames] isEqualToArray:[NSArray arrayWithObject:@"first"]]);
+        [tv setString:base];
+        [tv setSelectedRange:NSMakeRange(0, 0)];
+        CHECK([mc runSaved:@"first"]);
+        CHECK([[tv string] hasPrefix:@"fABoo(1)\n"]);
+
+        /* while learning, a replay is refused; replacements and filters are learned too */
+        [mc toggleLearning];
+        [[own finder] macroReplaceKind:1 pattern:@"o" replacement:@"0" flags:@"fp"];
+        [(ShellController *)[own shellController] macroFilter:@"cat"];
+        [mc toggleLearning];
+        CHECK([[mc lastAsText] isEqualToString:@"replace-all fp \"o\" \"0\"\nfilter \"cat\"\n"]);
     }
     {   /* Shell > Filter Selection: the selection goes through a command and comes back, as one undo step */
         EditorDoc *sd = [[[EditorDoc alloc] initWithOwner:nil] autorelease];

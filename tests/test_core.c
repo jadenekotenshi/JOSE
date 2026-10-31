@@ -34,6 +34,7 @@ int main(void)
     CHECK(str_eq(lang_mode_for("t", "#!/bin/zsh"), "Zsh") && str_eq(lang_mode_for("t", "#!/bin/sh"), "Shell"));
     CHECK(str_eq(lang_mode_for("Imakefile", NULL), "Imakefile") && str_eq(lang_mode_for("Motif.tmpl", NULL), "Imakefile"));
     CHECK(str_eq(lang_mode_for("BSDmakefile", NULL), "BSDMakefile") && str_eq(lang_mode_for("/usr/share/mk/bsd.prog.mk", NULL), "BSDMakefile"));
+    CHECK(str_eq(lang_mode_for("first", "# JOSE macro\n"), "JOSEMacro") && str_eq(lang_mode_for("a.jmacro", NULL), "JOSEMacro"));
     CHECK(str_eq(lang_mode_for("config.mk", NULL), "GNUmakefile") && lang_mode_for("bsd.mk", NULL) != NULL);
     CHECK(str_eq(lang_mode_for("tool", "#!/usr/bin/env python"), "Python"));
     CHECK(str_eq(lang_mode_for("Thing.mm", NULL), "ObjC++"));

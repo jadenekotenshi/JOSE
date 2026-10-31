@@ -4,6 +4,7 @@
 #import "ShellController.h"
 #import "PrefsController.h"
 #import "TagsController.h"
+#import "MacroController.h"
 #import "Appearance.h"
 #import "UIHelpers.h"
 #import "HKSyntaxDefinition.h"
@@ -15,6 +16,9 @@
 @interface AppController (Private)
 - (void)loadPreferences;
 - (void)savePreferences;
+- (MacroController *)macroController;
+- (void)macroNote:(NSString *)name;
+- (void)rebuildMacroMenus;
 - (void)loadRecent;
 - (void)saveRecent;
 - (void)rebuildRecentMenu;
@@ -313,6 +317,16 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
     [self addItem:@"Execute Command..." action:@selector(executeCommand:) key:@"!" target:self toMenu:m];
     [self addItem:@"Sort Lines" action:@selector(sortLines:) key:@"" target:self toMenu:m];
 
+    m = [self submenuNamed:@"Macro" inMenu:main];
+    [self addItem:@"Learn Macro" action:@selector(learnMacro:) key:@"L" target:self toMenu:m];
+    [self addItem:@"Replay Macro" action:@selector(replayMacro:) key:@"y" target:self toMenu:m];
+    [self addItem:@"Repeat Macro..." action:@selector(repeatMacro:) key:@"Y" target:self toMenu:m];
+    [self addItem:@"Save Macro As..." action:@selector(saveMacro:) key:@"" target:self toMenu:m];
+    macroRunMenu = [self submenuNamed:@"Run Macro" inMenu:m];
+    macroEditMenu = [self submenuNamed:@"Edit Macro" inMenu:m];
+    [self addItem:@"Macro as Text" action:@selector(macroAsText:) key:@"" target:self toMenu:m];
+    [self rebuildMacroMenus];
+
     m = [self submenuNamed:@"Windows" inMenu:main];
     [self addItem:@"Arrange in Front" action:@selector(arrangeInFront:) key:@"" target:nil toMenu:m];
     [self addItem:@"Miniaturize Window" action:@selector(performMiniaturize:) key:@"m" target:nil toMenu:m];
@@ -357,6 +371,16 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
         || a == @selector(gotoBracket:) || a == @selector(selectBracket:) || a == @selector(shiftLeft:) || a == @selector(shiftRight:) || a == @selector(commentLines:) || a == @selector(uncommentLines:)
         || a == @selector(fillParagraph:) || a == @selector(toggleFold:) || a == @selector(foldAll:) || a == @selector(expandAll:) || a == @selector(filterSelection:) || a == @selector(executeCommand:) || a == @selector(sortLines:))
         if (d == nil) return NO;
+    if (a == @selector(learnMacro:)) {
+        BOOL rec = [self macroRecording];
+        [item setTitle:rec ? @"Stop Learning" : @"Learn Macro"];
+        return d != nil || rec;
+    }
+    if (a == @selector(replayMacro:) || a == @selector(repeatMacro:))
+        return d != nil && ![self macroRecording] && [[self macroController] hasMacro];
+    if (a == @selector(saveMacro:) || a == @selector(macroAsText:))
+        return ![self macroRecording] && [[self macroController] hasMacro];
+    if (a == @selector(runSavedMacro:)) return d != nil && ![self macroRecording];
     if (a == @selector(setFillWidth:)) [item setState:tag == prefFillWidth ? NSOnState : NSOffState];
     if (a == @selector(toggleLineNumbers:)) [item setState:prefLineNumbers ? NSOnState : NSOffState];
     if (a == @selector(toggleAutoIndent:)) [item setState:prefAutoIndent ? NSOnState : NSOffState];
@@ -443,8 +467,8 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
     [d revert];
 }
 
-- (void)undoDoc:(id)sender { [[self frontDocument] undo]; }
-- (void)redoDoc:(id)sender { [[self frontDocument] redo]; }
+- (void)undoDoc:(id)sender { [self macroNote:@"undo"]; [[self frontDocument] undo]; }
+- (void)redoDoc:(id)sender { [self macroNote:@"redo"]; [[self frontDocument] redo]; }
 - (void)closeDoc:(id)sender { [[self frontDocument] closeWindow]; }
 
 - (void)setMode:(id)sender
@@ -485,12 +509,12 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
     [self savePreferences];
 }
 
-- (void)gotoBracket:(id)sender { [[self frontDocument] gotoMatchingBracket:NO]; }
-- (void)selectBracket:(id)sender { [[self frontDocument] gotoMatchingBracket:YES]; }
-- (void)shiftLeft:(id)sender { [[self frontDocument] shiftSelection:-1]; }
-- (void)shiftRight:(id)sender { [[self frontDocument] shiftSelection:1]; }
-- (void)commentLines:(id)sender { [[self frontDocument] commentSelection:YES]; }
-- (void)uncommentLines:(id)sender { [[self frontDocument] commentSelection:NO]; }
+- (void)gotoBracket:(id)sender { [self macroNote:@"match-bracket"]; [[self frontDocument] gotoMatchingBracket:NO]; }
+- (void)selectBracket:(id)sender { [self macroNote:@"select-bracket"]; [[self frontDocument] gotoMatchingBracket:YES]; }
+- (void)shiftLeft:(id)sender { [self macroNote:@"shift-left"]; [[self frontDocument] shiftSelection:-1]; }
+- (void)shiftRight:(id)sender { [self macroNote:@"shift-right"]; [[self frontDocument] shiftSelection:1]; }
+- (void)commentLines:(id)sender { [self macroNote:@"comment"]; [[self frontDocument] commentSelection:YES]; }
+- (void)uncommentLines:(id)sender { [self macroNote:@"uncomment"]; [[self frontDocument] commentSelection:NO]; }
 
 - (void)toggleWrap:(id)sender
 {
@@ -522,6 +546,7 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
 {
     EditorDoc *d = [self frontDocument];
 
+    [self macroNote:@"fill-paragraph"];
     [d expandAllFolds];                      /* a marker must not be re-flowed */
     [d fillWithWidth:prefFillWidth];
 }
@@ -623,7 +648,140 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
 - (void)showCallTip:(id)sender { [[self tagsController] showCallTip]; }
 - (void)loadTags:(id)sender { [[self tagsController] loadTagsFile]; }
 - (void)hideCallTip { if (tags != nil) [tags hideCallTip]; }
-- (void)showCallTipAfterParenIn:(EditorDoc *)doc { [[self tagsController] showCallTipAfterParenIn:doc]; }
+- (void)showCallTipAfterParenIn:(EditorDoc *)doc { if (![self macroReplaying]) [[self tagsController] showCallTipAfterParenIn:doc]; }
+
+/* ---- macros ---- */
+
+- (MacroController *)macroController
+{
+    if (macros == nil) macros = [[MacroController alloc] initWithOwner:self];
+    return macros;
+}
+
+- (BOOL)macroRecording { return macros != nil && [macros recording]; }
+- (BOOL)macroReplaying { return macros != nil && [macros replaying]; }
+- (void)macroNote:(NSString *)name { if (macros != nil) [macros noteCommand:name]; }
+- (void)macroNoteInsert:(NSString *)text { if (macros != nil) [macros noteInsert:text]; }
+- (void)macroNoteAction:(NSString *)name { if (macros != nil) [macros noteAction:name]; }
+- (void)macroNoteFind:(NSString *)pattern flags:(NSString *)flags { if (macros != nil) [macros noteFind:pattern flags:flags]; }
+- (void)macroNoteFilter:(NSString *)verb command:(NSString *)command { if (macros != nil) [macros noteFilter:verb command:command]; }
+- (BOOL)macroIsRecordableAction:(NSString *)name { return [[self macroController] isRecordableAction:name]; }
+
+- (void)macroNoteReplace:(NSString *)verb pattern:(NSString *)pattern replacement:(NSString *)replacement flags:(NSString *)flags
+{
+    if (macros != nil) [macros noteReplace:verb pattern:pattern replacement:replacement flags:flags];
+}
+
+/* A menu command by the name a macro gives it. */
+- (BOOL)macroCommand:(NSString *)name
+{
+    static const struct { const char *name; const char *sel; } T[] = {
+        { "shift-left", "shiftLeft:" }, { "shift-right", "shiftRight:" },
+        { "comment", "commentLines:" }, { "uncomment", "uncommentLines:" },
+        { "fill-paragraph", "fillParagraph:" },
+        { "fold-toggle", "toggleFold:" }, { "fold-all", "foldAll:" }, { "expand-all", "expandAll:" },
+        { "match-bracket", "gotoBracket:" }, { "select-bracket", "selectBracket:" },
+        { "undo", "undoDoc:" }, { "redo", "redoDoc:" },
+        { NULL, NULL }
+    };
+    int i;
+
+    for (i = 0; T[i].name != NULL; i++) {
+        if ([name isEqualToString:[NSString stringWithCString:T[i].name]]) {
+            [self performSelector:NSSelectorFromString([NSString stringWithCString:T[i].sel]) withObject:nil];
+            return YES;
+        }
+    }
+    return NO;
+}
+
+- (void)learnMacro:(id)sender
+{
+    unsigned int i;
+
+    [[self macroController] toggleLearning];
+    for (i = 0; i < [docs count]; i++) [[docs objectAtIndex:i] macroStateChanged];
+    [self rebuildMacroMenus];
+}
+
+- (void)replayMacro:(id)sender { [[self macroController] replay]; }
+- (void)repeatMacro:(id)sender { [[self macroController] repeatDialog]; }
+
+- (void)runSavedMacro:(id)sender
+{
+    NSArray *names = [[self macroController] savedNames];
+    int i = [sender tag];
+
+    if (i >= 0 && i < (int)[names count]) [[self macroController] runSaved:[names objectAtIndex:i]];
+}
+
+- (void)editSavedMacro:(id)sender
+{
+    NSArray *names = [[self macroController] savedNames];
+    int i = [sender tag];
+
+    if (i >= 0 && i < (int)[names count]) [self openPath:[[[self macroController] folderPath] stringByAppendingPathComponent:[names objectAtIndex:i]]];
+}
+
+- (void)rebuildMacroMenus
+{
+    NSMenu *menus[2];
+    SEL acts[2];
+    NSArray *names;
+    unsigned int m, i;
+
+    if (macroRunMenu == nil) return;
+    names = [[self macroController] savedNames];
+    menus[0] = macroRunMenu;  acts[0] = @selector(runSavedMacro:);
+    menus[1] = macroEditMenu; acts[1] = @selector(editSavedMacro:);
+    NS_DURING
+        for (m = 0; m < 2; m++) {
+            NSArray *old = [NSArray arrayWithArray:[menus[m] itemArray]];
+            for (i = 0; i < [old count]; i++) [menus[m] removeItem:[old objectAtIndex:i]];
+            for (i = 0; i < [names count]; i++) [[self addItem:[names objectAtIndex:i] action:acts[m] key:@"" target:self toMenu:menus[m]] setTag:(int)i];
+            if ([names count] == 0) [[self addItem:@"(none saved)" action:NULL key:@"" target:self toMenu:menus[m]] setEnabled:NO];
+            if ([menus[m] respondsToSelector:@selector(sizeToFit)]) [menus[m] sizeToFit];
+        }
+    NS_HANDLER
+        SSTrace("macro menus: %s -- %s", SSCS([localException name]), SSCS([localException reason]));
+    NS_ENDHANDLER
+}
+
+- (void)saveMacro:(id)sender
+{
+    NSPanel *panel;
+    NSTextField *field;
+    int result;
+
+    if (![[self macroController] hasMacro]) return;
+    panel = [[NSPanel alloc] initWithContentRect:NSMakeRect(0, 0, 300, 92)
+                                       styleMask:(NSTitledWindowMask | NSClosableWindowMask)
+                                         backing:NSBackingStoreBuffered defer:NO];
+    [panel setTitle:@"Save Macro"];
+    field = ui_field(NSMakeRect(70, 54, 210, 22));
+    [[panel contentView] addSubview:ui_label(@"Name:", NSMakeRect(16, 56, 50, 18))];
+    [[panel contentView] addSubview:field];
+    [[panel contentView] addSubview:ui_button(@"Save", NSMakeRect(210, 12, 70, 28), self, @selector(gotoOK:))];
+    [[panel contentView] addSubview:ui_button(@"Cancel", NSMakeRect(130, 12, 70, 28), self, @selector(gotoCancel:))];
+    [panel center];
+    [panel makeFirstResponder:field];
+    result = [NSApp runModalForWindow:panel];
+    if (result == NSOKButton) {
+        if ([[self macroController] saveLastAs:[field stringValue]]) [self rebuildMacroMenus];
+        else NSRunAlertPanel(@"Save Macro", @"The macro could not be saved under that name.", @"OK", nil, nil);
+    }
+    [panel close];
+    [panel release];
+}
+
+/* The macro learned last, as text in a window of its own: it can be read, changed and saved (in the macro folder, or anywhere). */
+- (void)macroAsText:(id)sender
+{
+    EditorDoc *d = [self newDocument];
+
+    [[d textView] setString:[@"# JOSE macro\n" stringByAppendingString:[[self macroController] lastAsText]]];
+    [d setMode:@"JOSEMacro"];
+}
 
 - (void)showPrefs:(id)sender
 {
@@ -638,9 +796,9 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
     for (i = 0; i < [docs count]; i++) [[docs objectAtIndex:i] applyAppearance];
 }
 
-- (void)toggleFold:(id)sender { [[self frontDocument] toggleFold]; }
-- (void)foldAll:(id)sender { [[self frontDocument] foldAll]; }
-- (void)expandAll:(id)sender { [[self frontDocument] expandAllFolds]; }
+- (void)toggleFold:(id)sender { [self macroNote:@"fold-toggle"]; [[self frontDocument] toggleFold]; }
+- (void)foldAll:(id)sender { [self macroNote:@"fold-all"]; [[self frontDocument] foldAll]; }
+- (void)expandAll:(id)sender { [self macroNote:@"expand-all"]; [[self frontDocument] expandAllFolds]; }
 
 - (void)setFillWidth:(id)sender
 {

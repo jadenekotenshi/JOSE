@@ -19,6 +19,7 @@ static const ExtMode EXTS[] = {
     { "json", "JSON" }, { "js", "JavaScript" }, { "mjs", "JavaScript" }, { "cjs", "JavaScript" },
     { "rb", "Ruby" }, { "rake", "Ruby" }, { "gemspec", "Ruby" }, { "ru", "Ruby" },
     { "zsh", "Zsh" },
+    { "jmacro", "JOSEMacro" },
     { "tmpl", "Imakefile" }, { "rules", "Imakefile" },
     { NULL, NULL }
 };
@@ -69,6 +70,7 @@ const char *lang_mode_for(const char *path, const char *first_line)
     base = base != NULL ? base + 1 : path;
     mode = lang_mode_for_name(base);
     if (mode != NULL) return mode;
+    if (first_line != NULL && strncmp(first_line, "# JOSE macro", 12) == 0) return "JOSEMacro";
     if (first_line != NULL && first_line[0] == '#' && first_line[1] == '!') {
         if (strstr(first_line, "python") != NULL) return "Python";
         if (strstr(first_line, "perl") != NULL) return "Perl";
@@ -87,7 +89,7 @@ int lang_comment_style(const char *mode, const char **open, const char **close)
     static const struct { const char *mode; const char *open; const char *close; } T[] = {
         { "C", "/*", "*/" }, { "C-Header", "/*", "*/" }, { "ObjC", "/*", "*/" },
         { "C++", "//", "" }, { "ObjC++", "//", "" },
-        { "JavaScript", "//", "" }, { "Ruby", "#", "" }, { "Zsh", "#", "" }, { "BSDMakefile", "#", "" }, { "Imakefile", "XCOMM", "" },
+        { "JOSEMacro", "#", "" }, { "JavaScript", "//", "" }, { "Ruby", "#", "" }, { "Zsh", "#", "" }, { "BSDMakefile", "#", "" }, { "Imakefile", "XCOMM", "" },
         { "Python", "#", "" }, { "Shell", "#", "" }, { "Csh", "#", "" }, { "Perl", "#", "" }, { "GNUmakefile", "#", "" },
         { "Plist", "/*", "*/" }, { "Strings", "/*", "*/" }, { "GSmarkup", "<!--", "-->" },
         { NULL, NULL, NULL }

@@ -5,6 +5,9 @@
 @class ShellController;
 @class PrefsController;
 @class TagsController;
+@class MacroController;
+@class FindController;
+@class ShellController;
 
 /* Owns every open document and the menus. */
 @interface AppController : NSObject
@@ -18,6 +21,9 @@
     ShellController *shell;
     PrefsController *prefs;
     TagsController *tags;
+    MacroController *macros;
+    NSMenu         *macroRunMenu;       /* Macro > Run Macro */
+    NSMenu         *macroEditMenu;      /* Macro > Edit Macro */
     NSMutableArray *recentFiles;        /* paths, most recent first */
     NSMenu         *recentMenu;         /* File > Open Recent */
     int             prefFillWidth;      /* the right margin of Fill Paragraph */
@@ -39,6 +45,17 @@
 - (void)documentDidClose:(EditorDoc *)doc;
 - (NSString *)syntaxDirectory;
 - (void)noteRecentFile:(NSString *)path;  /* a file was opened or saved: it goes to the top of Open Recent */
+- (FindController *)finder;
+- (ShellController *)shellController;
+- (BOOL)macroRecording;                 /* a macro is being learned */
+- (BOOL)macroReplaying;
+- (void)macroNoteInsert:(NSString *)text;           /* what is done while learning */
+- (void)macroNoteAction:(NSString *)selectorName;
+- (void)macroNoteFind:(NSString *)pattern flags:(NSString *)flags;
+- (void)macroNoteReplace:(NSString *)verb pattern:(NSString *)pattern replacement:(NSString *)replacement flags:(NSString *)flags;
+- (void)macroNoteFilter:(NSString *)verb command:(NSString *)command;
+- (BOOL)macroIsRecordableAction:(NSString *)selectorName;
+- (BOOL)macroCommand:(NSString *)name;             /* a menu command by its macro name */
 - (void)hideCallTip;                    /* the call tip, if one is showing, goes away */
 - (void)showCallTipAfterParenIn:(EditorDoc *)doc;
 - (void)appearanceChanged;              /* the font or colours changed: every window shows them */

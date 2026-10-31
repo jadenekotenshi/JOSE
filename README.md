@@ -61,6 +61,30 @@ Status: **prototype (0.0.1)** -- nothing here has been run on OPENSTEP yet.
   back.  A call tip -- the declaration line from the tags file -- appears when you type `(` after a tagged name (switchable in
   the Preferences panel), or with *Show Call Tip* (cmd-9).  The tags file is read again when it changes.
 
+## Macros
+
+*Macro > Learn Macro* (shift-cmd-L) starts learning; the status line says "Learning a macro"; *Stop Learning* ends it.  *Replay Macro*
+(cmd-Y) runs it again in the front window, and *Repeat Macro...* (shift-cmd-Y) runs it a number of times or until it fails (a
+search that finds nothing, say).  The last macro is kept between sessions; *Save Macro As...* names it, and *Run Macro* and
+*Edit Macro* list the saved ones (in `~/.JOSE.macros`).  *Macro as Text* shows the learned macro in a window.
+
+What is learned is not keystrokes but *actions*: typed text (one insert for a run of keys), key actions such as the arrows, Return,
+Tab, Delete, word and line movement, selecting, Cut/Copy/Paste, menu commands (shift, comment, fill, fold, brackets, undo), searches
+and replacements with their settings, and filters and executed commands.  Nothing is learned from the mouse, so start a macro at a
+place that a key or a search can find again.  Because the result is a short text, macros can be read, edited and written by hand:
+
+    # JOSE macro
+    find fcp "TODO"                     f/b = forward/backward; c case, r regular expression, w whole word, p wrap
+    action moveToEndOfLine:
+    insert "  /* done */"
+    replace-all fcp "foo" "bar"         also replace-sel; \\1 in a regular expression replacement is a group
+    command shift-right                 shift-left comment uncomment fill-paragraph fold-toggle fold-all expand-all
+                                        match-bracket select-bracket undo redo
+    filter "sort -r"                    exec "date"
+
+Strings take \\ \" \n \t \r \xHH, so a backslash in a regular expression is written twice.  A macro stops at the first line that cannot
+be done.  Only text-view actions (keys) may appear in `action` lines.
+
 ## Language modes
 
 C, C++, Objective-C and C headers, Python, Perl, Ruby, JavaScript, JSON, shell (sh/ksh/bash), zsh, csh/tcsh, GNU make, BSD make
@@ -92,7 +116,7 @@ Roughly in this order; the list is not a promise.
    fill paragraph, rectangular selection, shell commands -- done and checked; code folding -- done and checked.
 3. Highlighting: nested contexts -- done and checked; the Preferences panel (colours, dark mode, font), recent files, Open Included
    File, tags with call tips and the fold margin -- done, awaiting a check on 4.2; more language modes.
-4. Shell commands (filter, execute, sort) -- done and checked; still to do: a macro language with learn/replay, split panes,
+4. Shell commands (filter, execute, sort) -- done and checked; still to do: split panes,
    per-mode preferences.
 
 ## Building

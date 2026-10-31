@@ -15,6 +15,10 @@
 - (BOOL)literalReplacement;
 - (void)replaceBetween:(unsigned int)lo and:(unsigned int)hi what:(NSString *)what;
 - (void)say:(NSString *)text;
+- (NSString *)flagString:(BOOL)forward;
+- (void)applyFlagString:(NSString *)f;
+- (void)replaceAll:(id)sender;
+- (void)replaceInSelection:(id)sender;
 - (void)findNext:(id)sender;
 - (void)findPrev:(id)sender;
 - (void)replaceOne:(id)sender;
@@ -186,9 +190,11 @@ static u16 *units_of(NSString *s, unsigned int *n)
     SearchMatch m;
     BOOL found;
 
+    lastOK = NO;
     if (d == nil) { SSTrace("find: no front document"); [self say:@"No document to search."]; return NO; }
     s = [self compiledSearch];
     if (s == NULL) return NO;
+    if ([owner respondsToSelector:@selector(macroNoteFind:flags:)]) [owner macroNoteFind:[findField stringValue] flags:[self flagString:forward]];
     text = units_of([[d textView] string], &n);
     if (text == NULL) { [self say:@"Out of memory."]; return NO; }
     sel = [[d textView] selectedRange];
@@ -204,7 +210,49 @@ static u16 *units_of(NSString *s, unsigned int *n)
     [[d textView] scrollRangeToVisible:NSMakeRange(m.start[0], m.end[0] - m.start[0])];
     [self say:@""];
     [self showDocument:d];
+    lastOK = YES;
     return YES;
+}
+
+/* The panel's settings as the flag word of a macro line: f or b, then c (case sensitive), r (regular expression), w (whole word),
+ * p (wrap around). */
+- (NSString *)flagString:(BOOL)forward
+{
+    NSMutableString *f = [NSMutableString stringWithString:forward ? @"f" : @"b"];
+
+    if ([caseSwitch state] == NSOnState) [f appendString:@"c"];
+    if ([regexSwitch state] == NSOnState) [f appendString:@"r"];
+    if ([wordSwitch state] == NSOnState) [f appendString:@"w"];
+    if ([wrapSwitch state] == NSOnState) [f appendString:@"p"];
+    return f;
+}
+
+- (void)applyFlagString:(NSString *)f
+{
+    [caseSwitch setState:[f rangeOfString:@"c"].length > 0 ? NSOnState : NSOffState];
+    [regexSwitch setState:[f rangeOfString:@"r"].length > 0 ? NSOnState : NSOffState];
+    [wordSwitch setState:[f rangeOfString:@"w"].length > 0 ? NSOnState : NSOffState];
+    [wrapSwitch setState:[f rangeOfString:@"p"].length > 0 ? NSOnState : NSOffState];
+}
+
+- (BOOL)macroFind:(NSString *)pattern flags:(NSString *)flags
+{
+    [self buildPanel];
+    [findField setStringValue:pattern];
+    [self applyFlagString:flags];
+    return [self doFind:[flags rangeOfString:@"b"].length == 0];
+}
+
+- (BOOL)macroReplaceKind:(int)kind pattern:(NSString *)pattern replacement:(NSString *)replacement flags:(NSString *)flags
+{
+    [self buildPanel];
+    [findField setStringValue:pattern];
+    [replaceField setStringValue:replacement];
+    [self applyFlagString:flags];
+    if (kind == 0) [self replaceOne:nil];
+    else if (kind == 1) [self replaceAll:nil];
+    else [self replaceInSelection:nil];
+    return lastOK;
 }
 
 - (void)findNext:(id)sender
@@ -262,6 +310,7 @@ static u16 *units_of(NSString *s, unsigned int *n)
     unsigned int n, nrepl, nout;
     SearchMatch m;
 
+    lastOK = NO;
     if (d == nil) return;
     s = [self compiledSearch];
     if (s == NULL) return;
@@ -279,6 +328,9 @@ static u16 *units_of(NSString *s, unsigned int *n)
             free(out);
             [d replaceRange:sel with:str select:NSMakeRange(sel.location + nout, 0)];
             [self say:@"Replaced."];
+            lastOK = YES;
+            if ([owner respondsToSelector:@selector(macroNoteReplace:pattern:replacement:flags:)])
+                [owner macroNoteReplace:@"replace" pattern:[findField stringValue] replacement:[replaceField stringValue] flags:[self flagString:YES]];
         }
     } else {
         free(text);
@@ -304,6 +356,7 @@ static u16 *units_of(NSString *s, unsigned int *n)
     u16 *text, *repl, *out = NULL;
     unsigned int n, nrepl, nout = 0, first = 0, last = 0, count = 0;
 
+    lastOK = NO;
     if (d == nil) return;
     s = [self compiledSearch];
     if (s == NULL) return;
@@ -320,6 +373,10 @@ static u16 *units_of(NSString *s, unsigned int *n)
         [d replaceRange:NSMakeRange(first, last - first) with:str select:NSMakeRange(first, nout)];
         [self say:[NSString stringWithFormat:@"Replaced %u %@.", count, count == 1 ? @"match" : @"matches"]];
         [self showDocument:d];
+        lastOK = YES;
+        if ([owner respondsToSelector:@selector(macroNoteReplace:pattern:replacement:flags:)])
+            [owner macroNoteReplace:([what length] == 0 ? @"replace-all" : @"replace-sel") pattern:[findField stringValue]
+                        replacement:[replaceField stringValue] flags:[self flagString:YES]];
     } else {
         [self say:[NSString stringWithFormat:@"Not found%@.", what]];
         NSBeep();

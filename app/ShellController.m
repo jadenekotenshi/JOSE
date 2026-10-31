@@ -11,7 +11,8 @@
 @interface ShellController (Private)
 - (NSString *)askCommandWithTitle:(NSString *)title prompt:(NSString *)prompt key:(NSString *)key;
 - (BOOL)run:(NSString *)command input:(NSString *)input in:(EditorDoc *)doc result:(NSString **)output;
-- (void)filter:(NSString *)command in:(EditorDoc *)doc;
+- (BOOL)filter:(NSString *)command in:(EditorDoc *)doc;
+- (BOOL)insertOutputOf:(NSString *)command in:(EditorDoc *)doc;
 - (void)commandOK:(id)sender;
 - (void)commandCancel:(id)sender;
 @end
@@ -108,7 +109,7 @@
 }
 
 /* The selection (the whole text if there is none) goes through `command` and is replaced by what comes out. */
-- (void)filter:(NSString *)command in:(EditorDoc *)doc
+- (BOOL)filter:(NSString *)command in:(EditorDoc *)doc
 {
     NSTextView *tv = [doc textView];
     NSRange sel = [tv selectedRange];
@@ -118,12 +119,14 @@
 
     input = [doc expandedString:[text substringWithRange:region]];            /* folded code goes through the command too */
     endsInNewline = [input length] > 0 && [input characterAtIndex:[input length] - 1] == '\n';
-    if (![self run:command input:input in:doc result:&output]) return;
+    if ([owner respondsToSelector:@selector(macroNoteFilter:command:)]) [owner macroNoteFilter:@"filter" command:command];
+    if (![self run:command input:input in:doc result:&output]) return NO;
     /* a filter that ends its output with a newline that the selection did not have should not add one */
     if (!endsInNewline && [output length] > 0 && [output characterAtIndex:[output length] - 1] == '\n')
         output = [output substringToIndex:[output length] - 1];
-    if ([output isEqualToString:input]) return;
+    if ([output isEqualToString:input]) return YES;
     [doc replaceRange:region with:output select:NSMakeRange(region.location, [output length])];
+    return YES;
 }
 
 - (void)filterSelection
@@ -136,6 +139,20 @@
     if (cmd != nil) [self filter:cmd in:d];
 }
 
+- (BOOL)macroFilter:(NSString *)command
+{
+    EditorDoc *d = [owner frontDocument];
+
+    return d != nil && [self filter:command in:d];
+}
+
+- (BOOL)macroExecute:(NSString *)command
+{
+    EditorDoc *d = [owner frontDocument];
+
+    return d != nil && [self insertOutputOf:command in:d];
+}
+
 - (void)sortLines
 {
     EditorDoc *d = [owner frontDocument];
@@ -143,19 +160,28 @@
     if (d != nil) [self filter:@"sort" in:d];
 }
 
+/* The output of `command` goes in at the insertion point (in place of the selection). */
+- (BOOL)insertOutputOf:(NSString *)cmd in:(EditorDoc *)d
+{
+    NSString *output = nil;
+    NSRange sel;
+
+    if ([owner respondsToSelector:@selector(macroNoteFilter:command:)]) [owner macroNoteFilter:@"exec" command:cmd];
+    if (![self run:cmd input:nil in:d result:&output]) return NO;
+    if ([output length] == 0) return YES;
+    sel = [[d textView] selectedRange];
+    [d replaceRange:sel with:output select:NSMakeRange(sel.location + [output length], 0)];
+    return YES;
+}
+
 - (void)executeCommand
 {
     EditorDoc *d = [owner frontDocument];
-    NSString *cmd, *output = nil;
-    NSRange sel;
+    NSString *cmd;
 
     if (d == nil) return;
     cmd = [self askCommandWithTitle:@"Execute Command" prompt:@"Insert the output of:" key:@"ShellExecCommand"];
-    if (cmd == nil) return;
-    if (![self run:cmd input:nil in:d result:&output]) return;
-    if ([output length] == 0) return;
-    sel = [[d textView] selectedRange];
-    [d replaceRange:sel with:output select:NSMakeRange(sel.location + [output length], 0)];
+    if (cmd != nil) [self insertOutputOf:cmd in:d];
 }
 
 @end

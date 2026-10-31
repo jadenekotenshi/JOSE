@@ -18,11 +18,13 @@
     unsigned int         rectCurLine;      /* ... and where it is now */
     unsigned int         rectCurCol;
     BOOL                 mouseActive;      /* a click or drag is in progress */
+    int                  macroSuppress;    /* above 0 while an action is being done: what it does inside is not a thing to learn */
 }
 - (unsigned int)lineStartForPoint:(NSPoint)p;   /* the line at a point of this view's coordinates */
 - (void)setHighlighter:(HKSyntaxHighlighter *)h;
 - (void)setEditor:(id)anEditor;
 - (BOOL)mouseActive;
+- (void)macroAction:(SEL)sel sender:(id)sender;   /* learn an action, then let the text view do it */
 - (BOOL)rectActive;
 - (void)rectClear;
 - (void)rectSelectionMoved;                /* the selection changed: forget the rectangle unless it caused it */
@@ -119,6 +121,9 @@
 - (NSString *)selectedString;              /* the selected text, or nil */
 - (int)foldStateForLineStart:(unsigned int)lineStart;   /* 0 nothing, 1 a block begins there, 2 it is folded */
 - (void)toggleFoldAtLineStart:(unsigned int)lineStart;
+- (void)macroNoteInsert:(NSString *)text;     /* the macro recorder, if one is learning, is told */
+- (void)macroNoteAction:(NSString *)selectorName;
+- (void)macroStateChanged;                 /* learning began or ended: the status line says so */
 - (void)applyAppearance;                   /* the font or colours changed */
 - (void)showWindow;
 @end

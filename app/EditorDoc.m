@@ -32,20 +32,29 @@
 
 - (void)insertNewline:(id)sender
 {
+    if (macroSuppress == 0) [(EditorDoc *)editor macroNoteAction:@"insertNewline:"];
+    macroSuppress++;
     if (rectOn) [self rectClear];
     if (![(EditorDoc *)editor newlineWithIndent]) [super insertNewline:sender];
+    macroSuppress--;
 }
 
 - (void)insertTab:(id)sender
 {
+    if (macroSuppress == 0) [(EditorDoc *)editor macroNoteAction:@"insertTab:"];
+    macroSuppress++;
     if (![(EditorDoc *)editor tabInsertedSpaces]) [super insertTab:sender];
+    macroSuppress--;
 }
 
 - (void)insertText:(id)str
 {
-    if (rectOn && [str isKindOfClass:[NSString class]]) { [(EditorDoc *)editor rectType:str]; return; }
+    if (macroSuppress == 0 && [str isKindOfClass:[NSString class]]) [(EditorDoc *)editor macroNoteInsert:str];
+    macroSuppress++;
+    if (rectOn && [str isKindOfClass:[NSString class]]) { [(EditorDoc *)editor rectType:str]; macroSuppress--; return; }
     if ([str isKindOfClass:[NSString class]]) [(EditorDoc *)editor willInsertText:str];
     [super insertText:str];
+    macroSuppress--;
     if ([str isKindOfClass:[NSString class]] && [str isEqualToString:@"("]) [(EditorDoc *)editor didTypeOpenParen];
 }
 
@@ -178,36 +187,125 @@
 
 - (void)copy:(id)sender
 {
+    if (macroSuppress == 0) [(EditorDoc *)editor macroNoteAction:@"copy:"];
+    macroSuppress++;
     if (rectOn) [(EditorDoc *)editor rectCopyAndCut:NO];
     else if (![(EditorDoc *)editor copyExpandedSelectionAndCut:NO]) [super copy:sender];
+    macroSuppress--;
 }
 
 - (void)cut:(id)sender
 {
+    if (macroSuppress == 0) [(EditorDoc *)editor macroNoteAction:@"cut:"];
+    macroSuppress++;
     if (rectOn) [(EditorDoc *)editor rectCopyAndCut:YES];
     else if (![(EditorDoc *)editor copyExpandedSelectionAndCut:YES]) [super cut:sender];
+    macroSuppress--;
 }
 
 - (void)delete:(id)sender
 {
+    if (macroSuppress == 0) [(EditorDoc *)editor macroNoteAction:@"delete:"];
+    macroSuppress++;
     if (rectOn) [(EditorDoc *)editor rectDeleteBackward:NO]; else [super delete:sender];
+    macroSuppress--;
 }
 
 - (void)deleteBackward:(id)sender
 {
+    if (macroSuppress == 0) [(EditorDoc *)editor macroNoteAction:@"deleteBackward:"];
+    macroSuppress++;
     if (rectOn) [(EditorDoc *)editor rectDeleteBackward:YES]; else [super deleteBackward:sender];
+    macroSuppress--;
 }
 
 - (void)deleteForward:(id)sender
 {
+    if (macroSuppress == 0) [(EditorDoc *)editor macroNoteAction:@"deleteForward:"];
+    macroSuppress++;
     if (rectOn) [(EditorDoc *)editor rectDeleteBackward:NO]; else [super deleteForward:sender];
+    macroSuppress--;
 }
 
 - (void)paste:(id)sender
 {
-    if ((rectOn || [(EditorDoc *)editor pasteIsRectangle]) && [(EditorDoc *)editor rectPaste]) return;
+    if (macroSuppress == 0) [(EditorDoc *)editor macroNoteAction:@"paste:"];
+    macroSuppress++;
+    if ((rectOn || [(EditorDoc *)editor pasteIsRectangle]) && [(EditorDoc *)editor rectPaste]) { macroSuppress--; return; }
     [super paste:sender];
+    macroSuppress--;
 }
+
+/* ---- the macro recorder: key actions that are not overridden above come through here ---- */
+
+/* An action is noted for the macro being learned and then done by the text view as always. */
+- (void)macroAction:(SEL)sel sender:(id)sender
+{
+    if (macroSuppress == 0) [(EditorDoc *)editor macroNoteAction:NSStringFromSelector(sel)];
+    macroSuppress++;
+    NS_DURING
+        if ([NSTextView instancesRespondToSelector:sel]) {
+            IMP imp = [NSTextView instanceMethodForSelector:sel];
+            ((void (*)(id, SEL, id))imp)(self, sel, sender);
+        } else {
+            [[self nextResponder] tryToPerform:sel with:sender];
+        }
+    NS_HANDLER
+        macroSuppress--;
+        [localException raise];
+    NS_ENDHANDLER
+    macroSuppress--;
+}
+
+/* Where the key bindings send a command, if this release does it that way. */
+- (void)doCommandBySelector:(SEL)sel
+{
+    if (macroSuppress == 0) [(EditorDoc *)editor macroNoteAction:NSStringFromSelector(sel)];
+    macroSuppress++;
+    NS_DURING
+        [super doCommandBySelector:sel];
+    NS_HANDLER
+        macroSuppress--;
+        [localException raise];
+    NS_ENDHANDLER
+    macroSuppress--;
+}
+
+
+- (void)insertBacktab:(id)sender { [self macroAction:@selector(insertBacktab:) sender:sender]; }
+- (void)deleteWordBackward:(id)sender { [self macroAction:@selector(deleteWordBackward:) sender:sender]; }
+- (void)deleteWordForward:(id)sender { [self macroAction:@selector(deleteWordForward:) sender:sender]; }
+- (void)deleteToBeginningOfLine:(id)sender { [self macroAction:@selector(deleteToBeginningOfLine:) sender:sender]; }
+- (void)deleteToEndOfLine:(id)sender { [self macroAction:@selector(deleteToEndOfLine:) sender:sender]; }
+- (void)moveUp:(id)sender { [self macroAction:@selector(moveUp:) sender:sender]; }
+- (void)moveDown:(id)sender { [self macroAction:@selector(moveDown:) sender:sender]; }
+- (void)moveLeft:(id)sender { [self macroAction:@selector(moveLeft:) sender:sender]; }
+- (void)moveRight:(id)sender { [self macroAction:@selector(moveRight:) sender:sender]; }
+- (void)moveBackward:(id)sender { [self macroAction:@selector(moveBackward:) sender:sender]; }
+- (void)moveForward:(id)sender { [self macroAction:@selector(moveForward:) sender:sender]; }
+- (void)moveWordBackward:(id)sender { [self macroAction:@selector(moveWordBackward:) sender:sender]; }
+- (void)moveWordForward:(id)sender { [self macroAction:@selector(moveWordForward:) sender:sender]; }
+- (void)moveWordLeft:(id)sender { [self macroAction:@selector(moveWordLeft:) sender:sender]; }
+- (void)moveWordRight:(id)sender { [self macroAction:@selector(moveWordRight:) sender:sender]; }
+- (void)moveToBeginningOfLine:(id)sender { [self macroAction:@selector(moveToBeginningOfLine:) sender:sender]; }
+- (void)moveToEndOfLine:(id)sender { [self macroAction:@selector(moveToEndOfLine:) sender:sender]; }
+- (void)moveToBeginningOfParagraph:(id)sender { [self macroAction:@selector(moveToBeginningOfParagraph:) sender:sender]; }
+- (void)moveToEndOfParagraph:(id)sender { [self macroAction:@selector(moveToEndOfParagraph:) sender:sender]; }
+- (void)moveToBeginningOfDocument:(id)sender { [self macroAction:@selector(moveToBeginningOfDocument:) sender:sender]; }
+- (void)moveToEndOfDocument:(id)sender { [self macroAction:@selector(moveToEndOfDocument:) sender:sender]; }
+- (void)pageUp:(id)sender { [self macroAction:@selector(pageUp:) sender:sender]; }
+- (void)pageDown:(id)sender { [self macroAction:@selector(pageDown:) sender:sender]; }
+- (void)moveUpAndModifySelection:(id)sender { [self macroAction:@selector(moveUpAndModifySelection:) sender:sender]; }
+- (void)moveDownAndModifySelection:(id)sender { [self macroAction:@selector(moveDownAndModifySelection:) sender:sender]; }
+- (void)moveLeftAndModifySelection:(id)sender { [self macroAction:@selector(moveLeftAndModifySelection:) sender:sender]; }
+- (void)moveRightAndModifySelection:(id)sender { [self macroAction:@selector(moveRightAndModifySelection:) sender:sender]; }
+- (void)moveWordBackwardAndModifySelection:(id)sender { [self macroAction:@selector(moveWordBackwardAndModifySelection:) sender:sender]; }
+- (void)moveWordForwardAndModifySelection:(id)sender { [self macroAction:@selector(moveWordForwardAndModifySelection:) sender:sender]; }
+- (void)moveToBeginningOfLineAndModifySelection:(id)sender { [self macroAction:@selector(moveToBeginningOfLineAndModifySelection:) sender:sender]; }
+- (void)moveToEndOfLineAndModifySelection:(id)sender { [self macroAction:@selector(moveToEndOfLineAndModifySelection:) sender:sender]; }
+- (void)selectAll:(id)sender { [self macroAction:@selector(selectAll:) sender:sender]; }
+- (void)selectLine:(id)sender { [self macroAction:@selector(selectLine:) sender:sender]; }
+- (void)selectWord:(id)sender { [self macroAction:@selector(selectWord:) sender:sender]; }
 
 /* The rectangle, drawn over the text as a highlight. */
 - (void)drawRectangle:(NSRect)frame
@@ -444,6 +542,21 @@ static BOOL ident_char(unichar c)
     return b > a ? [s substringWithRange:NSMakeRange(a, b - a)] : nil;
 }
 
+- (void)macroNoteInsert:(NSString *)text
+{
+    if ([owner respondsToSelector:@selector(macroNoteInsert:)]) [owner macroNoteInsert:text];
+}
+
+- (void)macroNoteAction:(NSString *)name
+{
+    if ([owner respondsToSelector:@selector(macroNoteAction:)]) [owner macroNoteAction:name];
+}
+
+- (void)macroStateChanged
+{
+    [self updateStatus];
+}
+
 - (void)didTypeOpenParen
 {
     if ([owner respondsToSelector:@selector(showCallTipAfterParenIn:)]) [owner showCallTipAfterParenIn:self];
@@ -575,8 +688,9 @@ static BOOL ident_char(unichar c)
 
     line_col([textView string], sel.location, &line, &col);
     if ([folds count] > 0) line += [self hiddenLinesBefore:sel.location];
-    [status setStringValue:[NSString stringWithFormat:@"Line %u, col %u    %@    %@", line, col,
-                            mode != nil ? mode : @"Plain Text", eol == 1 ? @"CRLF" : (eol == 2 ? @"CR" : @"LF")]];
+    [status setStringValue:[NSString stringWithFormat:@"Line %u, col %u    %@    %@%@", line, col,
+                            mode != nil ? mode : @"Plain Text", eol == 1 ? @"CRLF" : (eol == 2 ? @"CR" : @"LF"),
+                            ([owner respondsToSelector:@selector(macroRecording)] && [owner macroRecording]) ? @"    Learning a macro" : @""]];
 }
 
 - (unsigned long)nowMillis

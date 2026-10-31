@@ -14,5 +14,7 @@
 - (id)initWithOwner:(id)anOwner;
 - (void)filterSelection;               /* Filter Selection...: the selection goes through the command and is replaced by its output */
 - (void)executeCommand;                /* Execute Command...: its output goes in at the insertion point */
-- (void)sortLines;                     /* Filter Selection with `sort` */
+- (void)sortLines;
+- (BOOL)macroFilter:(NSString *)command;     /* for macros: filter the selection through a command; NO if it failed */
+- (BOOL)macroExecute:(NSString *)command;    /* ... or insert what a command prints */                     /* Filter Selection with `sort` */
 @end

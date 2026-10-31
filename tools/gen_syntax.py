@@ -133,6 +133,12 @@ write("Imakefile", file_text("Imakefile and Imake templates (cpp lines, XCOMM co
        context(hdr, "\\>", "0.55 0.2 0.55", parent=4, comment="<header> in a cpp line"),
        context('"', '"', "0.55 0.2 0.55", parent=4, comment='"header" in a cpp line')]))
 
+# ---- the macro language ----
+macro_verbs = "insert action command find replace replace-all replace-sel filter exec".split()
+write("JOSEMacro", file_text("JOSE macros", [keyword("^%s>" % w, KEYWORD) for w in macro_verbs],
+      [context('"', '"', STRING, skips=ESC),
+       context("#", "\n", COMMENT, italic=True)]))
+
 # ---- Zsh: the Shell rules and the words that zsh adds ----
 extra = """autoload bindkey builtin bye cdr chdir compdef compinit declare disown emulate fc float functions getopts hash history integer
 jobs kill limit local nocorrect noglob popd print pushd rehash repeat setopt shopt sched stat typeset unfunction unhash unlimit
