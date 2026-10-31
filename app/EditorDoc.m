@@ -770,6 +770,7 @@ static BOOL ident_char(unichar c)
 - (BOOL)textView:(NSTextView *)tv shouldChangeTextInRange:(NSRange)range replacementString:(NSString *)replacement
 {
     if (replacement == nil) return YES;                        /* attributes only */
+    SSTrace("edit: range %u+%u, %u new units, text %u long", (unsigned)range.location, (unsigned)range.length, (unsigned)[replacement length], (unsigned)[[textView string] length]);
     if (range.location > [[textView string] length] || range.length > [[textView string] length] - range.location)
         return NO;                                             /* not a range of this text (Backspace at the very start may ask for one) */
     if (range.length == 0 && [replacement length] == 0) return NO;      /* nothing to change */
@@ -791,6 +792,7 @@ static BOOL ident_char(unichar c)
 
 - (void)textDidChange:(NSNotification *)notification
 {
+    SSTrace("changed: text now %u long", (unsigned)[[textView string] length]);
     [textView rectClear];
     [self markEdited];
     [self updateStatus];
@@ -1227,8 +1229,11 @@ static int unmatched_cmp(const void *a, const void *b)
         }
         what = [NSString stringWithFormat:@"Problem %u of %u: %@", pick + 1, total, what];
     }
+    SSTrace("unmatched: %u problems, showing #%u at %u+%u of %u", total, pick + 1, all[pick].pos, all[pick].len, n);
     [textView setSelectedRange:NSMakeRange(all[pick].pos, all[pick].len)];
+    SSTrace("unmatched: selected");
     [textView scrollRangeToVisible:NSMakeRange(all[pick].pos, all[pick].len)];
+    SSTrace("unmatched: scrolled");
     [window makeFirstResponder:textView];
     [statusNote release];
     statusNote = [what retain];

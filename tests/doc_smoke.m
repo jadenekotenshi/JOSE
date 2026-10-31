@@ -674,7 +674,10 @@ int main(void)
         [ud setMode:@"C"];
         [tv setString:@"a }\nb (\nc { }\n#if X\n"];
         [tv setSelectedRange:NSMakeRange(0, 0)];
+        CHECK(![ud isDirty] && ![ud canUndo]);
         CHECK([ud findUnmatchedBracket] == 3);
+        CHECK([[tv string] isEqualToString:@"a }\nb (\nc { }\n#if X\n"]);                  /* looking changes nothing */
+        CHECK(![ud isDirty] && ![ud canUndo]);
         CHECK([tv selectedRange].location == 2 && [tv selectedRange].length == 1);          /* the stray } */
         CHECK([ud findUnmatchedBracket] == 3 && [tv selectedRange].location == 6);          /* the ( never closed */
         CHECK([ud findUnmatchedBracket] == 3 && [tv selectedRange].location == 14 && [tv selectedRange].length == 3);   /* the #if */
@@ -728,6 +731,29 @@ int main(void)
         [tv setSelectedRange:NSMakeRange(4, 0)];
         [tv deleteForward:nil];
         CHECK([[tv string] isEqualToString:@"abc\n"]);
+    }
+    {   /* a big C++ file with a missing brace: find it, remove it, keep editing */
+        EditorDoc *xd = [[[EditorDoc alloc] initWithOwner:nil] autorelease];
+        EditTextView *tv = [xd textView];
+        NSMutableString *big = [NSMutableString string];
+        int i, k;
+
+        for (i = 0; i < 4000; i++) {
+            [big appendFormat:@"#ifdef X%d\nstatic int f%d(int a) { /* ( */ if (a) { return \"}\"[0]; }\n  // [\n  return a; }\n#endif\n\n", i, i];
+            if (i == 3000) [big appendString:@"void broken() {\n  if (x) {\n\n"];
+        }
+        [xd setMode:@"C"];
+        [tv setString:big];
+        [tv setSelectedRange:NSMakeRange(0, 0)];
+        CHECK([xd findUnmatchedBracket] >= 1);
+        for (k = 0; k < 3; k++) {
+            [tv deleteBackward:nil];
+            [tv deleteBackward:nil];
+            [xd findUnmatchedBracket];
+        }
+        [xd undo];
+        [xd undo];
+        CHECK([[tv string] length] > 100000);
     }
     [[NSFileManager defaultManager] removeItemAtPath:dir error:NULL];
     printf(failures ? "doc: FAILED\n" : "doc: ok\n");
