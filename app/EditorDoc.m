@@ -223,7 +223,9 @@
 {
     if (macroSuppress == 0) [(EditorDoc *)editor macroNoteAction:@"deleteBackward:"];
     macroSuppress++;
-    if (rectOn) [(EditorDoc *)editor rectDeleteBackward:YES]; else [super deleteBackward:sender];
+    if (rectOn) [(EditorDoc *)editor rectDeleteBackward:YES];
+    else if ([self selectedRange].length == 0 && [self selectedRange].location == 0) NSBeep();     /* nothing before the start */
+    else [super deleteBackward:sender];
     macroSuppress--;
 }
 
@@ -231,7 +233,9 @@
 {
     if (macroSuppress == 0) [(EditorDoc *)editor macroNoteAction:@"deleteForward:"];
     macroSuppress++;
-    if (rectOn) [(EditorDoc *)editor rectDeleteBackward:NO]; else [super deleteForward:sender];
+    if (rectOn) [(EditorDoc *)editor rectDeleteBackward:NO];
+    else if ([self selectedRange].length == 0 && [self selectedRange].location >= [[self string] length]) NSBeep();   /* nothing after the end */
+    else [super deleteForward:sender];
     macroSuppress--;
 }
 
@@ -766,6 +770,9 @@ static BOOL ident_char(unichar c)
 - (BOOL)textView:(NSTextView *)tv shouldChangeTextInRange:(NSRange)range replacementString:(NSString *)replacement
 {
     if (replacement == nil) return YES;                        /* attributes only */
+    if (range.location > [[textView string] length] || range.length > [[textView string] length] - range.location)
+        return NO;                                             /* not a range of this text (Backspace at the very start may ask for one) */
+    if (range.length == 0 && [replacement length] == 0) return NO;      /* nothing to change */
     if ([folds count] > 0 && ![self editAllowedInRange:range]) { NSBeep(); return NO; }
     [self recordEditInRange:range replacement:replacement];
     return YES;

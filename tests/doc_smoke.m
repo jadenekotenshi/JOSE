@@ -713,6 +713,22 @@ int main(void)
             [bd closePane];
         }
     }
+    {   /* a change that is not a range of the text (what Backspace at the start may ask for) is refused, not recorded */
+        EditorDoc *gd = [[[EditorDoc alloc] initWithOwner:nil] autorelease];
+        EditTextView *tv = [gd textView];
+
+        [tv setString:@"abc\n"];
+        [tv setSelectedRange:NSMakeRange(0, 0)];
+        CHECK(![(id)gd textView:tv shouldChangeTextInRange:NSMakeRange(NSNotFound, 1) replacementString:@""]);
+        CHECK(![(id)gd textView:tv shouldChangeTextInRange:NSMakeRange(3, 5) replacementString:@""]);
+        CHECK(![(id)gd textView:tv shouldChangeTextInRange:NSMakeRange(0, 0) replacementString:@""]);
+        CHECK([(id)gd textView:tv shouldChangeTextInRange:NSMakeRange(0, 1) replacementString:@""]);
+        [tv deleteBackward:nil];
+        [tv deleteBackward:nil];
+        [tv setSelectedRange:NSMakeRange(4, 0)];
+        [tv deleteForward:nil];
+        CHECK([[tv string] isEqualToString:@"abc\n"]);
+    }
     [[NSFileManager defaultManager] removeItemAtPath:dir error:NULL];
     printf(failures ? "doc: FAILED\n" : "doc: ok\n");
     [pool release];
