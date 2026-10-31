@@ -2,6 +2,7 @@
 #import "UIHelpers.h"
 #import "AppController.h"
 #import "LineNumberView.h"
+#import "Appearance.h"
 #include "langmodes.h"
 #include "eol.h"
 #include "edit.h"
@@ -290,6 +291,7 @@ static void line_col(NSString *s, unsigned int loc, unsigned int *line, unsigned
 - (void)updateStatus;
 - (void)buildWindow;
 - (void)applyFont;
+- (void)applyColors;
 - (BOOL)writeTo:(NSString *)aPath;
 - (void)textDidChange:(NSNotification *)notification;
 - (void)textViewDidChangeSelection:(NSNotification *)notification;
@@ -366,6 +368,7 @@ static void line_col(NSString *s, unsigned int loc, unsigned int *line, unsigned
     [textView setEditor:self];
     [scroll setDocumentView:textView];
     [self applyFont];
+    [self applyColors];
     [[window contentView] addSubview:scroll];
 
     status = ui_label(@"", NSMakeRect(4.0, 0.0, WINDOW_W - 8.0, STATUS_H));
@@ -380,6 +383,29 @@ static void line_col(NSString *s, unsigned int loc, unsigned int *line, unsigned
 - (void)applyFont
 {
     [textView setFont:[HKSyntaxHighlighter defaultFont]];
+}
+
+/* The scheme's background and text colours for the view (the highlighter colours what it knows about on top of them). */
+- (void)applyColors
+{
+    [textView setDrawsBackground:YES];
+    [textView setBackgroundColor:[Appearance backgroundColor]];
+    [textView setTextColor:[Appearance textColor]];
+    if ([textView respondsToSelector:@selector(setInsertionPointColor:)])
+        [textView setInsertionPointColor:[Appearance textColor]];
+    [scroll setBackgroundColor:[Appearance backgroundColor]];
+}
+
+/* The font or colours changed (Preferences): the highlighter is made again, which colours the text afresh. */
+- (void)applyAppearance
+{
+    NSString *m = [[mode copy] autorelease];
+
+    [self applyFont];
+    [self applyColors];
+    [self setMode:m];
+    [ruler setNeedsDisplay:YES];
+    [textView setNeedsDisplay:YES];
 }
 
 - (void)showWindow
@@ -542,11 +568,11 @@ static void line_col(NSString *s, unsigned int loc, unsigned int *line, unsigned
     mode = [aMode copy];
     if ([ts length] > 0) {                      /* clear what the old mode coloured */
         NSRange all = NSMakeRange(0, [ts length]);
-        [ts addAttribute:NSForegroundColorAttributeName value:[NSColor blackColor] range:all];
+        [ts addAttribute:NSForegroundColorAttributeName value:[Appearance textColor] range:all];
         [ts addAttribute:NSFontAttributeName value:[HKSyntaxHighlighter defaultFont] range:all];
     }
     if (mode != nil) {
-        highlighter = [[HKSyntaxHighlighter alloc] initWithHighlighterType:mode textStorage:ts defaultTextColor:[NSColor blackColor]];
+        highlighter = [[HKSyntaxHighlighter alloc] initWithHighlighterType:mode textStorage:ts defaultTextColor:[Appearance textColor]];
         if (highlighter == nil) { [mode release]; mode = nil; }
     }
     [textView setHighlighter:highlighter];

@@ -677,12 +677,34 @@ LocateString(NSString * str,
 
 @implementation HKSyntaxHighlighter
 
+static NSString * overrideFontName = nil;
+static float overrideFontSize = 0.0;
+
++ (void) setFontName: (NSString *) name size: (float) size
+{
+  [overrideFontName release];
+  overrideFontName = [name copy];
+  overrideFontSize = size;
+}
+
 + (NSFont *) defaultFont
 {
+
   NSUserDefaults * df = [NSUserDefaults standardUserDefaults];
   NSString * fontName;
   float fontSize;
   NSFont * font = nil;
+
+  if (overrideFontName != nil)
+    {
+      NSFont * chosen = [NSFont fontWithName: overrideFontName
+                                        size: overrideFontSize];
+
+      if (chosen != nil)
+        {
+          return chosen;
+        }
+    }
 
   fontName = [df objectForKey: @"HKFont"];
   fontSize = [df floatForKey: @"HKFontSize"];

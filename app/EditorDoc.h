@@ -107,5 +107,6 @@
 - (NSString *)expandedString:(NSString *)s;   /* s with every fold marker replaced by the code it hides */
 - (BOOL)copyExpandedSelectionAndCut:(BOOL)cut;   /* a selection that holds markers goes to the pasteboard with the code; NO if it holds none */
 - (void)mouseSelectionDone;                /* a click ended: a marker that was clicked on opens */
+- (void)applyAppearance;                   /* the font or colours changed */
 - (void)showWindow;
 @end

@@ -2,6 +2,8 @@
 #import "EditorDoc.h"
 #import "FindController.h"
 #import "ShellController.h"
+#import "PrefsController.h"
+#import "Appearance.h"
 #import "UIHelpers.h"
 #import "HKSyntaxDefinition.h"
 
@@ -61,6 +63,7 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
     w = [ud stringForKey:@"FillWidth"];
     prefFillWidth = w != nil ? [w intValue] : 72;
     if (prefFillWidth < 20 || prefFillWidth > 200) prefFillWidth = 72;
+    [Appearance loadSettings];
 }
 
 - (void)savePreferences
@@ -177,6 +180,7 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
     [self addItem:@"Go to Line..." action:@selector(gotoLine:) key:@"l" target:self toMenu:m];
 
     m = [self submenuNamed:@"Preferences" inMenu:main];
+    [self addItem:@"Preferences Panel..." action:@selector(showPrefs:) key:@"," target:self toMenu:m];
     [[self addItem:@"Wrap Lines" action:@selector(toggleWrap:) key:@"" target:self toMenu:m] setTag:1];
     [self addItem:@"Line Numbers" action:@selector(toggleLineNumbers:) key:@"" target:self toMenu:m];
     [self addItem:@"Auto Indent" action:@selector(toggleAutoIndent:) key:@"" target:self toMenu:m];
@@ -421,6 +425,19 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
 
     [d expandAllFolds];                      /* a marker must not be re-flowed */
     [d fillWithWidth:prefFillWidth];
+}
+
+- (void)showPrefs:(id)sender
+{
+    if (prefs == nil) prefs = [[PrefsController alloc] initWithOwner:self];
+    [prefs showPanel];
+}
+
+- (void)appearanceChanged
+{
+    unsigned int i;
+
+    for (i = 0; i < [docs count]; i++) [[docs objectAtIndex:i] applyAppearance];
 }
 
 - (void)toggleFold:(id)sender { [[self frontDocument] toggleFold]; }

@@ -2,6 +2,7 @@
 #import "EditorDoc.h"
 #import "LineNumberView.h"
 #import "ShellController.h"
+#import "Appearance.h"
 #import "HKSyntaxDefinition.h"
 #include <stdio.h>
 
@@ -298,6 +299,36 @@ int main(void)
         [pd foldAll];                                                             /* the outer if only */
         CHECK([[tv string] rangeOfString:@"then ... 4 lines ~"].location != NSNotFound);
         CHECK([[tv string] rangeOfString:@"fi\necho end"].location != NSNotFound);
+    }
+    {   /* the dark scheme: light text on a dark background, lightened syntax colours, and back */
+        EditorDoc *ad = [[[EditorDoc alloc] initWithOwner:nil] autorelease];
+        EditTextView *tv = [ad textView];
+        NSColor *lightKw, *darkKw;
+        float r1, g1, b1, r2, g2, b2;
+        [ad setMode:@"C"];
+        [tv setString:@"int x;\n"];
+        [tv displayIfNeeded];
+        [(EditTextView *)tv drawRect:[tv bounds]];
+        lightKw = [[tv textStorage] attribute:NSForegroundColorAttributeName atIndex:0 effectiveRange:NULL];
+        CHECK(![Appearance dark]);
+        [Appearance setDark:YES];
+        [ad applyAppearance];
+        [(EditTextView *)tv drawRect:[tv bounds]];
+        darkKw = [[tv textStorage] attribute:NSForegroundColorAttributeName atIndex:0 effectiveRange:NULL];
+        CHECK([[tv backgroundColor] isEqual:[Appearance backgroundColor]]);
+        { NSColor *c = [[tv backgroundColor] colorUsingColorSpaceName:NSCalibratedRGBColorSpace]; r1 = [c redComponent]; g1 = [c greenComponent]; b1 = [c blueComponent]; }
+        CHECK(r1 < 0.3 && g1 < 0.3 && b1 < 0.3);                                 /* a dark background */
+        { NSColor *c = [[Appearance textColor] colorUsingColorSpaceName:NSCalibratedRGBColorSpace]; r2 = [c redComponent]; g2 = [c greenComponent]; b2 = [c blueComponent]; }
+        CHECK(r2 > 0.7 && g2 > 0.7 && b2 > 0.7);                                  /* light text */
+        CHECK(lightKw != nil && darkKw != nil && ![lightKw isEqual:darkKw]);
+        { NSColor *c = [darkKw colorUsingColorSpaceName:NSCalibratedRGBColorSpace]; r2 = [c redComponent]; g2 = [c greenComponent]; b2 = [c blueComponent]; }
+        CHECK(r2 + g2 + b2 > 1.3);                                                /* the keyword colour is light enough to read */
+        [Appearance setBackgroundColor:[NSColor colorWithCalibratedRed:0.2 green:0.0 blue:0.0 alpha:1.0]];
+        CHECK([[Appearance backgroundColor] isEqual:[NSColor colorWithCalibratedRed:0.2 green:0.0 blue:0.0 alpha:1.0]]);
+        [Appearance resetColors];
+        [Appearance setDark:NO];
+        [ad applyAppearance];
+        CHECK([[tv backgroundColor] isEqual:[NSColor whiteColor]] || [[tv backgroundColor] isEqual:[Appearance backgroundColor]]);
     }
     {   /* Shell > Filter Selection: the selection goes through a command and comes back, as one undo step */
         EditorDoc *sd = [[[EditorDoc alloc] initWithOwner:nil] autorelease];

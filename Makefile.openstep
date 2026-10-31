@@ -37,12 +37,12 @@ ICONFLAGS = -sectcreate __ICON __header $(ICONHDR) -segprot __ICON r r -sectcrea
 
 HK_OBJS   = hk/HKTextPattern.o hk/HKSyntaxDefinition.o hk/HKSyntaxHighlighter.o
 CORE_OBJS = core/langmodes.o core/eol.o core/undo.o core/search.o core/edit.o core/brace.o core/fill.o core/rect.o core/shellrun.o core/fold.o core/words.o
-APP_OBJS  = app/AppController.o app/EditorDoc.o app/FindController.o app/LineNumberView.o app/ShellController.o app/UIHelpers.o app/main.o
+APP_OBJS  = app/AppController.o app/EditorDoc.o app/FindController.o app/LineNumberView.o app/ShellController.o app/Appearance.o app/PrefsController.o app/UIHelpers.o app/main.o
 
 # Every header, so that a changed one rebuilds what includes it.  tools/lint_openstep.sh checks the list is complete.
 HEADERS   = hk/HKCompat.h hk/HKSyntaxDefinition.h hk/HKSyntaxHighlighter.h hk/HKTextPattern.h \
             core/eol.h core/langmodes.h core/undo.h core/search.h core/edit.h core/brace.h core/fill.h core/rect.h core/shellrun.h core/fold.h core/words.h \
-            app/AppController.h app/Compat.h app/EditorDoc.h app/FindController.h app/LineNumberView.h app/ShellController.h app/UIHelpers.h
+            app/AppController.h app/Compat.h app/EditorDoc.h app/FindController.h app/LineNumberView.h app/ShellController.h app/Appearance.h app/PrefsController.h app/UIHelpers.h
 .SUFFIXES: .c .m .o
 
 .c.o:

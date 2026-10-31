@@ -1,5 +1,6 @@
 #import "LineNumberView.h"
 #import "UIHelpers.h"
+#import "Appearance.h"
 #include "fold.h"
 
 #define CHUNK 1024
@@ -124,7 +125,7 @@
     NSRange glyphs;
     unsigned int g;
 
-    [[NSColor colorWithCalibratedWhite:0.88 alpha:1.0] set];
+    [[Appearance gutterBackground] set];
     NSRectFill(rect);
     if (![lm respondsToSelector:@selector(lineFragmentRectForGlyphAtIndex:effectiveRange:)] ||
         ![lm respondsToSelector:@selector(characterIndexForGlyphAtIndex:)]) {
@@ -132,7 +133,7 @@
         return;
     }
     [font set];
-    [[NSColor colorWithCalibratedWhite:0.35 alpha:1.0] set];
+    [[Appearance gutterText] set];
     glyphs = [lm glyphRangeForBoundingRect:inContainer inTextContainer:tc];
     g = glyphs.location;
     while (g < NSMaxRange(glyphs)) {

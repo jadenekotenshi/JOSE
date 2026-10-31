@@ -69,7 +69,7 @@ hk-smoke:
 
 doc-smoke:
 	mkdir -p $(BUILD)
-	for f in tests/doc_smoke.m app/EditorDoc.m app/UIHelpers.m app/LineNumberView.m app/ShellController.m hk/*.m; do \
+	for f in tests/doc_smoke.m app/EditorDoc.m app/UIHelpers.m app/LineNumberView.m app/ShellController.m app/Appearance.m hk/*.m; do \
 	  $(CC) -c $(OBJCFLAGS) -fsanitize=address,undefined $$f -o $(BUILD)/dc_$$(basename $$f .m).o || exit 1; \
 	done
 	for f in core/*.c; do $(CC) -c -w -g -Icore -fsanitize=address,undefined $$f -o $(BUILD)/dc_c_$$(basename $$f .c).o || exit 1; done

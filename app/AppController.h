@@ -3,6 +3,7 @@
 @class EditorDoc;
 @class FindController;
 @class ShellController;
+@class PrefsController;
 
 /* Owns every open document and the menus. */
 @interface AppController : NSObject
@@ -14,6 +15,7 @@
     NSTextField    *gotoField;
     FindController *finder;
     ShellController *shell;
+    PrefsController *prefs;
     int             prefFillWidth;      /* the right margin of Fill Paragraph */
     BOOL            prefAutoIndent;     /* indentation settings, applied to every document */
     BOOL            prefUseSpaces;
@@ -32,5 +34,6 @@
 - (EditorDoc *)frontDocument;
 - (void)documentDidClose:(EditorDoc *)doc;
 - (NSString *)syntaxDirectory;
+- (void)appearanceChanged;              /* the font or colours changed: every window shows them */
 - (NSArray *)modeNames;                 /* the language modes available (sorted) */
 @end

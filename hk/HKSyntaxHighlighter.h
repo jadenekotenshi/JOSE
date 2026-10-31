@@ -53,6 +53,7 @@
   BOOL didBeginEditing;
 }
 
++ (void) setFontName: (NSString *) name size: (float) size;   /* nil name: the user's fixed-pitch font */
 + (NSFont *) defaultFont;
 + (NSFont *) defaultBoldFont;
 + (NSFont *) defaultItalicFont;

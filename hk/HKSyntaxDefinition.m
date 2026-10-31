@@ -67,6 +67,12 @@ ParseSyntaxGraphics (NSDictionary * specification)
                                                       blue: b
                                                      alpha: a]
                    forKey: @"ForegroundColor"];
+          /* the same colour for a dark background: lightened */
+          [dict setObject: [NSColor colorWithCalibratedRed: r * 0.6 + 0.4
+                                                     green: g * 0.6 + 0.4
+                                                      blue: b * 0.6 + 0.4
+                                                     alpha: a]
+                   forKey: @"DarkForegroundColor"];
         }
       else
         {
@@ -97,6 +103,11 @@ ParseSyntaxGraphics (NSDictionary * specification)
                                                       blue: b
                                                      alpha: a]
                    forKey: @"BackgroundColor"];
+          [dict setObject: [NSColor colorWithCalibratedRed: r * 0.35
+                                                     green: g * 0.35
+                                                      blue: b * 0.35
+                                                     alpha: a]
+                   forKey: @"DarkBackgroundColor"];
         }
       else
         {
@@ -153,6 +164,7 @@ MarkTextPatternBeginningCharacters (HKTextPattern * pattern,
 }
 
 static NSMutableDictionary * syntaxDefinitions = nil;
+static BOOL darkColors = NO;       /* hand out the lightened foregrounds and darkened backgrounds */
 
 /**
  * This class representas a compiled syntax definition file and is needed
@@ -275,6 +287,11 @@ static NSString *explicitSyntaxDirectory = nil;
  * Clean syntaxDefinitions, so this can be created with the new path 
  * of syntax files.
  */
++ (void) setDarkMode: (BOOL) flag
+{
+  darkColors = flag;
+}
+
 + (void) themeDidChange
 {
   [syntaxDefinitions removeAllObjects];
@@ -643,7 +660,7 @@ static NSString *explicitSyntaxDirectory = nil;
 {
   return [[contextGraphics
     objectAtIndex: context]
-    objectForKey: @"ForegroundColor"];
+    objectForKey: darkColors ? @"DarkForegroundColor" : @"ForegroundColor"];
 }
 
 /**
@@ -653,7 +670,7 @@ static NSString *explicitSyntaxDirectory = nil;
 {
   return [[contextGraphics
     objectAtIndex: context]
-    objectForKey: @"BackgroundColor"];
+    objectForKey: darkColors ? @"DarkBackgroundColor" : @"BackgroundColor"];
 }
 
 /**
@@ -700,7 +717,7 @@ static NSString *explicitSyntaxDirectory = nil;
   return [[[keywordGraphics
     objectAtIndex: context]
     objectAtIndex: keyword]
-    objectForKey: @"ForegroundColor"];
+    objectForKey: darkColors ? @"DarkForegroundColor" : @"ForegroundColor"];
 }
 
 /**
@@ -714,7 +731,7 @@ static NSString *explicitSyntaxDirectory = nil;
   return [[[keywordGraphics
     objectAtIndex: context]
     objectAtIndex: keyword]
-    objectForKey: @"BackgroundColor"];
+    objectForKey: darkColors ? @"DarkBackgroundColor" : @"BackgroundColor"];
 }
 
 /**

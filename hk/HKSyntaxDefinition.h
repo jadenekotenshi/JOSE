@@ -62,6 +62,7 @@
 + (NSString *) findSyntaxFileForType: (NSString *) type;
 + (HKSyntaxDefinition *) syntaxDefinitionForType: (NSString *) type;
 + (void) themeDidChange;
++ (void) setDarkMode: (BOOL) flag;     /* colours for a dark background (lightened foregrounds, darkened backgrounds) */
 
 - (id) initWithContextList: (NSArray *) contexts;
 
