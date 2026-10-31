@@ -396,6 +396,22 @@ static void line_col(NSString *s, unsigned int loc, unsigned int *line, unsigned
     [scroll setBackgroundColor:[Appearance backgroundColor]];
 }
 
+- (NSString *)lineAtCaret
+{
+    NSString *s = [textView string];
+    NSRange lr = [s lineRangeForRange:NSMakeRange([textView selectedRange].location, 0)];
+
+    if (lr.length > 0 && [s characterAtIndex:NSMaxRange(lr) - 1] == '\n') lr.length--;
+    return [s substringWithRange:lr];
+}
+
+- (NSString *)selectedString
+{
+    NSRange sel = [textView selectedRange];
+
+    return sel.length > 0 ? [[textView string] substringWithRange:sel] : nil;
+}
+
 /* The font or colours changed (Preferences): the highlighter is made again, which colours the text afresh. */
 - (void)applyAppearance
 {
@@ -684,6 +700,7 @@ static void line_col(NSString *s, unsigned int loc, unsigned int *line, unsigned
     if (![self writeTo:[panel filename]]) return NO;
     [path release];
     path = [[panel filename] copy];
+    if ([owner respondsToSelector:@selector(noteRecentFile:)]) [owner noteRecentFile:path];
     undo_break(undo);
     savedVersion = undo_version(undo);
     dirty = NO;

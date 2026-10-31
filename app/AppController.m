@@ -6,12 +6,17 @@
 #import "Appearance.h"
 #import "UIHelpers.h"
 #import "HKSyntaxDefinition.h"
+#include "includes.h"
+#include "langmodes.h"
 
 #define TAG_MODE_BASE 1000             /* the Language Mode items: the tag is this plus the mode's index; plain text is TAG_MODE_BASE - 1 */
 
 @interface AppController (Private)
 - (void)loadPreferences;
 - (void)savePreferences;
+- (void)loadRecent;
+- (void)saveRecent;
+- (void)rebuildRecentMenu;
 - (void)applyIndentPrefsTo:(EditorDoc *)d;
 - (void)applyIndentPrefs;
 - (id)addItem:(NSString *)title action:(SEL)action key:(NSString *)key target:(id)target toMenu:(NSMenu *)menu;
@@ -27,6 +32,7 @@
     if (self) {
         docs = [[NSMutableArray alloc] init];
         [self loadPreferences];
+        [self loadRecent];
         menuKeepers = [[NSMutableArray alloc] init];
         syntaxDir = [[[NSBundle mainBundle] bundlePath] stringByAppendingPathComponent:@"syntax"];
         [syntaxDir retain];
@@ -77,6 +83,82 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
     set_pref_bool(ud, @"LineNumbers", prefLineNumbers);
     [ud setObject:[NSString stringWithFormat:@"%d", prefFillWidth] forKey:@"FillWidth"];
     [ud synchronize];
+}
+
+/* ---- recent files ---- */
+
+#define MAX_RECENT 12
+
+- (void)loadRecent
+{
+    NSString *v = [[NSUserDefaults standardUserDefaults] stringForKey:@"RecentFiles"];
+    NSArray *parts = v != nil ? [v componentsSeparatedByString:@"\n"] : [NSArray array];
+    unsigned int i;
+
+    recentFiles = [[NSMutableArray alloc] init];
+    for (i = 0; i < [parts count] && [recentFiles count] < MAX_RECENT; i++)
+        if ([[parts objectAtIndex:i] length] > 0) [recentFiles addObject:[parts objectAtIndex:i]];
+}
+
+- (void)saveRecent
+{
+    NSUserDefaults *ud = [NSUserDefaults standardUserDefaults];
+
+    [ud setObject:[recentFiles componentsJoinedByString:@"\n"] forKey:@"RecentFiles"];
+    [ud synchronize];
+}
+
+- (void)openRecent:(id)sender
+{
+    int i = [sender tag];
+    NSString *p;
+
+    if (i < 0 || i >= (int)[recentFiles count]) return;
+    p = [[[recentFiles objectAtIndex:i] retain] autorelease];
+    if (![[NSFileManager defaultManager] isReadableFileAtPath:p]) {
+        NSRunAlertPanel(@"Open Recent", @"%@ is no longer there.", @"OK", nil, nil, p);
+        [recentFiles removeObjectAtIndex:i];
+        [self saveRecent];
+        [self rebuildRecentMenu];
+        return;
+    }
+    [self openPath:p];
+}
+
+- (void)clearRecent:(id)sender
+{
+    [recentFiles removeAllObjects];
+    [self saveRecent];
+    [self rebuildRecentMenu];
+}
+
+- (void)rebuildRecentMenu
+{
+    unsigned int i;
+
+    if (recentMenu == nil) return;
+    while ([recentMenu numberOfItems] > 0) [recentMenu removeItemAtIndex:0];
+    for (i = 0; i < [recentFiles count]; i++) {
+        NSString *p = [recentFiles objectAtIndex:i];
+        NSString *title = [NSString stringWithFormat:@"%@  (%@)", [p lastPathComponent],
+                           [[p stringByDeletingLastPathComponent] stringByAbbreviatingWithTildeInPath]];
+        [[self addItem:title action:@selector(openRecent:) key:@"" target:self toMenu:recentMenu] setTag:(int)i];
+    }
+    if ([recentFiles count] > 0) [self addItem:@"Clear Menu" action:@selector(clearRecent:) key:@"" target:self toMenu:recentMenu];
+    else [[self addItem:@"(none)" action:NULL key:@"" target:self toMenu:recentMenu] setEnabled:NO];
+    if ([recentMenu respondsToSelector:@selector(sizeToFit)]) [recentMenu sizeToFit];
+}
+
+- (void)noteRecentFile:(NSString *)path
+{
+    if (path == nil) return;
+    path = [path stringByStandardizingPath];
+    [[path retain] autorelease];
+    [recentFiles removeObject:path];
+    [recentFiles insertObject:path atIndex:0];
+    while ([recentFiles count] > MAX_RECENT) [recentFiles removeLastObject];
+    [self saveRecent];
+    [self rebuildRecentMenu];
 }
 
 - (id)addItem:(NSString *)title action:(SEL)action key:(NSString *)key
@@ -147,6 +229,9 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
     m = [self submenuNamed:@"File" inMenu:main];
     [self addItem:@"New" action:@selector(newDoc:) key:@"n" target:self toMenu:m];
     [self addItem:@"Open..." action:@selector(openDoc:) key:@"o" target:self toMenu:m];
+    recentMenu = [self submenuNamed:@"Open Recent" inMenu:m];
+    [self rebuildRecentMenu];
+    [self addItem:@"Open Included File" action:@selector(openIncluded:) key:@"d" target:self toMenu:m];
     [self addItem:@"Save" action:@selector(saveDoc:) key:@"s" target:self toMenu:m];
     [self addItem:@"Save As..." action:@selector(saveDocAs:) key:@"S" target:self toMenu:m];
     [self addItem:@"Revert to Saved" action:@selector(revertDoc:) key:@"" target:self toMenu:m];
@@ -255,7 +340,7 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
     SEL a = [item action];
     int tag = [item tag];
 
-    if (a == @selector(saveDoc:) || a == @selector(saveDocAs:) || a == @selector(closeDoc:) || a == @selector(gotoLine:) || a == @selector(showFind:) || a == @selector(findAgain:)
+    if (a == @selector(saveDoc:) || a == @selector(openIncluded:) || a == @selector(saveDocAs:) || a == @selector(closeDoc:) || a == @selector(gotoLine:) || a == @selector(showFind:) || a == @selector(findAgain:)
         || a == @selector(findPrevious:) || a == @selector(findSelection:)
         || a == @selector(toggleWrap:) || a == @selector(setMode:)
         || a == @selector(gotoBracket:) || a == @selector(selectBracket:) || a == @selector(shiftLeft:) || a == @selector(shiftRight:) || a == @selector(commentLines:) || a == @selector(uncommentLines:)
@@ -297,6 +382,7 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
     unsigned int i;
     EditorDoc *d;
 
+    path = [path stringByStandardizingPath];
     for (i = 0; i < [docs count]; i++) {                       /* already open: bring it forward */
         d = [docs objectAtIndex:i];
         if ([d path] != nil && [[d path] isEqualToString:path]) { [d showWindow]; return d; }
@@ -308,6 +394,7 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
     [docs addObject:d];
     [d release];
     [d showWindow];
+    [self noteRecentFile:path];
     return d;
 }
 
@@ -425,6 +512,90 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
 
     [d expandAllFolds];                      /* a marker must not be re-flowed */
     [d fillWithWidth:prefFillWidth];
+}
+
+/* ---- Open Included File ---- */
+
+/* The file that `name` stands for: next to the document, then along the include path (a name like Foo/Bar.h is also looked for as
+ * Foo.framework/Headers/Bar.h).  nil if there is none. */
+- (NSString *)resolveInclude:(NSString *)name from:(EditorDoc *)d searched:(NSMutableArray *)searched
+{
+    NSFileManager *fm = [NSFileManager defaultManager];
+    NSMutableArray *dirs = [NSMutableArray array];
+    NSArray *path = [[Appearance includePath] componentsSeparatedByString:@":"];
+    unsigned int i;
+    BOOL isDir;
+
+    name = [name stringByExpandingTildeInPath];
+    if ([name isAbsolutePath]) {
+        [searched addObject:name];
+        return ([fm fileExistsAtPath:name isDirectory:&isDir] && !isDir) ? name : nil;
+    }
+    if ([d path] != nil) [dirs addObject:[[d path] stringByDeletingLastPathComponent]];
+    for (i = 0; i < [path count]; i++)
+        if ([[path objectAtIndex:i] length] > 0) [dirs addObject:[path objectAtIndex:i]];
+    for (i = 0; i < [dirs count]; i++) {
+        NSString *dir = [dirs objectAtIndex:i], *cand = [dir stringByAppendingPathComponent:name];
+        NSRange slash = [name rangeOfString:@"/"];
+
+        if ([fm fileExistsAtPath:cand isDirectory:&isDir] && !isDir) return cand;
+        if (slash.length > 0) {
+            NSString *fw = [NSString stringWithFormat:@"%@.framework/Headers", [name substringToIndex:slash.location]];
+            cand = [[dir stringByAppendingPathComponent:fw] stringByAppendingPathComponent:[name substringFromIndex:NSMaxRange(slash)]];
+            if ([fm fileExistsAtPath:cand isDirectory:&isDir] && !isDir) return cand;
+        }
+        [searched addObject:dir];
+    }
+    return nil;
+}
+
+- (void)openIncluded:(id)sender
+{
+    EditorDoc *d = [self frontDocument];
+    char names[INCLUDE_MAX_NAMES][INCLUDE_NAME_SIZE], tok[INCLUDE_NAME_SIZE];
+    NSString *line, *found = nil, *first = nil;
+    NSMutableArray *searched = [NSMutableArray array];
+    unsigned int count, i, n;
+    int system = 0;
+    u16 *u;
+
+    if (d == nil) return;
+    line = [d lineAtCaret];
+    n = [line length];
+    u = (u16 *)malloc((n + 1) * sizeof(u16));
+    if (u == NULL) return;
+    if (n > 0) [line getCharacters:u];
+    count = include_parse(u, n, [d mode] != nil ? [[d mode] cString] : NULL, names, &system);
+    free(u);
+    if (count == 0) {                                          /* not an include line: a selected name, or the name at the insertion point */
+        NSString *sel = [d selectedString];
+
+        if (sel != nil && [sel length] < INCLUDE_NAME_SIZE && [sel rangeOfString:@"\n"].length == 0) {
+            strcpy(names[0], [ui_trim(sel) cString]);
+            count = strlen(names[0]) > 0 ? 1 : 0;
+        } else {
+            NSRange r = [[d textView] selectedRange];
+            NSRange lr = [[[d textView] string] lineRangeForRange:NSMakeRange(r.location, 0)];
+            u = (u16 *)malloc((n + 1) * sizeof(u16));
+            if (u != NULL) {
+                if (n > 0) [line getCharacters:u];
+                if (include_token(u, n, r.location - lr.location, tok, sizeof tok) > 0) { strcpy(names[0], tok); count = 1; }
+                free(u);
+            }
+        }
+    }
+    if (count == 0) { NSBeep(); return; }
+    for (i = 0; i < count && found == nil; i++) {
+        NSString *nm = [NSString stringWithCString:names[i]];
+        if (first == nil) first = nm;
+        found = [self resolveInclude:nm from:d searched:searched];
+    }
+    if (found == nil) {
+        NSRunAlertPanel(@"Open Included File", @"%@ was not found in:\n%@", @"OK", nil, nil, first,
+                        [searched count] > 0 ? [searched componentsJoinedByString:@"\n"] : @"(nowhere)");
+        return;
+    }
+    [self openPath:found];
 }
 
 - (void)showPrefs:(id)sender

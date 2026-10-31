@@ -16,6 +16,8 @@
     FindController *finder;
     ShellController *shell;
     PrefsController *prefs;
+    NSMutableArray *recentFiles;        /* paths, most recent first */
+    NSMenu         *recentMenu;         /* File > Open Recent */
     int             prefFillWidth;      /* the right margin of Fill Paragraph */
     BOOL            prefAutoIndent;     /* indentation settings, applied to every document */
     BOOL            prefUseSpaces;
@@ -34,6 +36,7 @@
 - (EditorDoc *)frontDocument;
 - (void)documentDidClose:(EditorDoc *)doc;
 - (NSString *)syntaxDirectory;
+- (void)noteRecentFile:(NSString *)path;  /* a file was opened or saved: it goes to the top of Open Recent */
 - (void)appearanceChanged;              /* the font or colours changed: every window shows them */
 - (NSArray *)modeNames;                 /* the language modes available (sorted) */
 @end
