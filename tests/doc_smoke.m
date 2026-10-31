@@ -6,6 +6,10 @@
 #import "HKSyntaxDefinition.h"
 #include <stdio.h>
 
+@interface EditorDoc (SmokeTest)
+- (void)refreshFoldInfo;
+@end
+
 @interface ShellController (SmokeTest)
 - (void)filter:(NSString *)command in:(EditorDoc *)doc;
 @end
@@ -352,6 +356,25 @@ int main(void)
         CHECK([w isEqualToString:@"helper"] && at == [src rangeOfString:@"(1);"].location);
         [tv setSelectedRange:NSMakeRange(2, 0)];
         CHECK([td wordBeforeParenAt:&at] == nil && at == 2);
+    }
+    {   /* the fold margin: which lines show a - or a +, and clicking one */
+        EditorDoc *gd = [[[EditorDoc alloc] initWithOwner:nil] autorelease];
+        EditTextView *tv = [gd textView];
+        NSString *src = @"int f(void)\n{\n  a;\n  b;\n}\nint g;\n";
+        unsigned int brace;
+        [gd setMode:@"C"];
+        [tv setString:src];
+        [gd refreshFoldInfo];
+        brace = [src rangeOfString:@"{\n  a"].location;
+        CHECK([gd foldStateForLineStart:brace] == 1);
+        CHECK([gd foldStateForLineStart:0] == 0);
+        CHECK([gd foldStateForLineStart:[src rangeOfString:@"int g"].location] == 0);
+        [gd toggleFoldAtLineStart:brace];                                        /* a click on the - */
+        CHECK([[tv string] rangeOfString:@"{ ... 3 lines ~"].location != NSNotFound);
+        CHECK([gd foldStateForLineStart:brace] == 2);                            /* now a + */
+        [gd toggleFoldAtLineStart:brace];                                        /* a click on the + */
+        CHECK([[tv string] isEqualToString:src]);
+        CHECK([gd foldStateForLineStart:brace] == 1);
     }
     {   /* Shell > Filter Selection: the selection goes through a command and comes back, as one undo step */
         EditorDoc *sd = [[[EditorDoc alloc] initWithOwner:nil] autorelease];

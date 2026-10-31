@@ -53,6 +53,7 @@
 
 - (BOOL)mouseActive { return mouseActive; }
 
+
 - (BOOL)rectActive { return rectOn; }
 
 - (void)rectClear
@@ -97,6 +98,14 @@
     *ls = [s lineRangeForRange:NSMakeRange(ci, 0)].location;
     c = (p.x - [self rectLeft]) / [self rectCharWidth] + 0.5;
     *col = c < 0.0 ? 0 : (unsigned int)c;
+}
+
+- (unsigned int)lineStartForPoint:(NSPoint)p
+{
+    unsigned int ls, col;
+
+    [self rectPoint:p line:&ls column:&col];
+    return ls;
 }
 
 - (void)mouseDown:(NSEvent *)event
@@ -293,6 +302,9 @@ static void line_col(NSString *s, unsigned int loc, unsigned int *line, unsigned
 - (void)buildWindow;
 - (void)applyFont;
 - (void)applyColors;
+- (void)updateRuler;
+- (void)refreshFoldInfo;
+- (void)scheduleFoldRefresh;
 - (BOOL)writeTo:(NSString *)aPath;
 - (void)textDidChange:(NSNotification *)notification;
 - (void)textViewDidChangeSelection:(NSNotification *)notification;
@@ -315,6 +327,7 @@ static void line_col(NSString *s, unsigned int loc, unsigned int *line, unsigned
         folds = [[NSMutableDictionary alloc] init];
         clockBase = [NSDate timeIntervalSinceReferenceDate];
         [self buildWindow];
+        [self updateRuler];
         [self setMode:nil];
         [self updateTitle];
         [self updateStatus];
@@ -329,6 +342,8 @@ static void line_col(NSString *s, unsigned int loc, unsigned int *line, unsigned
     [highlighter release];
     undo_free(undo);
     [ruler release];
+    [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(refreshFoldInfo) object:nil];
+    foldlines_free(&foldInfo);
     [folds release];
     [path release];
     [mode release];
@@ -618,6 +633,7 @@ static BOOL ident_char(unichar c)
 {
     BOOL d = undo_version(undo) != savedVersion;
 
+    [self scheduleFoldRefresh];
     if (d != dirty) {
         dirty = d;
         [self updateTitle];
@@ -702,6 +718,7 @@ static BOOL ident_char(unichar c)
     }
     [textView setHighlighter:highlighter];
     [textView setNeedsDisplay:YES];
+    [self scheduleFoldRefresh];
     [self updateStatus];
 }
 
@@ -864,22 +881,75 @@ static BOOL ident_char(unichar c)
 
 /* ---- line numbers and brackets ---- */
 
+/* The margin on the left of the text: line numbers and the fold column, whichever are wanted. */
+- (void)updateRuler
+{
+    BOOL fold = [Appearance foldMargin], show = lineNumbers || fold;
+
+    if (show && ruler == nil) {
+        if (![scroll respondsToSelector:@selector(setVerticalRulerView:)]) { SSTrace("line numbers: no scroll view rulers here"); lineNumbers = NO; return; }
+        ruler = [[LineNumberView alloc] initWithScrollView:scroll textView:textView];
+        [scroll setVerticalRulerView:ruler];
+        [scroll setHasVerticalRuler:YES];
+    }
+    if (ruler != nil) {
+        [ruler setFoldSource:self];
+        [ruler setShowNumbers:lineNumbers showFold:fold];
+        [scroll setRulersVisible:show];
+        if (show) {
+            [ruler textReplaced];
+            [self scheduleFoldRefresh];
+        }
+    }
+}
+
 - (BOOL)lineNumbers { return lineNumbers; }
 
 - (void)setLineNumbers:(BOOL)flag
 {
     lineNumbers = flag;
-    if (flag && ruler == nil) {
-        if (![scroll respondsToSelector:@selector(setVerticalRulerView:)]) { SSTrace("line numbers: no scroll view rulers here"); lineNumbers = NO; return; }
-        ruler = [[LineNumberView alloc] initWithScrollView:scroll textView:textView];
-        [scroll setVerticalRulerView:ruler];
-        [scroll setHasVerticalRuler:YES];
-        [ruler textReplaced];
-    }
-    if (ruler != nil) {
-        [scroll setRulersVisible:flag];
-        if (flag) [ruler textReplaced];
-    }
+    [self updateRuler];
+}
+
+/* ---- the fold margin ---- */
+
+#define FOLD_SCAN_LIMIT 3000000U           /* beyond this many characters the margin stays empty rather than slow */
+
+- (void)refreshFoldInfo
+{
+    NSString *s = [textView string];
+    unsigned int n = [s length];
+    u16 *t;
+    const char *m = mode != nil ? [mode cString] : NULL;
+
+    foldlines_free(&foldInfo);
+    if (ruler == nil || ![Appearance foldMargin] || n == 0 || n > FOLD_SCAN_LIMIT) { [ruler setNeedsDisplay:YES]; return; }
+    t = (u16 *)malloc((n + 1) * sizeof(u16));
+    if (t == NULL) return;
+    [s getCharacters:t];
+    foldlines_scan(t, n, lang_fold_style(m), lang_c_like(m), lang_word_kind(m), &foldInfo);
+    free(t);
+    [ruler setNeedsDisplay:YES];
+}
+
+/* After a pause: scanning for every keystroke would be wasteful. */
+- (void)scheduleFoldRefresh
+{
+    [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(refreshFoldInfo) object:nil];
+    if (ruler != nil && [Appearance foldMargin]) [self performSelector:@selector(refreshFoldInfo) withObject:nil afterDelay:0.4];
+}
+
+- (int)foldStateForLineStart:(unsigned int)lineStart
+{
+    return foldlines_state(&foldInfo, lineStart);
+}
+
+- (void)toggleFoldAtLineStart:(unsigned int)lineStart
+{
+    [textView setSelectedRange:NSMakeRange(lineStart, 0)];
+    [window makeFirstResponder:textView];
+    [self toggleFold];
+    [self refreshFoldInfo];
 }
 
 - (void)gotoMatchingBracket:(BOOL)select
@@ -1379,6 +1449,7 @@ static NSString *rect_clip;                 /* what Copy last took from a rectan
 
     [self replaceRange:range with:str select:sel];
     [ruler textReplaced];
+    [self refreshFoldInfo];
     if (wasClean) {
         savedVersion = undo_version(undo);
         dirty = NO;

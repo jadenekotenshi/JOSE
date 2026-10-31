@@ -4,12 +4,15 @@
 #include "fold.h"
 
 #define CHUNK 1024
+#define FOLD_W 13.0
 
 @interface LineNumberView (Private)
 - (float)thicknessForDigits:(int)d;
 - (unsigned int)newlinesFrom:(unsigned int)from to:(unsigned int)to;
 - (void)updateThickness;
 - (void)drawNumber:(unsigned int)n atY:(float)y height:(float)h;
+- (void)drawMark:(const char *)mark atY:(float)y height:(float)h;
+- (float)totalThickness;
 @end
 
 @implementation LineNumberView
@@ -22,8 +25,9 @@
         font = [[NSFont userFixedPitchFontOfSize:9.0] retain];
         cacheLine = 1;
         digits = 3;
+        showNumbers = YES;
         [self setReservedThicknessForMarkers:0.0];
-        [self setRuleThickness:[self thicknessForDigits:digits]];
+        [self setRuleThickness:[self totalThickness]];
     }
     return self;
 }
@@ -32,6 +36,27 @@
 {
     [font release];
     [super dealloc];
+}
+
+/* The width of the whole margin: the numbers, if shown, and the fold column, if shown. */
+- (float)totalThickness
+{
+    float w = (showNumbers ? [self thicknessForDigits:digits] : 0.0) + (showFold ? FOLD_W : 0.0);
+
+    return w < 4.0 ? 4.0 : w;
+}
+
+- (void)setShowNumbers:(BOOL)numbers showFold:(BOOL)fold
+{
+    showNumbers = numbers;
+    showFold = fold;
+    [self setRuleThickness:[self totalThickness]];
+    [self setNeedsDisplay:YES];
+}
+
+- (void)setFoldSource:(id)source
+{
+    foldSource = source;
 }
 
 - (float)thicknessForDigits:(int)d
@@ -80,7 +105,7 @@
     if (d < 3) d = 3;
     if (d != digits) {
         digits = d;
-        [self setRuleThickness:[self thicknessForDigits:digits]];
+        [self setRuleThickness:[self totalThickness]];
     }
 }
 
@@ -109,9 +134,35 @@
 
     sprintf(buf, "%u", n);
     w = [font widthOfString:[NSString stringWithCString:buf]];
-    x = [self ruleThickness] - 5.0 - w;
+    x = [self thicknessForDigits:digits] - 5.0 - w;
     PSmoveto(x, y + ([font ascender] + (h - ([font ascender] - [font descender])) / 2.0));
     PSshow(buf);
+}
+
+/* A + or - in the fold column. */
+- (void)drawMark:(const char *)mark atY:(float)y height:(float)h
+{
+    float w = [font widthOfString:[NSString stringWithCString:mark]];
+    float x = (showNumbers ? [self thicknessForDigits:digits] : 0.0) + (FOLD_W - w) / 2.0;
+
+    PSmoveto(x, y + ([font ascender] + (h - ([font ascender] - [font descender])) / 2.0));
+    PSshow(mark);
+}
+
+/* A click in the fold column folds or unfolds the block that begins on that line. */
+- (void)mouseDown:(NSEvent *)event
+{
+    NSPoint p = [self convertPoint:[event locationInWindow] fromView:nil];
+    float left = showNumbers ? [self thicknessForDigits:digits] : 0.0;
+
+    if (showFold && foldSource != nil && p.x >= left) {
+        NSPoint tp = [textView convertPoint:[event locationInWindow] fromView:nil];
+        unsigned int ls = [(id)textView lineStartForPoint:tp];
+
+        if ([foldSource foldStateForLineStart:ls] != 0) [foldSource toggleFoldAtLineStart:ls];
+        return;
+    }
+    [super mouseDown:event];
 }
 
 - (void)drawHashMarksAndLabelsInRect:(NSRect)rect
@@ -143,7 +194,18 @@
         NSRect r = [self convertRect:NSMakeRect(fr.origin.x + origin.x, fr.origin.y + origin.y, fr.size.width, fr.size.height)
                             fromView:textView];
 
-        if (ch == 0 || [str characterAtIndex:ch - 1] == '\n') [self drawNumber:[self lineNumberForChar:ch] atY:r.origin.y height:r.size.height];
+        if (ch == 0 || [str characterAtIndex:ch - 1] == '\n') {
+            if (showNumbers) [self drawNumber:[self lineNumberForChar:ch] atY:r.origin.y height:r.size.height];
+            if (showFold && foldSource != nil) {
+                int st = [foldSource foldStateForLineStart:ch];
+
+                if (st != 0) {
+                    [[Appearance foldMarkerColor] set];
+                    [self drawMark:(st == 2 ? "+" : "-") atY:r.origin.y height:r.size.height];
+                    [[Appearance gutterText] set];
+                }
+            }
+        }
         if (eff.length == 0) break;
         g = NSMaxRange(eff);
     }
@@ -154,7 +216,7 @@
             if (fr.size.height > 0.0) {
                 NSRect r = [self convertRect:NSMakeRect(fr.origin.x + origin.x, fr.origin.y + origin.y, fr.size.width, fr.size.height)
                                     fromView:textView];
-                [self drawNumber:[self lineNumberForChar:[str length]] atY:r.origin.y height:r.size.height];
+                if (showNumbers) [self drawNumber:[self lineNumberForChar:[str length]] atY:r.origin.y height:r.size.height];
             }
         }
     }

@@ -1,6 +1,7 @@
 #import "Compat.h"
 #import "HKSyntaxHighlighter.h"
 #include "undo.h"
+#include "foldlines.h"
 
 @class EditorDoc;
 @class LineNumberView;
@@ -18,6 +19,7 @@
     unsigned int         rectCurCol;
     BOOL                 mouseActive;      /* a click or drag is in progress */
 }
+- (unsigned int)lineStartForPoint:(NSPoint)p;   /* the line at a point of this view's coordinates */
 - (void)setHighlighter:(HKSyntaxHighlighter *)h;
 - (void)setEditor:(id)anEditor;
 - (BOOL)mouseActive;
@@ -57,6 +59,7 @@
     unsigned int         foldNext;
     BOOL                 snapping;         /* the selection is being moved off a fold marker */
     NSRange              prevSel;
+    FoldLines            foldInfo;         /* the lines that can be folded or are folded, for the fold margin */
 }
 - (id)initWithOwner:(id)anOwner;
 - (BOOL)openFile:(NSString *)aPath;        /* NO (and an alert) if it cannot be read */
@@ -114,6 +117,8 @@
 - (void)didTypeOpenParen;                  /* a `(` was typed: perhaps show a call tip */
 - (NSString *)lineAtCaret;                  /* the text of the line with the insertion point (no newline) */
 - (NSString *)selectedString;              /* the selected text, or nil */
+- (int)foldStateForLineStart:(unsigned int)lineStart;   /* 0 nothing, 1 a block begins there, 2 it is folded */
+- (void)toggleFoldAtLineStart:(unsigned int)lineStart;
 - (void)applyAppearance;                   /* the font or colours changed */
 - (void)showWindow;
 @end

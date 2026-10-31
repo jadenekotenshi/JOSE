@@ -36,12 +36,12 @@ SYNTAXFILES = syntax/C.syntax
 ICONFLAGS = -sectcreate __ICON __header $(ICONHDR) -segprot __ICON r r -sectcreate __ICON app $(ICONTIFF)
 
 HK_OBJS   = hk/HKTextPattern.o hk/HKSyntaxDefinition.o hk/HKSyntaxHighlighter.o
-CORE_OBJS = core/langmodes.o core/eol.o core/undo.o core/search.o core/edit.o core/brace.o core/fill.o core/rect.o core/shellrun.o core/fold.o core/words.o core/includes.o core/tags.o
+CORE_OBJS = core/langmodes.o core/eol.o core/undo.o core/search.o core/edit.o core/brace.o core/fill.o core/rect.o core/shellrun.o core/fold.o core/words.o core/includes.o core/tags.o core/foldlines.o
 APP_OBJS  = app/AppController.o app/EditorDoc.o app/FindController.o app/LineNumberView.o app/ShellController.o app/TagsController.o app/Appearance.o app/PrefsController.o app/UIHelpers.o app/main.o
 
 # Every header, so that a changed one rebuilds what includes it.  tools/lint_openstep.sh checks the list is complete.
 HEADERS   = hk/HKCompat.h hk/HKSyntaxDefinition.h hk/HKSyntaxHighlighter.h hk/HKTextPattern.h \
-            core/eol.h core/langmodes.h core/undo.h core/search.h core/edit.h core/brace.h core/fill.h core/rect.h core/shellrun.h core/fold.h core/words.h core/includes.h core/tags.h \
+            core/eol.h core/langmodes.h core/undo.h core/search.h core/edit.h core/brace.h core/fill.h core/rect.h core/shellrun.h core/fold.h core/words.h core/includes.h core/tags.h core/foldlines.h \
             app/AppController.h app/Compat.h app/EditorDoc.h app/FindController.h app/LineNumberView.h app/ShellController.h app/TagsController.h app/Appearance.h app/PrefsController.h app/UIHelpers.h
 .SUFFIXES: .c .m .o
 
@@ -109,6 +109,11 @@ build/test_tags: tests/test_tags.c core/tags.o
 	@( cd build ) >/dev/null 2>&1 || { echo "make: build is missing or is not a directory:"; ls -ld build; echo "remove it and run make again"; exit 1; }
 	$(CC) $(CFLAGS) -o build/test_tags tests/test_tags.c core/tags.o
 
+build/test_foldlines: tests/test_foldlines.c core/foldlines.o core/fold.o core/words.o core/brace.o
+	-mkdir build
+	@( cd build ) >/dev/null 2>&1 || { echo "make: build is missing or is not a directory:"; ls -ld build; echo "remove it and run make again"; exit 1; }
+	$(CC) $(CFLAGS) -o build/test_foldlines tests/test_foldlines.c core/foldlines.o core/fold.o core/words.o core/brace.o
+
 build/test_shell: tests/test_shell.c core/shellrun.o
 	-mkdir build
 	@( cd build ) >/dev/null 2>&1 || { echo "make: build is missing or is not a directory:"; ls -ld build; echo "remove it and run make again"; exit 1; }
@@ -119,7 +124,7 @@ build/test_core: tests/test_core.c $(CORE_OBJS)
 	@( cd build ) >/dev/null 2>&1 || { echo "make: build is missing or is not a directory:"; ls -ld build; echo "remove it and run make again"; exit 1; }
 	$(CC) $(CFLAGS) -o build/test_core tests/test_core.c $(CORE_OBJS)
 
-test: build/test_core build/test_search build/test_edit build/test_brace build/test_fill build/test_shell build/test_fold build/test_words build/test_includes build/test_tags
+test: build/test_core build/test_search build/test_edit build/test_brace build/test_fill build/test_shell build/test_fold build/test_words build/test_includes build/test_tags build/test_foldlines
 	build/test_core
 	build/test_search
 	build/test_edit
@@ -130,6 +135,7 @@ test: build/test_core build/test_search build/test_edit build/test_brace build/t
 	build/test_words
 	build/test_includes
 	build/test_tags
+	build/test_foldlines
 
 # ---- install ----
 # OPENSTEP's own conventions: /LocalApps for a locally-built application (parallel to /NextApps

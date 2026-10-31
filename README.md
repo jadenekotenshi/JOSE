@@ -45,6 +45,22 @@ Status: **prototype (0.0.1)** -- nothing here has been run on OPENSTEP yet.
   if you select into it), and Find sees only the markers, not the folded code; Go to Line, Fill, rectangular selection and
   Replace All open all folds first.  Folds are not remembered when a file is closed.
 
+* **Preferences panel** (Preferences > Preferences Panel..., cmd-,): Light or Dark colours (light text on a dark background, with the
+  syntax colours lightened to match), the background and text colours, the font and size (any fixed-pitch font installed), the
+  include path, call tips and the fold margin.  Changes show in every window at once and are saved.
+* **Fold margin**: a `-` beside every line where a block begins and a `+` beside every folded one, next to the line numbers (or
+  alone, if they are off).  Click it to fold or unfold.  It is rescanned shortly after you stop typing, and left empty for files of
+  more than three million characters.
+* **File > Open Recent** (twelve files, saved) and **File > Open Included File** (cmd-D): opens the file named by the `#include`,
+  `#import`, Python `import`/`from`, shell `.`/`source`, Perl `use`/`require` or make `include` on the insertion point's line --
+  or the selected name, or the file name under the insertion point -- in a window of its own.  It looks next to the current file,
+  then along the include path of the Preferences panel (`Foo/Bar.h` is also tried as `Foo.framework/Headers/Bar.h`).
+* **Tags** (Search menu): a ctags file called `tags` in the document's folder or one above it is found by itself; others can be
+  loaded with *Load Tags File...*.  *Find Definition* (cmd-T) opens the definition of the selected name, or the name at the
+  insertion point (a chooser appears if there are several), in a window of its own; *Return from Definition* (shift-cmd-T) goes
+  back.  A call tip -- the declaration line from the tags file -- appears when you type `(` after a tagged name (switchable in
+  the Preferences panel), or with *Show Call Tip* (cmd-9).  The tags file is read again when it changes.
+
 ## Syntax files
 
 HighlighterKit's `.syntax` files are property lists of contexts.  JOSE adds one key: a context may have a `Parent`
@@ -62,12 +78,11 @@ Roughly in this order; the list is not a promise.
 1. Search: Find, Replace, Find Again/Previous, Find Selection, regular expressions, case/word options, Replace All and In Selection (one undo step) -- done, awaiting a check on 4.2; multi-file replace still to do.
 2. Editing: undo/redo, auto-indent, smart indent (brace languages, Python), shift left/right, comment/uncomment, spaces-for-tabs
    and indent width -- done and checked on 4.2; match brace, line numbers and saved settings -- done and checked;
-   fill paragraph, rectangular selection, shell commands -- done and checked; code folding -- done, awaiting a check on 4.2.
-3. Highlighting: nested contexts -- done (see above), awaiting a check on 4.2; more language modes, a preferences panel for
-   the colours and fonts.
-4. Shell commands (filter, execute, sort) -- done, awaiting a check on 4.2; a macro language, learn/replay, tags files (ctags)
-   with call tips, split panes, a files menu with recent files.
-5. Preferences saved per language mode.
+   fill paragraph, rectangular selection, shell commands -- done and checked; code folding -- done and checked.
+3. Highlighting: nested contexts -- done and checked; the Preferences panel (colours, dark mode, font), recent files, Open Included
+   File, tags with call tips and the fold margin -- done, awaiting a check on 4.2; more language modes.
+4. Shell commands (filter, execute, sort) -- done and checked; still to do: a macro language with learn/replay, split panes,
+   per-mode preferences.
 
 ## Building
 
