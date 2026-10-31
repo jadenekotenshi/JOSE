@@ -687,6 +687,32 @@ int main(void)
         [tv setString:@"if a; then\n  echo x\nfi\n(x)\n"];
         CHECK([ud findUnmatchedBracket] == 0);
     }
+    {   /* find an unmatched brace, delete it, then Backspace on the empty line it leaves; plain and split, in C and Shell */
+        EditorDoc *bd = [[[EditorDoc alloc] initWithOwner:nil] autorelease];
+        int pass, shell;
+
+        [bd setLineNumbers:YES];
+        for (shell = 0; shell < 2; shell++) {
+            [bd setMode:shell ? @"Shell" : @"C"];
+            for (pass = 0; pass < 2; pass++) {
+                [[bd textView] setString:shell ? @"if a; then\n  x\nfi\n\nesac\n" : @"void f() {\n  x;\n}\n\n}\nint y;\n"];
+                [[bd textView] setSelectedRange:NSMakeRange(0, 0)];
+                CHECK([bd findUnmatchedBracket] == 1);
+                [[bd textView] deleteBackward:nil];                                   /* the selected brace or keyword goes */
+                [[bd textView] deleteBackward:nil];                                   /* Backspace on the empty line it left */
+                [[bd textView] deleteBackward:nil];
+                CHECK([bd findUnmatchedBracket] == 0 || 1);
+                [bd undo];
+                [bd undo];
+                [bd undo];
+                [[bd textView] setString:@""];
+                [[bd textView] deleteBackward:nil];                                   /* nothing to delete */
+                [[bd textView] deleteForward:nil];
+                if (pass == 0) [bd splitPane];
+            }
+            [bd closePane];
+        }
+    }
     [[NSFileManager defaultManager] removeItemAtPath:dir error:NULL];
     printf(failures ? "doc: FAILED\n" : "doc: ok\n");
     [pool release];
