@@ -1426,13 +1426,13 @@ static NSString *rect_clip;                 /* what Copy last took from a rectan
 - (void)goToLine:(int)line
 {
     NSString *s;
-
-    [self expandAllFolds];                       /* line numbers are those of the whole text */
-    s = [textView string];
-    unsigned int pos = 0, n = [s length];
+    unsigned int pos = 0, n;
     int l = 1;
     NSRange r;
 
+    [self expandAllFolds];                       /* line numbers are those of the whole text */
+    s = [textView string];
+    n = [s length];
     while (l < line && pos < n) {
         r = [s lineRangeForRange:NSMakeRange(pos, 0)];
         if (NSMaxRange(r) <= pos) break;
