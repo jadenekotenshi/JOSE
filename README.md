@@ -20,8 +20,9 @@ Status: **prototype (0.0.1)** -- nothing here has been run on OPENSTEP yet.
 Roughly in this order; the list is not a promise.
 
 1. Search: Find, Replace, Find Again/Previous, Find Selection, regular expressions, case/word options, Replace All and In Selection (one undo step) -- done, awaiting a check on 4.2; multi-file replace still to do.
-2. Editing: undo/redo, auto-indent, smart indent for C, shift left/right, comment/uncomment, fill paragraph,
-   rectangular selection and its operations, match brace, tabs/emulated tabs.
+2. Editing: undo/redo, auto-indent, smart indent (brace languages, Python), shift left/right, comment/uncomment, spaces-for-tabs
+   and indent width -- done, awaiting a check on 4.2; still to do: fill paragraph, rectangular selection and its operations,
+   match brace, saving the indentation settings.
 3. Highlighting: nested patterns (NEdit-style `.pats`), more language modes, a preferences panel for the colours and fonts.
 4. Shell commands (filter selection through a command; run a command and show its output), a macro language,
    learn/replay, tags files (ctags) with call tips, split panes, line numbers, a files menu with recent files.

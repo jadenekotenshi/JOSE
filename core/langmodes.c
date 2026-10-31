@@ -70,3 +70,30 @@ const char *lang_mode_for(const char *path, const char *first_line)
     }
     return NULL;
 }
+
+int lang_comment_style(const char *mode, const char **open, const char **close)
+{
+    static const struct { const char *mode; const char *open; const char *close; } T[] = {
+        { "C", "/*", "*/" }, { "C-Header", "/*", "*/" }, { "ObjC", "/*", "*/" },
+        { "C++", "//", "" }, { "ObjC++", "//", "" },
+        { "Python", "#", "" }, { "Shell", "#", "" }, { "Csh", "#", "" }, { "Perl", "#", "" }, { "GNUmakefile", "#", "" },
+        { "Plist", "/*", "*/" }, { "Strings", "/*", "*/" }, { "GSmarkup", "<!--", "-->" },
+        { NULL, NULL, NULL }
+    };
+    int i;
+
+    if (mode == NULL) return 0;
+    for (i = 0; T[i].mode; i++)
+        if (strcmp(mode, T[i].mode) == 0) { *open = T[i].open; *close = T[i].close; return 1; }
+    return 0;
+}
+
+int lang_smart_indent(const char *mode)
+{
+    if (mode == NULL) return 0;
+    if (strcmp(mode, "Python") == 0) return 'c';
+    if (strcmp(mode, "C") == 0 || strcmp(mode, "C-Header") == 0 || strcmp(mode, "C++") == 0 || strcmp(mode, "ObjC") == 0 ||
+        strcmp(mode, "ObjC++") == 0 || strcmp(mode, "Perl") == 0 || strcmp(mode, "Shell") == 0 || strcmp(mode, "Csh") == 0)
+        return 'b';
+    return 0;
+}

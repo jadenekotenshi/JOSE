@@ -12,6 +12,9 @@
     NSString       *syntaxDir;         /* where the .syntax files are */
     NSTextField    *gotoField;
     FindController *finder;
+    BOOL            prefAutoIndent;     /* indentation settings, applied to every document */
+    BOOL            prefUseSpaces;
+    int             prefIndentWidth;
     BOOL            launched;
     NSMutableArray *startupFiles;      /* named on the command line; opened once the event loop runs */
 }

@@ -36,12 +36,12 @@ SYNTAXFILES = syntax/C.syntax
 ICONFLAGS = -sectcreate __ICON __header $(ICONHDR) -segprot __ICON r r -sectcreate __ICON app $(ICONTIFF)
 
 HK_OBJS   = hk/HKTextPattern.o hk/HKSyntaxDefinition.o hk/HKSyntaxHighlighter.o
-CORE_OBJS = core/langmodes.o core/eol.o core/undo.o core/search.o
+CORE_OBJS = core/langmodes.o core/eol.o core/undo.o core/search.o core/edit.o
 APP_OBJS  = app/AppController.o app/EditorDoc.o app/FindController.o app/UIHelpers.o app/main.o
 
 # Every header, so that a changed one rebuilds what includes it.  tools/lint_openstep.sh checks the list is complete.
 HEADERS   = hk/HKCompat.h hk/HKSyntaxDefinition.h hk/HKSyntaxHighlighter.h hk/HKTextPattern.h \
-            core/eol.h core/langmodes.h core/undo.h core/search.h \
+            core/eol.h core/langmodes.h core/undo.h core/search.h core/edit.h \
             app/AppController.h app/Compat.h app/EditorDoc.h app/FindController.h app/UIHelpers.h
 .SUFFIXES: .c .m .o
 
@@ -74,14 +74,20 @@ build/test_search: tests/test_search.c core/search.o
 	@( cd build ) >/dev/null 2>&1 || { echo "make: build is missing or is not a directory:"; ls -ld build; echo "remove it and run make again"; exit 1; }
 	$(CC) $(CFLAGS) -o build/test_search tests/test_search.c core/search.o
 
+build/test_edit: tests/test_edit.c core/edit.o core/langmodes.o
+	-mkdir build
+	@( cd build ) >/dev/null 2>&1 || { echo "make: build is missing or is not a directory:"; ls -ld build; echo "remove it and run make again"; exit 1; }
+	$(CC) $(CFLAGS) -o build/test_edit tests/test_edit.c core/edit.o core/langmodes.o
+
 build/test_core: tests/test_core.c $(CORE_OBJS)
 	-mkdir build
 	@( cd build ) >/dev/null 2>&1 || { echo "make: build is missing or is not a directory:"; ls -ld build; echo "remove it and run make again"; exit 1; }
 	$(CC) $(CFLAGS) -o build/test_core tests/test_core.c $(CORE_OBJS)
 
-test: build/test_core build/test_search
+test: build/test_core build/test_search build/test_edit
 	build/test_core
 	build/test_search
+	build/test_edit
 
 # ---- install ----
 # OPENSTEP's own conventions: /LocalApps for a locally-built application (parallel to /NextApps

@@ -3,6 +3,7 @@
 #import "AppController.h"
 #include "langmodes.h"
 #include "eol.h"
+#include "edit.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -15,6 +16,27 @@
 - (void)setHighlighter:(HKSyntaxHighlighter *)h
 {
     highlighter = h;
+}
+
+- (void)setEditor:(id)anEditor
+{
+    editor = anEditor;
+}
+
+- (void)insertNewline:(id)sender
+{
+    if (![(EditorDoc *)editor newlineWithIndent]) [super insertNewline:sender];
+}
+
+- (void)insertTab:(id)sender
+{
+    if (![(EditorDoc *)editor tabInsertedSpaces]) [super insertTab:sender];
+}
+
+- (void)insertText:(id)str
+{
+    if ([str isKindOfClass:[NSString class]]) [(EditorDoc *)editor willInsertText:str];
+    [super insertText:str];
 }
 
 /* Colour what is about to be drawn (and only that: a big file is never coloured as a whole). */
@@ -56,6 +78,9 @@ static void line_col(NSString *s, unsigned int loc, unsigned int *line, unsigned
 
 @interface EditorDoc (Private)
 - (void)applyStep:(const UndoStep *)step undoing:(BOOL)undoing;
+- (unsigned int)lineBeforeCaret:(u16 **)prefix;
+- (NSRange)selectedLines:(NSRange)sel;
+- (void)replaceLines:(NSRange)region with:(u16 *)buf length:(unsigned int)n selection:(NSRange)sel;
 - (void)markEdited;
 - (unsigned long)nowMillis;
 - (void)recordEditInRange:(NSRange)range replacement:(NSString *)replacement;
@@ -78,6 +103,9 @@ static void line_col(NSString *s, unsigned int loc, unsigned int *line, unsigned
     if (self) {
         owner = anOwner;
         wrap = NO;
+        autoIndent = YES;
+        useSpaces = NO;
+        indentWidth = 4;
         undo = undo_new(2000, 2000000UL);
         clockBase = [NSDate timeIntervalSinceReferenceDate];
         [self buildWindow];
@@ -130,6 +158,7 @@ static void line_col(NSString *s, unsigned int loc, unsigned int *line, unsigned
     [[textView textContainer] setWidthTracksTextView:NO];
     [textView setRichText:NO];
     [textView setDelegate:self];
+    [textView setEditor:self];
     [scroll setDocumentView:textView];
     [self applyFont];
     [[window contentView] addSubview:scroll];
@@ -451,6 +480,156 @@ static void line_col(NSString *s, unsigned int loc, unsigned int *line, unsigned
     dirty = NO;
     [window close];
     return YES;
+}
+
+/* ---- indentation and commenting ---- */
+
+- (void)setAutoIndent:(BOOL)flag { autoIndent = flag; }
+- (BOOL)autoIndent { return autoIndent; }
+- (void)setUseSpaces:(BOOL)flag { useSpaces = flag; }
+- (BOOL)useSpaces { return useSpaces; }
+- (void)setIndentWidth:(int)width { indentWidth = width < 1 ? 1 : (width > 16 ? 16 : width); }
+- (int)indentWidth { return indentWidth; }
+
+/* The text of the caret's line up to the caret (malloc'd, *prefix; the caller frees it); its length. */
+- (unsigned int)lineBeforeCaret:(u16 **)prefix
+{
+    NSString *s = [textView string];
+    NSRange sel = [textView selectedRange];
+    NSRange lr = [s lineRangeForRange:NSMakeRange(sel.location, 0)];
+    unsigned int n = sel.location - lr.location;
+
+    *prefix = (u16 *)malloc((n + 1) * sizeof(u16));
+    if (*prefix == NULL) return 0;
+    if (n > 0) [s getCharacters:*prefix range:NSMakeRange(lr.location, n)];
+    return n;
+}
+
+- (BOOL)newlineWithIndent
+{
+    u16 *before, *out;
+    unsigned int n, k;
+    int smart = lang_smart_indent(mode != nil ? [mode cString] : NULL);
+    NSString *str;
+
+    if (!autoIndent) return NO;
+    n = [self lineBeforeCaret:&before];
+    if (before == NULL) return NO;
+    out = (u16 *)malloc((n + (unsigned int)indentWidth + 2) * sizeof(u16));
+    if (out == NULL) { free(before); return NO; }
+    out[0] = '\n';
+    k = edit_newline_indent(before, n, smart, useSpaces, (unsigned int)indentWidth, out + 1, n + (unsigned int)indentWidth + 1);
+    str = [NSString stringWithCharacters:out length:k + 1];
+    free(out);
+    free(before);
+    [textView insertText:str];
+    return YES;
+}
+
+- (void)willInsertText:(NSString *)str
+{
+    u16 *before;
+    unsigned int n, amount;
+    NSRange sel = [textView selectedRange];
+
+    if (!autoIndent || sel.length != 0 || [str length] != 1 || [str characterAtIndex:0] != '}') return;
+    if (lang_smart_indent(mode != nil ? [mode cString] : NULL) != 'b') return;
+    n = [self lineBeforeCaret:&before];
+    if (before == NULL) return;
+    amount = edit_outdent_amount(before, n, (unsigned int)indentWidth);
+    free(before);
+    if (amount > 0) [textView setSelectedRange:NSMakeRange(sel.location - amount, amount)];
+}
+
+- (BOOL)tabInsertedSpaces
+{
+    u16 *before;
+    unsigned int n, col, count, i;
+    NSMutableString *sp;
+    NSRange sel = [textView selectedRange];
+
+    if (!useSpaces) return NO;
+    n = [self lineBeforeCaret:&before];
+    if (before == NULL) return NO;
+    col = edit_column(before, n);
+    free(before);
+    count = (unsigned int)indentWidth - col % (unsigned int)indentWidth;
+    sp = [NSMutableString string];
+    for (i = 0; i < count; i++) [sp appendString:@" "];
+    if (sel.length > 0) return NO;
+    [textView insertText:sp];
+    return YES;
+}
+
+/* The whole lines the selection touches, without the newline that ends the last of them.  A selection that ends just after a
+ * newline does not take in the following line. */
+- (NSRange)selectedLines:(NSRange)sel
+{
+    NSString *s = [textView string];
+    NSRange q = sel, region;
+
+    if (q.length > 0 && [s characterAtIndex:NSMaxRange(q) - 1] == '\n') q.length--;
+    region = [s lineRangeForRange:q];
+    if (region.length > 0 && [s characterAtIndex:NSMaxRange(region) - 1] == '\n') region.length--;
+    return region;
+}
+
+- (void)replaceLines:(NSRange)region with:(u16 *)buf length:(unsigned int)n selection:(NSRange)sel
+{
+    NSString *str = n > 0 ? [NSString stringWithCharacters:buf length:n] : @"";
+    NSRange after;
+
+    if (sel.length == 0) {                                          /* a caret stays about where it was in its line */
+        int pos = (int)sel.location + (int)n - (int)region.length;
+        if (pos < (int)region.location) pos = (int)region.location;
+        after = NSMakeRange((unsigned int)pos, 0);
+    } else {
+        after = NSMakeRange(region.location, n);
+    }
+    [self replaceRange:region with:str select:after];
+}
+
+- (void)shiftSelection:(int)direction
+{
+    NSRange sel = [textView selectedRange];
+    NSRange region = [self selectedLines:sel];
+    u16 *text, *out = NULL;
+    unsigned int outlen = 0;
+    BOOL changed;
+
+    if (region.length == 0) { NSBeep(); return; }
+    text = (u16 *)malloc(region.length * sizeof(u16));
+    if (text == NULL) return;
+    [[textView string] getCharacters:text range:region];
+    changed = edit_shift_lines(text, region.length, direction, useSpaces, (unsigned int)indentWidth, &out, &outlen) != 0;
+    free(text);
+    if (!changed) { NSBeep(); return; }
+    [self replaceLines:region with:out length:outlen selection:sel];
+    free(out);
+}
+
+- (void)commentSelection:(BOOL)comment
+{
+    NSRange sel = [textView selectedRange];
+    NSRange region;
+    const char *open, *close;
+    u16 *text, *out = NULL, pre[16], suf[16];
+    unsigned int npre = 0, nsuf = 0, outlen = 0;
+    BOOL changed;
+
+    if (mode == nil || !lang_comment_style([mode cString], &open, &close)) { NSBeep(); return; }
+    while (open[npre] != '\0' && npre < 15) { pre[npre] = (u16)(unsigned char)open[npre]; npre++; }
+    while (close[nsuf] != '\0' && nsuf < 15) { suf[nsuf] = (u16)(unsigned char)close[nsuf]; nsuf++; }
+    region = [self selectedLines:sel];
+    if (region.length == 0) { NSBeep(); return; }
+    text = (u16 *)malloc(region.length * sizeof(u16));
+    if (text == NULL) return;
+    [[textView string] getCharacters:text range:region];
+    changed = edit_comment_lines(text, region.length, pre, npre, suf, nsuf, comment ? 0 : 1, &out, &outlen) != 0;
+    free(text);
+    if (!changed) { NSBeep(); return; }
+    [self replaceLines:region with:out length:outlen selection:sel];
+    free(out);
 }
 
 /* A programmatic edit (search and replace): one undo step of its own, then the text selected. */

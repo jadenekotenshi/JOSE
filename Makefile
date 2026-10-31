@@ -6,9 +6,14 @@ OBJCFLAGS = -x objective-c -fno-objc-arc -w -g -Ihk -Icore -Iapp
 CFLAGS  = -std=c89 -pedantic -Wall -Wextra -Wdeclaration-after-statement \
           -Wno-long-long -Wno-unused-parameter -O2 -g -Icore
 
-test: $(BUILD)/test_core $(BUILD)/test_search
+test: $(BUILD)/test_core $(BUILD)/test_search $(BUILD)/test_edit
 	$(BUILD)/test_core
 	$(BUILD)/test_search
+	$(BUILD)/test_edit
+
+$(BUILD)/test_edit: tests/test_edit.c tests/test.h core/edit.c core/edit.h core/langmodes.c core/langmodes.h
+	mkdir -p $(BUILD)
+	$(CC) $(CFLAGS) tests/test_edit.c core/edit.c core/langmodes.c -o $@
 
 $(BUILD)/test_search: tests/test_search.c tests/test.h core/search.c core/search.h
 	mkdir -p $(BUILD)

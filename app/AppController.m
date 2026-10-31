@@ -7,6 +7,8 @@
 #define TAG_MODE_BASE 1000             /* the Language Mode items: the tag is this plus the mode's index; plain text is TAG_MODE_BASE - 1 */
 
 @interface AppController (Private)
+- (void)applyIndentPrefsTo:(EditorDoc *)d;
+- (void)applyIndentPrefs;
 - (id)addItem:(NSString *)title action:(SEL)action key:(NSString *)key target:(id)target toMenu:(NSMenu *)menu;
 - (NSMenu *)keepMenu:(NSMenu *)menu;
 - (NSMenu *)submenuNamed:(NSString *)title inMenu:(NSMenu *)parent;
@@ -19,6 +21,9 @@
     self = [super init];
     if (self) {
         docs = [[NSMutableArray alloc] init];
+        prefAutoIndent = YES;
+        prefUseSpaces = NO;
+        prefIndentWidth = 4;
         menuKeepers = [[NSMutableArray alloc] init];
         syntaxDir = [[[NSBundle mainBundle] bundlePath] stringByAppendingPathComponent:@"syntax"];
         [syntaxDir retain];
@@ -108,6 +113,10 @@
     [self addItem:@"Paste" action:@selector(paste:) key:@"v" target:nil toMenu:m];
     [self addItem:@"Delete" action:@selector(delete:) key:@"" target:nil toMenu:m];
     [self addItem:@"Select All" action:@selector(selectAll:) key:@"a" target:nil toMenu:m];
+    [self addItem:@"Shift Left" action:@selector(shiftLeft:) key:@"[" target:self toMenu:m];
+    [self addItem:@"Shift Right" action:@selector(shiftRight:) key:@"]" target:self toMenu:m];
+    [self addItem:@"Comment" action:@selector(commentLines:) key:@"/" target:self toMenu:m];
+    [self addItem:@"Uncomment" action:@selector(uncommentLines:) key:@"\\" target:self toMenu:m];
 
     m = [self submenuNamed:@"Search" inMenu:main];
     [self addItem:@"Find..." action:@selector(showFind:) key:@"f" target:self toMenu:m];
@@ -119,6 +128,17 @@
 
     m = [self submenuNamed:@"Preferences" inMenu:main];
     [[self addItem:@"Wrap Lines" action:@selector(toggleWrap:) key:@"" target:self toMenu:m] setTag:1];
+    [self addItem:@"Auto Indent" action:@selector(toggleAutoIndent:) key:@"" target:self toMenu:m];
+    [self addItem:@"Spaces for Indentation" action:@selector(toggleUseSpaces:) key:@"" target:self toMenu:m];
+    {
+        NSMenu *wm = [self submenuNamed:@"Indent Width" inMenu:m];
+        static const int widths[] = { 2, 3, 4, 8 };
+        int wi;
+        for (wi = 0; wi < 4; wi++) {
+            NSString *t = [NSString stringWithFormat:@"%d", widths[wi]];
+            [[self addItem:t action:@selector(setIndentWidth:) key:@"" target:self toMenu:wm] setTag:widths[wi]];
+        }
+    }
     modeMenu = [self submenuNamed:@"Language Mode" inMenu:m];
     item = [self addItem:@"Plain Text" action:@selector(setMode:) key:@"" target:self toMenu:modeMenu];
     [item setTag:TAG_MODE_BASE - 1];
@@ -168,8 +188,12 @@
 
     if (a == @selector(saveDoc:) || a == @selector(saveDocAs:) || a == @selector(closeDoc:) || a == @selector(gotoLine:) || a == @selector(showFind:) || a == @selector(findAgain:)
         || a == @selector(findPrevious:) || a == @selector(findSelection:)
-        || a == @selector(toggleWrap:) || a == @selector(setMode:))
+        || a == @selector(toggleWrap:) || a == @selector(setMode:)
+        || a == @selector(shiftLeft:) || a == @selector(shiftRight:) || a == @selector(commentLines:) || a == @selector(uncommentLines:))
         if (d == nil) return NO;
+    if (a == @selector(toggleAutoIndent:)) [item setState:prefAutoIndent ? NSOnState : NSOffState];
+    if (a == @selector(toggleUseSpaces:)) [item setState:prefUseSpaces ? NSOnState : NSOffState];
+    if (a == @selector(setIndentWidth:)) [item setState:tag == prefIndentWidth ? NSOnState : NSOffState];
     if (a == @selector(undoDoc:)) return d != nil && [d canUndo];
     if (a == @selector(redoDoc:)) return d != nil && [d canRedo];
     if (a == @selector(revertDoc:)) return d != nil && [d path] != nil;
@@ -188,6 +212,7 @@
 {
     EditorDoc *d = [[EditorDoc alloc] initWithOwner:self];
 
+    [self applyIndentPrefsTo:d];
     [docs addObject:d];
     [d release];
     [d showWindow];
@@ -204,6 +229,7 @@
         if ([d path] != nil && [[d path] isEqualToString:path]) { [d showWindow]; return d; }
     }
     d = [[EditorDoc alloc] initWithOwner:self];
+    [self applyIndentPrefsTo:d];
     if (![d openFile:path]) { [d release]; return nil; }
     [docs addObject:d];
     [d release];
@@ -256,6 +282,29 @@
     if (d == nil) return;
     [d setMode:(tag == TAG_MODE_BASE - 1) ? nil : [sender title]];
 }
+
+/* Pushes the indentation settings to a document. */
+- (void)applyIndentPrefsTo:(EditorDoc *)d
+{
+    [d setAutoIndent:prefAutoIndent];
+    [d setUseSpaces:prefUseSpaces];
+    [d setIndentWidth:prefIndentWidth];
+}
+
+- (void)applyIndentPrefs
+{
+    unsigned int i;
+
+    for (i = 0; i < [docs count]; i++) [self applyIndentPrefsTo:[docs objectAtIndex:i]];
+}
+
+- (void)toggleAutoIndent:(id)sender { prefAutoIndent = !prefAutoIndent; [self applyIndentPrefs]; }
+- (void)toggleUseSpaces:(id)sender { prefUseSpaces = !prefUseSpaces; [self applyIndentPrefs]; }
+- (void)setIndentWidth:(id)sender { prefIndentWidth = [sender tag]; [self applyIndentPrefs]; }
+- (void)shiftLeft:(id)sender { [[self frontDocument] shiftSelection:-1]; }
+- (void)shiftRight:(id)sender { [[self frontDocument] shiftSelection:1]; }
+- (void)commentLines:(id)sender { [[self frontDocument] commentSelection:YES]; }
+- (void)uncommentLines:(id)sender { [[self frontDocument] commentSelection:NO]; }
 
 - (void)toggleWrap:(id)sender
 {
