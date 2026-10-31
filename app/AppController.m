@@ -280,10 +280,19 @@
 
 /* ---- the application ---- */
 
+- (void)openAtLaunch:(NSString *)path
+{
+    if (startupFiles == nil) startupFiles = [[NSMutableArray alloc] init];
+    [startupFiles addObject:path];
+}
+
 - (void)applicationDidFinishLaunching:(NSNotification *)notification
 {
+    int i;
     launched = YES;
     [self buildFullMenu];
+    for (i = 0; i < (int)[startupFiles count]; i++) [self openPath:[startupFiles objectAtIndex:i]];
+    [startupFiles release]; startupFiles = nil;
     if ([docs count] == 0) [self newDocument];
 }
 

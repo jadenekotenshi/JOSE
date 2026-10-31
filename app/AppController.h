@@ -11,11 +11,13 @@
     NSString       *syntaxDir;         /* where the .syntax files are */
     NSTextField    *gotoField;
     BOOL            launched;
+    NSMutableArray *startupFiles;      /* named on the command line; opened once the event loop runs */
 }
 - (int)menuCount;
 - (void)buildMenu;                      /* before the application runs: only a minimal menu (Quit), quickly */
 - (void)buildFullMenu;                  /* the real menus, once the application is running */
 - (EditorDoc *)newDocument;
+- (void)openAtLaunch:(NSString *)path;
 - (EditorDoc *)openPath:(NSString *)path;
 - (EditorDoc *)frontDocument;
 - (void)documentDidClose:(EditorDoc *)doc;

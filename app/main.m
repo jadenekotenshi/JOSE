@@ -89,7 +89,7 @@ int main(int argc, char *argv[])
              * and only an argument that names an existing file is opened. */
             for (i = 1; i < argc; i++) {
                 if (argv[i][0] == '-') { i++; continue; }
-                if (access(argv[i], R_OK) == 0) [controller openPath:[NSString stringWithCString:argv[i]]];
+                if (access(argv[i], R_OK) == 0) [controller openAtLaunch:[NSString stringWithCString:argv[i]]];
             }
         }
         NSLog(@"JOSE: menu built, entering the event loop");
