@@ -12,6 +12,7 @@ static const ExtMode EXTS[] = {
     { "plist", "Plist" }, { "strings", "Strings" },
     { "gsmarkup", "GSmarkup" },
     { "mk", "GNUmakefile" },
+    { "py", "Python" }, { "pyw", "Python" },
     { NULL, NULL }
 };
 
@@ -56,7 +57,8 @@ const char *lang_mode_for(const char *path, const char *first_line)
     mode = lang_mode_for_name(base);
     if (mode != NULL) return mode;
     if (first_line != NULL && first_line[0] == '#' && first_line[1] == '!') {
-        /* No shell or script modes yet: nothing to choose.  (Here is where #!/bin/sh would map.) */
+        /* only Python among the scripts so far (no shell mode yet) */
+        if (strstr(first_line, "python") != NULL) return "Python";
         return NULL;
     }
     return NULL;

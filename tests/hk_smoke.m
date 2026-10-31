@@ -36,6 +36,23 @@ int main(int argc, char **argv)
     CHECK(![kw isEqual:cm]);
     CHECK(![cm isEqual:str]);
     CHECK(![kw isEqual:plain] || plain == nil);
+    {   /* Python: keyword, comment, string and triple-quoted string get colours */
+        NSString *py = @"def f(x):\n    # note\n    s = 'abc'\n    \"\"\"doc\n    more\"\"\"\n    return None\n";
+        NSTextStorage *pts = [[[NSTextStorage alloc] initWithString:py] autorelease];
+        HKSyntaxHighlighter *ph = [[HKSyntaxHighlighter alloc] initWithHighlighterType:@"Python" textStorage:pts
+                                                                      defaultTextColor:[NSColor blackColor]];
+        CHECK(ph != nil);
+        [ph highlightRange:NSMakeRange(0, [pts length])];
+        CHECK(colourAt(pts, 0) != nil);
+        CHECK(colourAt(pts, [py rangeOfString:@"note"].location) != nil);
+        CHECK(colourAt(pts, [py rangeOfString:@"abc"].location) != nil);
+        CHECK(colourAt(pts, [py rangeOfString:@"more"].location) != nil);
+        CHECK(![colourAt(pts, 0) isEqual:colourAt(pts, [py rangeOfString:@"note"].location)]);
+        CHECK(![colourAt(pts, [py rangeOfString:@"more"].location) isEqual:colourAt(pts, [py rangeOfString:@"x"].location)]);
+        printf("python def=%s note=%s more=%s\n", [[colourAt(pts, 0) description] cString],
+               [[colourAt(pts, [py rangeOfString:@"note"].location) description] cString],
+               [[colourAt(pts, [py rangeOfString:@"more"].location) description] cString]);
+    }
     printf("int=%s comment=%s string=%s main=%s\n", [[kw description] cString], [[cm description] cString],
            [[str description] cString], [[plain description] cString]);
 

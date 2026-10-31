@@ -18,6 +18,8 @@ int main(void)
     CHECK(str_eq(lang_mode_for("foo.H", NULL), "C-Header"));
     CHECK(str_eq(lang_mode_for("/a.b/x.cpp", NULL), "C++"));
     CHECK(str_eq(lang_mode_for("Thing.m", NULL), "ObjC"));
+    CHECK(str_eq(lang_mode_for("tool.py", NULL), "Python"));
+    CHECK(str_eq(lang_mode_for("tool", "#!/usr/bin/env python"), "Python"));
     CHECK(str_eq(lang_mode_for("Thing.mm", NULL), "ObjC++"));
     CHECK(str_eq(lang_mode_for("/usr/src/Makefile", NULL), "GNUmakefile"));
     CHECK(str_eq(lang_mode_for("Makefile.openstep", NULL), "GNUmakefile"));
