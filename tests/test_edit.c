@@ -97,5 +97,7 @@ int main(void)
     CHECK(!lang_comment_style("Generic", &o, &c));
     CHECK(!lang_comment_style(NULL, &o, &c));
     CHECK(lang_smart_indent("Python") == 'c' && lang_smart_indent("C") == 'b' && lang_smart_indent("Plist") == 0);
+    CHECK(lang_word_kind("Shell") == 1 && lang_word_kind("Csh") == 2 && lang_word_kind("C") == 3 && lang_word_kind("Python") == 0 && lang_word_kind(NULL) == 0);
+    CHECK(lang_fold_style("Python") == 'i' && lang_fold_style("Shell") == 'w' && lang_fold_style("C") == 'b' && lang_fold_style(NULL) == 'b');
     TEST_DONE("edit");
 }

@@ -104,3 +104,18 @@ int lang_c_like(const char *mode)
     return strcmp(mode, "C") == 0 || strcmp(mode, "C-Header") == 0 || strcmp(mode, "C++") == 0 || strcmp(mode, "ObjC") == 0 ||
            strcmp(mode, "ObjC++") == 0;
 }
+
+int lang_word_kind(const char *mode)
+{
+    if (mode == NULL) return 0;
+    if (strcmp(mode, "Shell") == 0) return 1;
+    if (strcmp(mode, "Csh") == 0) return 2;
+    return lang_c_like(mode) ? 3 : 0;
+}
+
+int lang_fold_style(const char *mode)
+{
+    if (mode != NULL && strcmp(mode, "Python") == 0) return 'i';
+    if (mode != NULL && (strcmp(mode, "Shell") == 0 || strcmp(mode, "Csh") == 0)) return 'w';
+    return 'b';
+}

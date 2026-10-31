@@ -19,6 +19,17 @@ unsigned fold_make_token(u16 *out, unsigned lines, unsigned id);
  * and its number.  0 if there is none. */
 int fold_token_find(const u16 *t, unsigned n, unsigned from, unsigned *start, unsigned *end, unsigned *lines, unsigned *id);
 
+/* Is there a token that starts exactly at t[i]?  Its end, the line breaks it hides and its number come back. */
+int fold_token_at(const u16 *t, unsigned n, unsigned i, unsigned *end, unsigned *lines, unsigned *id);
+
+/* Folding by indentation (Python): the text to hide for the block at `pos` -- from the end of the header line to the end of
+ * the last line of the block -- as [*hs, *he).  The header is the line at `pos` if the next line is indented more than it,
+ * else the nearest line above that is indented less.  Returns 0 if there is no block. */
+int fold_indent_block(const u16 *t, unsigned n, unsigned pos, unsigned *hs, unsigned *he);
+
+/* All the blocks whose header is as little indented as any line in the text, as ranges to hide (malloc'd arrays; free them). */
+unsigned fold_indent_top(const u16 *t, unsigned n, unsigned **hs, unsigned **he);
+
 /* The line breaks hidden by the tokens that start before `limit` in t[0, n) (n may be a little past limit so that a token
  * that starts just before it is whole). */
 unsigned fold_hidden_lines(const u16 *t, unsigned n, unsigned limit);

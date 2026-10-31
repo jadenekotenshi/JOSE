@@ -256,6 +256,49 @@ int main(void)
         [fd toggleFold];
         CHECK([[tv string] isEqualToString:full]);
     }
+    {   /* Python folds by indentation; shell by if/fi and friends; ⌘B jumps between keyword pairs */
+        NSString *py = @"import os\n\ndef f(x):\n    a = 1\n    if x:\n        b = 2\n    return a\n\nclass K:\n    def m(self):\n        pass\n\nprint(1)\n";
+        EditorDoc *pd = [[[EditorDoc alloc] initWithOwner:nil] autorelease];
+        EditTextView *tv = [pd textView];
+        NSString *sh = @"if [ -f x ]; then\n  for i in a b; do\n    echo $i\n  done\nfi\necho end\n";
+        unsigned int at;
+        [pd setMode:@"Python"];
+        [tv setString:py];
+        [tv setSelectedRange:NSMakeRange([py rangeOfString:@"def f"].location, 0)];
+        [pd toggleFold];
+        CHECK([[tv string] rangeOfString:@"def f(x): ... 4 lines ~1 \nclass"].location == NSNotFound);   /* a blank line stays out of it */
+        CHECK([[tv string] rangeOfString:@"def f(x): ... 4 lines ~1 \n\nclass K:"].location != NSNotFound);
+        CHECK([[pd expandedString:[tv string]] isEqualToString:py]);
+        [tv setSelectedRange:NSMakeRange(0, 0)];
+        [pd expandAllFolds];
+        [pd foldAll];
+        CHECK([[tv string] rangeOfString:@"class K: ... 2 lines"].location != NSNotFound);
+        CHECK([[tv string] rangeOfString:@"def f(x): ... 4 lines"].location != NSNotFound);
+        CHECK([[pd expandedString:[tv string]] isEqualToString:py]);
+        [pd expandAllFolds];
+        CHECK([[tv string] isEqualToString:py]);
+        [pd setMode:@"Shell"];
+        [tv setString:sh];
+        [tv setSelectedRange:NSMakeRange(1, 0)];                                  /* on "if" */
+        [pd gotoMatchingBracket:NO];
+        at = [sh rangeOfString:@"fi\n"].location;
+        CHECK([tv selectedRange].location == at + 2 && [tv selectedRange].length == 0);        /* just after the fi */
+        [pd gotoMatchingBracket:NO];
+        CHECK([tv selectedRange].location == 0);                                  /* and back to the if */
+        [tv setSelectedRange:NSMakeRange([sh rangeOfString:@"for"].location, 0)];
+        [pd gotoMatchingBracket:YES];
+        CHECK([tv selectedRange].location == [sh rangeOfString:@"for"].location && [tv selectedRange].length == [sh rangeOfString:@"done"].location + 4 - [sh rangeOfString:@"for"].location);
+        [tv setSelectedRange:NSMakeRange([sh rangeOfString:@"for"].location, 0)];
+        [pd toggleFold];
+        CHECK([[tv string] rangeOfString:@"for i in a b; do ... 2 lines ~"].location != NSNotFound);
+        CHECK([[tv string] rangeOfString:@"done\nfi"].location != NSNotFound);
+        CHECK([[pd expandedString:[tv string]] isEqualToString:sh]);
+        [pd expandAllFolds];
+        [tv setSelectedRange:NSMakeRange(0, 0)];
+        [pd foldAll];                                                             /* the outer if only */
+        CHECK([[tv string] rangeOfString:@"then ... 4 lines ~"].location != NSNotFound);
+        CHECK([[tv string] rangeOfString:@"fi\necho end"].location != NSNotFound);
+    }
     {   /* Shell > Filter Selection: the selection goes through a command and comes back, as one undo step */
         EditorDoc *sd = [[[EditorDoc alloc] initWithOwner:nil] autorelease];
         NSTextView *tv = [sd textView];

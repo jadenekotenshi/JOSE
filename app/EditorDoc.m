@@ -9,6 +9,7 @@
 #include "fill.h"
 #include "rect.h"
 #include "fold.h"
+#include "words.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -276,6 +277,7 @@ static void line_col(NSString *s, unsigned int loc, unsigned int *line, unsigned
 - (unsigned long)nowMillis;
 - (void)recordEditInRange:(NSRange)range replacement:(NSString *)replacement;
 - (void)noteLineChangeAt:(unsigned int)loc removed:(const u16 *)rem count:(unsigned int)nrem inserted:(const u16 *)ins count:(unsigned int)nins;
+- (BOOL)foldRangeAt:(unsigned int)pos in:(const u16 *)t length:(unsigned int)n from:(unsigned int *)hs to:(unsigned int *)he;
 - (unsigned int)hiddenLinesBefore:(unsigned int)loc;
 - (NSString *)hiddenTextForNumber:(unsigned int)fid;
 - (BOOL)editAllowedInRange:(NSRange)range;
@@ -745,6 +747,27 @@ static void line_col(NSString *s, unsigned int loc, unsigned int *line, unsigned
     else if (pos > 0 && pos <= n && brace_is_bracket(t[pos - 1])) { pos--; found = YES; }
     if (found)
         found = brace_match(t, n, pos, lang_c_like(mode != nil ? [mode cString] : NULL), &match) != 0;
+    if (!found && lang_word_kind(mode != nil ? [mode cString] : NULL) != 0) {
+        /* not a bracket: perhaps if/fi, case/esac, #if/#endif ... */
+        WordBlocks b;
+        unsigned int ws, we, ms, me;
+
+        if (words_scan(t, n, lang_word_kind([mode cString]), &b)) {
+            BOOL hit = words_match(&b, sel.location, &ws, &we, &ms, &me) != 0;
+            words_free(&b);
+            if (hit) {
+                free(t);
+                if (select) {
+                    unsigned int lo = ws < ms ? ws : ms, hi = ws < ms ? me : we;
+                    [textView setSelectedRange:NSMakeRange(lo, hi - lo)];
+                } else {
+                    [textView setSelectedRange:NSMakeRange(ms > ws ? me : ms, 0)];
+                }
+                [textView scrollRangeToVisible:[textView selectedRange]];
+                return;
+            }
+        }
+    }
     free(t);
     if (!found) { NSBeep(); return; }
     if (select) {
@@ -1212,11 +1235,35 @@ static NSString *rect_clip;                 /* what Copy last took from a rectan
     [self updateStatus];
 }
 
+/* The hidden range for the block at `pos`, by the way the mode folds: braces, indentation or keyword pairs. */
+- (BOOL)foldRangeAt:(unsigned int)pos in:(const u16 *)t length:(unsigned int)n from:(unsigned int *)hs to:(unsigned int *)he
+{
+    const char *m = mode != nil ? [mode cString] : NULL;
+    int style = lang_fold_style(m);
+    unsigned int open, close;
+    BOOL ok = NO;
+
+    if (style == 'i') {
+        ok = fold_indent_block(t, n, pos, hs, he) != 0;
+    } else if (style == 'w') {
+        WordBlocks b;
+        if (words_scan(t, n, lang_word_kind(m), &b)) {
+            ok = words_fold_block(&b, t, n, pos, hs, he) != 0;
+            words_free(&b);
+        }
+    } else if (fold_find_block(t, n, pos, lang_c_like(m), &open, &close)) {
+        *hs = open + 1;
+        *he = close;
+        ok = YES;
+    }
+    return ok && *he > *hs;
+}
+
 - (void)toggleFold
 {
     NSString *s = [textView string];
     NSRange sel = [textView selectedRange];
-    unsigned int n = [s length], ls, le, st, en, lines, fid, open, close, from;
+    unsigned int n = [s length], ls, le, st, en, lines, fid, hs, he, from;
     NSRange lr = [s lineRangeForRange:NSMakeRange(sel.location, 0)];
     u16 *t;
     BOOL ok;
@@ -1234,9 +1281,9 @@ static NSString *rect_clip;                 /* what Copy last took from a rectan
         if (st >= ls && [self hiddenTextForNumber:fid] != nil) { free(t); [self expandMarkerAt:st]; return; }
         from = st + 1;
     }
-    ok = fold_find_block(t, n, sel.location, lang_c_like(mode != nil ? [mode cString] : NULL), &open, &close) != 0;
+    ok = [self foldRangeAt:sel.location in:t length:n from:&hs to:&he];
     if (ok) {
-        NSRange inner = NSMakeRange(open + 1, close - open - 1);
+        NSRange inner = NSMakeRange(hs, he - hs);
         NSString *hidden = [s substringWithRange:inner];
         NSString *full = [self expandedString:hidden];
         unsigned int k, nl = 0, fl = [full length];
@@ -1251,7 +1298,7 @@ static NSString *rect_clip;                 /* what Copy last took from a rectan
             [folds setObject:hidden forKey:[NSNumber numberWithUnsignedInt:foldNext]];
             tn = fold_make_token(tok, nl, foldNext);
             [self foldReplaceRange:inner with:[NSString stringWithCharacters:tok length:tn]
-                            select:NSMakeRange(open + 1 + tn, 0)];
+                            select:NSMakeRange(hs + tn, 0)];
         }
     }
     free(t);
@@ -1261,7 +1308,9 @@ static NSString *rect_clip;                 /* what Copy last took from a rectan
 - (void)foldAll
 {
     NSString *s = [textView string];
-    unsigned int n = [s length], count, i, pos, *opens, *closes;
+    const char *m = mode != nil ? [mode cString] : NULL;
+    int style = lang_fold_style(m);
+    unsigned int n = [s length], count = 0, i, pos, *hs = NULL, *he = NULL;
     u16 *t;
     NSMutableString *out;
     NSRange region;
@@ -1270,28 +1319,47 @@ static NSString *rect_clip;                 /* what Copy last took from a rectan
     t = (u16 *)malloc((n + 1) * sizeof(u16));
     if (t == NULL) return;
     [s getCharacters:t];
-    count = fold_top_blocks(t, n, lang_c_like(mode != nil ? [mode cString] : NULL), &opens, &closes);
+    if (style == 'i') {
+        count = fold_indent_top(t, n, &hs, &he);
+    } else if (style == 'w') {
+        WordBlocks b;
+        if (words_scan(t, n, lang_word_kind(m), &b)) {
+            count = words_fold_top(&b, t, n, &hs, &he);
+            words_free(&b);
+        }
+    } else {
+        unsigned int *opens, *closes;
+        count = fold_top_blocks(t, n, lang_c_like(m), &opens, &closes);
+        if (count > 0) {
+            hs = (unsigned int *)malloc(count * sizeof(unsigned int));
+            he = (unsigned int *)malloc(count * sizeof(unsigned int));
+            for (i = 0; hs != NULL && he != NULL && i < count; i++) { hs[i] = opens[i] + 1; he[i] = closes[i]; }
+            if (hs == NULL || he == NULL) count = 0;
+        }
+        free(opens);
+        free(closes);
+    }
     free(t);
-    if (count == 0) { NSBeep(); return; }
-    region = NSMakeRange(opens[0] + 1, closes[count - 1] - opens[0] - 1);
+    if (count == 0) { free(hs); free(he); NSBeep(); return; }
+    region = NSMakeRange(hs[0], he[count - 1] - hs[0]);
     out = [NSMutableString stringWithCapacity:region.length];
     pos = region.location;
     for (i = 0; i < count; i++) {
-        NSRange inner = NSMakeRange(opens[i] + 1, closes[i] - opens[i] - 1);
+        NSRange inner = NSMakeRange(hs[i], he[i] - hs[i]);
         NSString *hidden = [s substringWithRange:inner], *full = [self expandedString:hidden];
         unsigned int k, nl = 0, fl = [full length], tn;
         u16 tok[FOLD_MAX_TOKEN];
 
         for (k = 0; k < fl; k++) if ([full characterAtIndex:k] == '\n') nl++;
-        [out appendString:[s substringWithRange:NSMakeRange(pos, inner.location - pos)]];
+        if (inner.location > pos) [out appendString:[s substringWithRange:NSMakeRange(pos, inner.location - pos)]];
         foldNext++;
         [folds setObject:hidden forKey:[NSNumber numberWithUnsignedInt:foldNext]];
         tn = fold_make_token(tok, nl, foldNext);
         [out appendString:[NSString stringWithCharacters:tok length:tn]];
         pos = NSMaxRange(inner);
     }
-    free(opens);
-    free(closes);
+    free(hs);
+    free(he);
     [self foldReplaceRange:region with:out select:NSMakeRange(region.location, 0)];
 }
 

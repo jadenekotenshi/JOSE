@@ -52,7 +52,7 @@ static int match_text(const u16 *t, unsigned n, unsigned i, const char *s)
 }
 
 /* A token that starts exactly at i. */
-static int token_at(const u16 *t, unsigned n, unsigned i, unsigned *end, unsigned *lines, unsigned *id)
+int fold_token_at(const u16 *t, unsigned n, unsigned i, unsigned *end, unsigned *lines, unsigned *id)
 {
     unsigned p = i + 5, k;
 
@@ -75,7 +75,7 @@ int fold_token_find(const u16 *t, unsigned n, unsigned from, unsigned *start, un
     unsigned i;
 
     for (i = from; i + 5 < n; i++) {
-        if (t[i] == ' ' && t[i + 1] == '.' && token_at(t, n, i, end, lines, id)) {
+        if (t[i] == ' ' && t[i + 1] == '.' && fold_token_at(t, n, i, end, lines, id)) {
             *start = i;
             return 1;
         }
@@ -88,7 +88,7 @@ unsigned fold_hidden_lines(const u16 *t, unsigned n, unsigned limit)
     unsigned total = 0, i, end, lines, id;
 
     for (i = 0; i < limit && i + 5 < n; i++) {
-        if (t[i] == ' ' && t[i + 1] == '.' && token_at(t, n, i, &end, &lines, &id)) {
+        if (t[i] == ' ' && t[i + 1] == '.' && fold_token_at(t, n, i, &end, &lines, &id)) {
             total += lines;
             i = end - 1;
         }
@@ -205,5 +205,149 @@ unsigned fold_top_blocks(const u16 *t, unsigned n, int c_aware, unsigned **opens
     }
     *opens = o;
     *closes = c;
+    return count;
+}
+
+/* ---- folding by indentation ---- */
+
+/* The indentation of the line t[a, b) in columns (a tab going to the next multiple of 8), -1 if it is blank. */
+static int line_indent(const u16 *t, unsigned a, unsigned b)
+{
+    unsigned i;
+    int col = 0;
+
+    for (i = a; i < b; i++) {
+        if (t[i] == ' ') col++;
+        else if (t[i] == '\t') col = (col / 8 + 1) * 8;
+        else if (t[i] == '\r') continue;
+        else return col;
+    }
+    return -1;
+}
+
+static unsigned eol_from(const u16 *t, unsigned n, unsigned i)
+{
+    while (i < n && t[i] != '\n') i++;
+    return i;
+}
+
+/* The end of the block under the header line whose end is `he_line`: the end of the last line indented more than `indent`
+ * (blank lines at the end do not count).  Returns he_line if the block is empty. */
+static unsigned block_end(const u16 *t, unsigned n, unsigned he_line, int indent)
+{
+    unsigned last = he_line, ls = he_line + 1, le;
+
+    while (he_line < n && ls <= n) {
+        int ind;
+        le = eol_from(t, n, ls);
+        ind = line_indent(t, ls, le);
+        if (ind >= 0) {
+            if (ind <= indent) break;
+            last = le;
+        }
+        if (le >= n) break;
+        ls = le + 1;
+    }
+    return last;
+}
+
+/* The indentation of the next non-blank line after the one that ends at `le`, -1 if there is none. */
+static int next_indent(const u16 *t, unsigned n, unsigned le)
+{
+    unsigned ls, e;
+    int ind;
+
+    while (le < n) {
+        ls = le + 1;
+        e = eol_from(t, n, ls);
+        ind = line_indent(t, ls, e);
+        if (ind >= 0) return ind;
+        le = e;
+    }
+    return -1;
+}
+
+int fold_indent_block(const u16 *t, unsigned n, unsigned pos, unsigned *hs, unsigned *he)
+{
+    unsigned ls, le, hls, hle;
+    int ind;
+
+    if (pos > n) pos = n;
+    ls = pos;
+    while (ls > 0 && t[ls - 1] != '\n') ls--;
+    le = eol_from(t, n, pos);
+    /* a blank line: use the nearest non-blank one above */
+    while (line_indent(t, ls, le) < 0) {
+        if (ls == 0) return 0;
+        le = ls - 1;
+        ls = le;
+        while (ls > 0 && t[ls - 1] != '\n') ls--;
+    }
+    ind = line_indent(t, ls, le);
+    hls = ls;
+    hle = le;
+    if (next_indent(t, n, le) <= ind) {              /* no block under this line: the header is the nearest line above that is indented less */
+        unsigned cl = ls;
+        int found = 0;
+        while (cl > 0) {
+            unsigned pe = cl - 1, ps = pe;
+            int pi;
+            while (ps > 0 && t[ps - 1] != '\n') ps--;
+            pi = line_indent(t, ps, pe);
+            if (pi >= 0 && pi < ind) { hls = ps; hle = pe; ind = pi; found = 1; break; }
+            cl = ps;
+        }
+        if (!found) return 0;
+    }
+    {
+        unsigned end = block_end(t, n, hle, line_indent(t, hls, hle));
+        if (end <= hle) return 0;
+        *hs = hle;
+        *he = end;
+        return 1;
+    }
+}
+
+unsigned fold_indent_top(const u16 *t, unsigned n, unsigned **hs, unsigned **he)
+{
+    unsigned ls = 0, count = 0, cap = 0, le, skip_to = 0;
+    int base = -1;
+    unsigned *a = NULL, *b = NULL;
+
+    *hs = *he = NULL;
+    for (le = 0; ls <= n; ls = le + 1) {                    /* the least indentation of any line */
+        int ind;
+        le = eol_from(t, n, ls);
+        ind = line_indent(t, ls, le);
+        if (ind >= 0 && (base < 0 || ind < base)) base = ind;
+        if (le >= n) break;
+    }
+    if (base < 0) return 0;
+    for (ls = 0; ls <= n; ls = le + 1) {
+        int ind;
+        le = eol_from(t, n, ls);
+        ind = line_indent(t, ls, le);
+        if (ind == base && ls >= skip_to) {
+            unsigned end = block_end(t, n, le, ind);
+            if (end > le) {
+                if (count == cap) {
+                    unsigned nc = cap ? cap * 2 : 32;
+                    unsigned *na = (unsigned *)realloc(a, nc * sizeof(unsigned));
+                    unsigned *nb = (unsigned *)realloc(b, nc * sizeof(unsigned));
+                    if (na) a = na;
+                    if (nb) b = nb;
+                    if (!na || !nb) { free(a); free(b); return 0; }
+                    cap = nc;
+                }
+                a[count] = le;
+                b[count] = end;
+                count++;
+                skip_to = end;
+            }
+        }
+        if (le >= n) break;
+    }
+    *hs = a;
+    *he = b;
     return count;
 }

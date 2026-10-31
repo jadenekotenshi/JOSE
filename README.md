@@ -13,7 +13,8 @@ Status: **prototype (0.0.1)** -- nothing here has been run on OPENSTEP yet.
   The mode is chosen from the file name and can be changed from *Preferences > Language Mode*.
   Syntax files are in `syntax/` and are installed in `JOSE.app/syntax/`; add more there.
 * Line endings (LF, CRLF, CR) are detected on load and kept on save; UTF-8 is read and written (invalid bytes read as Latin-1).
-* Status line (line, column, mode, line ending), Go to Line, optional line wrapping, optional line numbers, matching brackets.
+* Status line (line, column, mode, line ending), Go to Line, optional line wrapping, optional line numbers, matching brackets
+  (`( ) [ ] { }`, and in shell scripts and the C family also the keyword pairs below).
 * Find/Replace with regular expressions; auto-indent, shift left/right, comment/uncomment; saved preferences.
 * **Fill Paragraph** (Edit, cmd-J): re-flows the selected lines, or the paragraph around the insertion point, to the
   *Preferences > Fill Width*.  A comment leader (`//`, `#`, `*`, `>`, `;`, `--`) and the indentation are kept, and the second
@@ -27,9 +28,17 @@ Status: **prototype (0.0.1)** -- nothing here has been run on OPENSTEP yet.
   file's folder; the editor waits for them for up to a minute.  Output on stderr or a non-zero status is shown in an alert
   and, for a failure, the text is left alone.
 
+* **Matching keyword pairs** (Search > Go to / Select to Matching Bracket, with the insertion point on or next to the word):
+  shell `if`/`fi`, `case`/`esac`, `for`/`while`/`until`/`select`/`done`, and `then`, `elif`, `else`, `do` (which go to the end of
+  their block); csh `if (...) then`/`endif`, `foreach`/`while`/`end`, `switch`/`endsw`; C-family `#if`, `#ifdef`, `#ifndef`/`#endif`,
+  with `#else` and `#elif`.  A word only counts where a command can start, so `echo if` is left alone; comments and quoted text are
+  skipped.  (Not understood: here-documents, which may hide a keyword at the start of a line.)
 * **Code folding** (Edit > Fold/Unfold Block, cmd-K; Fold All Blocks; Expand All Blocks): collapses the block between matching
   braces, the one that opens on the insertion point's line, closes on it, or surrounds it, into `{ ... 12 lines ~7 }`.
-  Click the marker, or press cmd-K on its line, to open it again.  Fold All Blocks folds every outermost block that spans
+  How a block is found depends on the mode: braces for the C family and most others; **indentation for Python** (the line with
+  the insertion point if the next line is indented more, else the nearest line above that is indented less; blank lines at the end
+  stay out of it); **keyword pairs for shell and csh** (`if`...`fi`, `for`...`done`, `case`...`esac`: the closing word stays visible
+  after the marker).  Click the marker, or press cmd-K on its line, to open it again.  Fold All Blocks folds every outermost block that spans
   several lines (every function body, in C).  The hidden code stays in the document: Save writes it in full, Copy and Cut
   put it on the pasteboard in full, line numbers and the status line count it, folds are undone and redone like any edit, and
   folding does not make a clean file dirty.  What a fold cannot do: a marker cannot be edited in part (it is refused, or opens

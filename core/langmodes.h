@@ -19,4 +19,11 @@ int lang_smart_indent(const char *mode);
 /* 1 for the modes whose text is C-like (strings, character constants and C comments, for matching brackets). */
 int lang_c_like(const char *mode);
 
+/* Which keyword pairs a mode has, for matching and folding (the WORDS_ values of words.h): 1 shell, 2 csh, 3 the C
+ * preprocessor (the C family); 0 none. */
+int lang_word_kind(const char *mode);
+
+/* How code folds in a mode: 'i' by indentation (Python), 'w' by keyword pairs (shell, csh), 'b' by braces. */
+int lang_fold_style(const char *mode);
+
 #endif

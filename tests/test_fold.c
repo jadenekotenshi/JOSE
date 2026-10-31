@@ -73,5 +73,28 @@ int main(void)
     free(os); free(cs);
     n = widen("", t);
     CHECK(fold_top_blocks(t, n, 1, &os, &cs) == 0);
+    /* folding by indentation */
+    {
+        const char *py = "import os\n\ndef f(x):\n    a = 1\n\n    if x:\n        b = 2\n        c = 3\n    return a\n\nclass K:\n    def m(self):\n        pass\n\nprint(1)\n";
+        unsigned h1, h2, *hs2, *he2, cnt;
+        const char *p;
+        n = widen(py, t);
+        p = strstr(py, "def f");
+        CHECK(fold_indent_block(t, n, (unsigned)(p - py), &h1, &h2) && t[h1] == '\n' && h1 == (unsigned)(strstr(py, "\n    a = 1") - py));
+        CHECK(h2 == (unsigned)(strstr(py, "\n\nclass") - py));                          /* up to the end of "return a", not the blank lines after it */
+        CHECK(fold_indent_block(t, n, (unsigned)(strstr(py, "b = 2") - py), &h1, &h2) && h1 == (unsigned)(strstr(py, "\n        b") - py));   /* inside: the nearest header above */
+        CHECK(h2 == (unsigned)(strstr(py, "\n    return") - py));
+        CHECK(fold_indent_block(t, n, (unsigned)(strstr(py, "if x") - py), &h1, &h2) && h1 == (unsigned)(strstr(py, "\n        b") - py));
+        CHECK(!fold_indent_block(t, n, 0, &h1, &h2));                                      /* "import os": no block, nothing above */
+        CHECK(!fold_indent_block(t, n, (unsigned)(strstr(py, "print") - py), &h1, &h2));
+        CHECK(fold_indent_block(t, n, (unsigned)(strstr(py, "\n\n    if") - py) + 1, &h1, &h2));   /* a blank line inside a block: that block */
+        cnt = fold_indent_top(t, n, &hs2, &he2);
+        CHECK(cnt == 2 && hs2[0] < he2[0] && hs2[1] > he2[0]);
+        free(hs2); free(he2);
+        n = widen("", t);
+        CHECK(fold_indent_top(t, n, &hs2, &he2) == 0);
+        n = widen("a:\n\tb\n\tc\nd\n", t);
+        CHECK(fold_indent_block(t, n, 0, &h1, &h2) && h1 == 2 && h2 == 8);                  /* tabs */
+    }
     TEST_DONE("fold");
 }
