@@ -168,6 +168,7 @@
 
 - (void)drawHashMarksAndLabelsInRect:(NSRect)rect
 {
+    SSCrumb("line numbers: drawing");
     NS_DURING
         [self drawLabelsInRect:rect];
     NS_HANDLER

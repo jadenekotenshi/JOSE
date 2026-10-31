@@ -39,6 +39,24 @@ static void leaving(void)
     if (traceFD >= 0) write(traceFD, "the process exits\n", 18);
 }
 
+/* An exception raised while one event is handled is logged and the event is dropped, instead of ending the program (and the
+ * unsaved work in every window with it).  The last step the program reported (SSCrumb) is written with it. */
+@interface JOSEApplication : NSApplication
+@end
+
+@implementation JOSEApplication
+- (void)sendEvent:(NSEvent *)event
+{
+    NS_DURING
+        [super sendEvent:event];
+    NS_HANDLER
+        NSLog(@"JOSE: exception in an event: %@ -- %@", [localException name], [localException reason]);
+        SSTrace("EXCEPTION in an event: %s -- %s; last step: %s", SSCS([localException name]), SSCS([localException reason]), (const char *)ss_crumb);
+        NSBeep();
+    NS_ENDHANDLER
+}
+@end
+
 int main(int argc, char *argv[])
 {
     NSAutoreleasePool *pool;
@@ -76,7 +94,7 @@ int main(int argc, char *argv[])
     }
 
     NS_DURING
-        [NSApplication sharedApplication];
+        [JOSEApplication sharedApplication];
         NSLog(@"JOSE: NSApplication created");
         SSTrace("NSApplication created");
         controller = [[AppController alloc] init];

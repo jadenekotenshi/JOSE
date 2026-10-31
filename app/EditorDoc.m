@@ -60,6 +60,7 @@
     if (macroSuppress == 0 && [str isKindOfClass:[NSString class]]) [(EditorDoc *)editor macroNoteInsert:str];
     macroSuppress++;
     if (rectOn && [str isKindOfClass:[NSString class]]) { [(EditorDoc *)editor rectType:str]; macroSuppress--; return; }
+    if ([str isKindOfClass:[NSString class]] && [(EditorDoc *)editor editNearEnd:[self selectedRange] with:str]) { macroSuppress--; return; }   /* typing over a selection at the end */
     if ([str isKindOfClass:[NSString class]]) [(EditorDoc *)editor willInsertText:str];
     [super insertText:str];
     macroSuppress--;
@@ -207,6 +208,7 @@
     if (macroSuppress == 0) [(EditorDoc *)editor macroNoteAction:@"cut:"];
     macroSuppress++;
     if (rectOn) [(EditorDoc *)editor rectCopyAndCut:YES];
+    else if ([(EditorDoc *)editor cutNearEnd]) {}
     else if (![(EditorDoc *)editor copyExpandedSelectionAndCut:YES]) [super cut:sender];
     macroSuppress--;
 }
@@ -215,7 +217,9 @@
 {
     if (macroSuppress == 0) [(EditorDoc *)editor macroNoteAction:@"delete:"];
     macroSuppress++;
-    if (rectOn) [(EditorDoc *)editor rectDeleteBackward:NO]; else [super delete:sender];
+    if (rectOn) [(EditorDoc *)editor rectDeleteBackward:NO];
+    else if ([(EditorDoc *)editor editNearEnd:[self selectedRange] with:@""]) {}
+    else [super delete:sender];
     macroSuppress--;
 }
 
@@ -360,9 +364,11 @@
         NSLayoutManager *lm = [self layoutManager];
         NSRange drawn;
 
+        SSCrumb("draw: laying out the text for the area");
         SSTrace("draw: layout for y=%d h=%d ...", (int)frame.origin.y, (int)frame.size.height);
         drawn = [lm glyphRangeForBoundingRect:frame inTextContainer:[self textContainer]];
         SSTrace("draw: glyphs %u+%u laid out, highlighting", drawn.location, drawn.length);
+        SSCrumb("draw: highlighting");
         NS_DURING
             [highlighter highlightRange:drawn];
         NS_HANDLER
@@ -370,7 +376,9 @@
         NS_ENDHANDLER
         SSTrace("draw: highlighted");
     }
+    SSCrumb("draw: the text view's own drawing");
     [super drawRect:frame];
+    SSCrumb("draw: done");
     if (rectOn) [self drawRectangle:frame];
 }
 
@@ -424,6 +432,8 @@ static void line_col(NSString *s, unsigned int loc, unsigned int *line, unsigned
 - (void)rulersRedraw;
 - (void)wrapPane:(EditTextView *)tv scroll:(NSScrollView *)sc;
 - (void)swapPanes;
+- (BOOL)rangeIsNearEnd:(NSRange)r;
+- (void)scrollAwayFromEnd;
 - (NSScrollView *)paneScrollOf:(EditTextView *)view;
 - (void)refreshFoldInfo;
 - (void)scheduleFoldRefresh;
@@ -776,6 +786,7 @@ static BOOL ident_char(unichar c)
 - (BOOL)textView:(NSTextView *)tv shouldChangeTextInRange:(NSRange)range replacementString:(NSString *)replacement
 {
     if (replacement == nil) return YES;                        /* attributes only */
+    SSCrumb("shouldChangeTextInRange");
     SSTrace("edit: range %u+%u, %u new units, text %u long", (unsigned)range.location, (unsigned)range.length, (unsigned)[replacement length], (unsigned)[[textView string] length]);
     if (range.location > [[textView string] length] || range.length > [[textView string] length] - range.location)
         return NO;                                             /* not a range of this text (Backspace at the very start may ask for one) */
@@ -798,6 +809,7 @@ static BOOL ident_char(unichar c)
 
 - (void)textDidChange:(NSNotification *)notification
 {
+    SSCrumb("textDidChange");
     SSTrace("changed: text now %u long", (unsigned)[[textView string] length]);
     [textView rectClear];
     [self markEdited];
@@ -809,6 +821,7 @@ static BOOL ident_char(unichar c)
 {
     NSRange sel;
 
+    SSCrumb("selection changed");
     if ([notification object] != nil && [notification object] != textView) return;     /* the other pane's own selection */
     [statusNote release];
     statusNote = nil;
@@ -1463,14 +1476,20 @@ static int unmatched_cmp(const void *a, const void *b)
 {
     if ([folds count] > 0 && ![self editAllowedInRange:range]) { NSBeep(); return; }     /* it would cut a fold marker in two */
     undo_break(undo);
+    SSCrumb("replaceRange: recording the edit");
     [self recordEditInRange:range replacement:str];
     undo_break(undo);
+    SSCrumb("replaceRange: changing the text storage");
     [[textView textStorage] replaceCharactersInRange:range withString:str];
     expectedCaret = range.location + [str length];
+    SSCrumb("replaceRange: setting the selection");
     [textView setSelectedRange:sel];
+    SSCrumb("replaceRange: scrolling to the selection");
     [textView scrollRangeToVisible:sel];
+    SSCrumb("replaceRange: marking edited");
     [self markEdited];
     [self updateStatus];
+    SSCrumb("replaceRange: done");
 }
 
 /* ---- fill paragraph ---- */
@@ -2075,24 +2094,66 @@ static NSString *rect_clip;                 /* what Copy last took from a rectan
  * redrew the last lines in the middle of its own change; first seen deleting the last character, then deleting the newline before
  * a final blank line).  Our own edits do not, so a deletion there is done here: the selection, or the character before (Backspace)
  * or after (Delete) the insertion point.  Elsewhere the text view does it, and merges runs of them into one undo step. */
-- (BOOL)deleteNearEnd:(BOOL)forward
+/* Is the range in the last four lines of the text? */
+- (BOOL)rangeIsNearEnd:(NSRange)r
 {
     NSString *s = [textView string];
-    NSRange sel = [textView selectedRange], r = sel;
     unsigned int n = [s length], idx, seen = 0;
+
+    if (NSMaxRange(r) > n) return NO;
+    for (idx = n; idx > 0; idx--)                     /* where the fourth line from the end begins */
+        if ([s characterAtIndex:idx - 1] == '\n' && ++seen == 4) break;
+    return NSMaxRange(r) > idx;
+}
+
+/* A change that takes lines off the bottom shrinks the document, and the scroll view then scrolls itself and redraws in the middle of
+ * the change, which is where 4.2 raised its exception.  So when the view is showing the very end, it is scrolled up a few lines first
+ * (the caret is brought back into view afterwards). */
+- (void)scrollAwayFromEnd
+{
+    NSClipView *cv = [scroll contentView];
+    NSRect vis = [cv documentVisibleRect], doc = [textView frame];
+    NSFont *f = [HKSyntaxHighlighter defaultFont];
+    float lh = [f ascender] - [f descender], y;
+
+    if (lh < 4.0) lh = 14.0;
+    if (NSMaxY(vis) < NSMaxY(doc) - 4.0 * lh) return;
+    y = vis.origin.y - 3.0 * lh;
+    if (y < 0.0) y = 0.0;
+    SSCrumb("scrolling away from the end");
+    [cv scrollToPoint:NSMakePoint(vis.origin.x, y)];
+    [scroll reflectScrolledClipView:cv];
+}
+
+- (BOOL)editNearEnd:(NSRange)r with:(NSString *)str
+{
+    if (r.length == 0 || ![self rangeIsNearEnd:r]) return NO;
+    SSTrace("editNearEnd: %u+%u of %u, %u new units", (unsigned)r.location, (unsigned)r.length, (unsigned)[[textView string] length], (unsigned)[str length]);
+    [textView rectClear];
+    [self scrollAwayFromEnd];
+    [self replaceRange:r with:str select:NSMakeRange(r.location + [str length], 0)];
+    return YES;
+}
+
+- (BOOL)cutNearEnd
+{
+    NSRange sel = [textView selectedRange];
+
+    if (sel.length == 0 || ![self rangeIsNearEnd:sel]) return NO;
+    [textView copy:nil];                              /* copying is safe; it is the removal that is done by hand */
+    return [self editNearEnd:sel with:@""];
+}
+
+- (BOOL)deleteNearEnd:(BOOL)forward
+{
+    NSRange r = [textView selectedRange];
+    unsigned int n = [[textView string] length];
 
     if (r.length == 0) {
         if (forward && r.location < n) r = NSMakeRange(r.location, 1);
         else if (!forward && r.location > 0) r = NSMakeRange(r.location - 1, 1);
     }
-    if (r.length == 0 || NSMaxRange(r) > n) return NO;
-    for (idx = n; idx > 0; idx--)                     /* where the fourth line from the end begins */
-        if ([s characterAtIndex:idx - 1] == '\n' && ++seen == 4) break;
-    if (NSMaxRange(r) <= idx) return NO;
-    SSTrace("deleteNearEnd: %u+%u of %u", (unsigned)r.location, (unsigned)r.length, n);
-    [textView rectClear];
-    [self replaceRange:r with:@"" select:NSMakeRange(r.location, 0)];
-    return YES;
+    return [self editNearEnd:r with:@""];
 }
 
 - (void)splitPane

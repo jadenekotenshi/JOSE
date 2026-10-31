@@ -842,6 +842,24 @@ int main(void)
         [ed undo];
         CHECK([[tv string] isEqualToString:body]);
     }
+    {   /* Cut, Delete and typing over a selection in the last lines are done by hand too */
+        EditorDoc *ed = [[[EditorDoc alloc] initWithOwner:nil] autorelease];
+        EditTextView *tv = [ed textView];
+
+        [tv setString:@"one\ntwo\nthree\n"];
+        [tv setSelectedRange:NSMakeRange(8, 6)];                                  /* "three\n" */
+        [tv cut:nil];
+        CHECK([[tv string] isEqualToString:@"one\ntwo\n"] && [tv selectedRange].location == 8);
+        CHECK([[[NSPasteboard generalPasteboard] stringForType:NSStringPboardType] isEqualToString:@"three\n"]);
+        [tv setSelectedRange:NSMakeRange(4, 4)];                                  /* "two\n" */
+        [tv insertText:@"2\n"];
+        CHECK([[tv string] isEqualToString:@"one\n2\n"] && [tv selectedRange].location == 6);
+        [tv setSelectedRange:NSMakeRange(4, 2)];
+        [tv delete:nil];
+        CHECK([[tv string] isEqualToString:@"one\n"]);
+        [ed undo];
+        CHECK([[tv string] isEqualToString:@"one\n2\n"]);
+    }
     [[NSFileManager defaultManager] removeItemAtPath:dir error:NULL];
     printf(failures ? "doc: FAILED\n" : "doc: ok\n");
     [pool release];
