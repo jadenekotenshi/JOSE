@@ -3,7 +3,7 @@
 
 /* Block keywords that go in pairs, for matching and folding: shell `if`/`fi`, `case`/`esac`, `while`/`for`/`until`/`select` and
  * `done` (with `then`, `elif`, `else` and `do` in between); csh `if (...) then`/`endif`, `foreach`/`while`/`end`,
- * `switch`/`endsw`; and the C preprocessor `#if`, `#ifdef`, `#ifndef` and `#endif` (with `#else`, `#elif`).  A word only counts
+ * `switch`/`endsw`; Ruby `def`/`class`/`module`/`if`/`do`... with `end`; and the C preprocessor `#if`, `#ifdef`, `#ifndef` and `#endif` (with `#else`, `#elif`).  A word only counts
  * where a command could start (after a newline, `;`, `|`, `&`, `(`, `{`, or a keyword like `then`), so `echo if` is left
  * alone, and comments and quoted text are skipped.  Plain C so that it can be tested on the host. */
 
@@ -16,6 +16,7 @@ typedef unsigned short u16;
 #define WORDS_SH   1
 #define WORDS_CSH  2
 #define WORDS_CPP  3
+#define WORDS_RUBY 4
 
 typedef struct { unsigned os, oe, cs, ce; } WordPair;        /* the opening and closing words: [os, oe) and [cs, ce) */
 typedef struct { unsigned s, e; unsigned pair; } WordMid;    /* `else` and its like, and the pair that they belong to */

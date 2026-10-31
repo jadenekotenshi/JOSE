@@ -41,6 +41,23 @@ int main(void)
     CHECK(parse("require \"lib.pl\";", "Perl", names, &sys) == 1 && strcmp(names[0], "lib.pl") == 0);
     CHECK(parse("-include config.mk", "GNUmakefile", names, &sys) == 1 && strcmp(names[0], "config.mk") == 0);
     CHECK(parse("#include <a.h>", NULL, names, &sys) == 0);
+    CHECK(parse("source ~/.zsh/aliases", "Zsh", names, &sys) == 1 && strcmp(names[0], "~/.zsh/aliases") == 0);
+    CHECK(parse(".include <bsd.prog.mk>", "BSDMakefile", names, &sys) == 1 && strcmp(names[0], "bsd.prog.mk") == 0 && sys == 1);
+    CHECK(parse(".include \"local.mk\"", "BSDMakefile", names, &sys) == 1 && strcmp(names[0], "local.mk") == 0 && sys == 0);
+    CHECK(parse(".sinclude <x.mk>", "BSDMakefile", names, &sys) == 1);
+    CHECK(parse(".if defined(X)", "BSDMakefile", names, &sys) == 0);
+    CHECK(parse("#include <X11/Xos.h>", "Imakefile", names, &sys) == 1 && strcmp(names[0], "X11/Xos.h") == 0);
+    CHECK(parse("require 'json'", "Ruby", names, &sys) == 2 && strcmp(names[0], "json.rb") == 0 && strcmp(names[1], "json") == 0 && sys == 1);
+    CHECK(parse("require_relative \"lib/util\"", "Ruby", names, &sys) == 2 && strcmp(names[0], "lib/util.rb") == 0 && sys == 0);
+    CHECK(parse("require './x.rb'", "Ruby", names, &sys) == 1 && strcmp(names[0], "./x.rb") == 0);
+    CHECK(parse("requirement 'x'", "Ruby", names, &sys) == 0);
+    CHECK(parse("const a = require('./util');", "JavaScript", names, &sys) == 3 && strcmp(names[0], "./util") == 0 && strcmp(names[1], "./util.js") == 0 &&
+          strcmp(names[2], "./util/index.js") == 0 && sys == 0);
+    CHECK(parse("import { x } from \"lodash\";", "JavaScript", names, &sys) == 3 && strcmp(names[1], "lodash.js") == 0 && sys == 1);
+    CHECK(parse("import './side-effect.js'", "JavaScript", names, &sys) == 1 && strcmp(names[0], "./side-effect.js") == 0);
+    CHECK(parse("export * from '../a.mjs'", "JavaScript", names, &sys) == 1 && strcmp(names[0], "../a.mjs") == 0);
+    CHECK(parse("var x = 1;", "JavaScript", names, &sys) == 0);
+    CHECK(parse("{\"a\": 1}", "JSON", names, &sys) == 0);
     /* a name under the insertion point */
     n = widen("see ../lib/foo.h, then", t);
     CHECK(include_token(t, n, 8, tok, sizeof tok) == 12 && strcmp(tok, "../lib/foo.h") == 0);

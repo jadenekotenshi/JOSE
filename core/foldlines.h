@@ -16,9 +16,9 @@ typedef struct {
     unsigned count;
 } FoldLines;
 
-/* style: 'b' braces, 'i' indentation, 'w' keyword pairs (word_kind is the WORDS_ value for the mode).  Returns 1 on success
+/* flags: FOLD_CAWARE, FOLD_BRACKETS (fold.h).  style: 'b' braces, 'i' indentation, 'w' keyword pairs (word_kind is the WORDS_ value for the mode).  Returns 1 on success
  * (even if there are no lines). */
-int foldlines_scan(const u16 *t, unsigned n, int style, int c_aware, int word_kind, FoldLines *out);
+int foldlines_scan(const u16 *t, unsigned n, int style, int flags, int word_kind, FoldLines *out);
 void foldlines_free(FoldLines *f);
 
 /* The entry for the line that starts at `line_start`: 0 none, 1 a block begins there, 2 a marker is there. */

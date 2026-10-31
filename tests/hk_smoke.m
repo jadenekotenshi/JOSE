@@ -89,6 +89,57 @@ int main(int argc, char **argv)
         CHECK([colourAt(cts, [[cts string] rangeOfString:@"stdlib"].location) isEqual:hdr]);
         CHECK(![colourAt(cts, [[cts string] rangeOfString:@"int"].location) isEqual:hdr]);
     }
+    {   /* the newer modes each colour a keyword, a string and a comment differently, and the nested bits */
+        static const struct { const char *mode; NSString *text; NSString *kw, *str, *cmt; } T[] = {
+            { "JSON", @"{\"name\": \"x\", \"ok\": true}\n", @"true", @"x\"", nil },
+            { "JavaScript", @"function f() { return \"s\"; } // note\n", @"function", @"s\"", @"note" },
+            { "Ruby", @"def f\n  puts \"s\" # note\nend\n", @"def", @"s\"", @"note" },
+            { "Zsh", @"autoload -U compinit\necho \"s\" # note\n", @"autoload", @"s\"", @"note" },
+            { "BSDMakefile", @".include <bsd.prog.mk>\nFOO= \"s\" # note\n", @"include", @"s\"", @"note" },
+            { "Imakefile", @"XCOMM note\nSRCS = a.c\n#define X \"s\"\n", @"SRCS", @"s\"", @"note" }
+        };
+        int ti;
+        for (ti = 0; ti < 6; ti++) {
+            NSTextStorage *mts = [[[NSTextStorage alloc] initWithString:T[ti].text] autorelease];
+            HKSyntaxHighlighter *mh = [[HKSyntaxHighlighter alloc] initWithHighlighterType:[NSString stringWithCString:T[ti].mode] textStorage:mts
+                                                                          defaultTextColor:[NSColor blackColor]];
+            NSColor *kwc, *plainc;
+            if (mh == nil) { printf("FAIL: no syntax for %s\n", T[ti].mode); failures++; continue; }
+            [mh highlightRange:NSMakeRange(0, [mts length])];
+            kwc = colourAt(mts, [T[ti].text rangeOfString:T[ti].kw].location);
+            plainc = colourAt(mts, [T[ti].text length] - 1);
+            if (kwc == nil) { printf("FAIL: %s: no colour on %s\n", T[ti].mode, [T[ti].kw cString]); failures++; }
+            if (T[ti].str != nil) {
+                NSColor *sc = colourAt(mts, [T[ti].text rangeOfString:T[ti].str].location);
+                if (sc == nil || [sc isEqual:kwc]) { printf("FAIL: %s: the string is not coloured apart from the keyword\n", T[ti].mode); failures++; }
+            }
+            if (T[ti].cmt != nil) {
+                NSColor *cc = colourAt(mts, [T[ti].text rangeOfString:T[ti].cmt].location);
+                if (cc == nil || [cc isEqual:kwc]) { printf("FAIL: %s: the comment is not coloured apart from the keyword\n", T[ti].mode); failures++; }
+            }
+            (void)plainc;
+        }
+    }
+    {   /* Ruby: #{...} in a string; JavaScript: ${...} in a template literal; Imake: <header> in a cpp line */
+        NSString *rb = @"\"a #{b} c\"\n";
+        NSTextStorage *rts = [[[NSTextStorage alloc] initWithString:rb] autorelease];
+        HKSyntaxHighlighter *rh = [[HKSyntaxHighlighter alloc] initWithHighlighterType:@"Ruby" textStorage:rts defaultTextColor:[NSColor blackColor]];
+        NSString *js = @"`a ${b} c`\n";
+        NSTextStorage *jts = [[[NSTextStorage alloc] initWithString:js] autorelease];
+        HKSyntaxHighlighter *jh = [[HKSyntaxHighlighter alloc] initWithHighlighterType:@"JavaScript" textStorage:jts defaultTextColor:[NSColor blackColor]];
+        NSString *im = @"#include <X11/Xos.h>\nSRCS = a.c\n";
+        NSTextStorage *its = [[[NSTextStorage alloc] initWithString:im] autorelease];
+        HKSyntaxHighlighter *ih = [[HKSyntaxHighlighter alloc] initWithHighlighterType:@"Imakefile" textStorage:its defaultTextColor:[NSColor blackColor]];
+        [rh highlightRange:NSMakeRange(0, [rts length])];
+        [jh highlightRange:NSMakeRange(0, [jts length])];
+        [ih highlightRange:NSMakeRange(0, [its length])];
+        CHECK(![colourAt(rts, [rb rangeOfString:@"a #"].location) isEqual:colourAt(rts, [rb rangeOfString:@"b"].location)]);
+        CHECK([colourAt(rts, [rb rangeOfString:@"a #"].location) isEqual:colourAt(rts, [rb rangeOfString:@" c"].location + 1)]);      /* back in the string */
+        CHECK(![colourAt(jts, [js rangeOfString:@"a $"].location) isEqual:colourAt(jts, [js rangeOfString:@"b"].location)]);
+        CHECK([colourAt(jts, [js rangeOfString:@"a $"].location) isEqual:colourAt(jts, [js rangeOfString:@" c"].location + 1)]);
+        CHECK(![colourAt(its, 1) isEqual:colourAt(its, [im rangeOfString:@"X11"].location)]);
+        CHECK(![colourAt(its, 1) isEqual:colourAt(its, [im rangeOfString:@"a.c"].location)]);
+    }
     {   /* Python: keyword, comment, string and triple-quoted string get colours */
         NSString *py = @"def f(x):\n    # note\n    s = 'abc'\n    \"\"\"doc\n    more\"\"\"\n    return None\n";
         NSTextStorage *pts = [[[NSTextStorage alloc] initWithString:py] autorelease];

@@ -927,7 +927,7 @@ static BOOL ident_char(unichar c)
     t = (u16 *)malloc((n + 1) * sizeof(u16));
     if (t == NULL) return;
     [s getCharacters:t];
-    foldlines_scan(t, n, lang_fold_style(m), lang_c_like(m), lang_word_kind(m), &foldInfo);
+    foldlines_scan(t, n, lang_fold_style(m), (lang_c_like(m) ? FOLD_CAWARE : 0) | (lang_fold_brackets(m) ? FOLD_BRACKETS : 0), lang_word_kind(m), &foldInfo);
     free(t);
     [ruler setNeedsDisplay:YES];
 }
@@ -1474,7 +1474,7 @@ static NSString *rect_clip;                 /* what Copy last took from a rectan
             ok = words_fold_block(&b, t, n, pos, hs, he) != 0;
             words_free(&b);
         }
-    } else if (fold_find_block(t, n, pos, lang_c_like(m), &open, &close)) {
+    } else if (fold_find_block(t, n, pos, (lang_c_like(m) ? FOLD_CAWARE : 0) | (lang_fold_brackets(m) ? FOLD_BRACKETS : 0), &open, &close)) {
         *hs = open + 1;
         *he = close;
         ok = YES;
@@ -1552,7 +1552,7 @@ static NSString *rect_clip;                 /* what Copy last took from a rectan
         }
     } else {
         unsigned int *opens, *closes;
-        count = fold_top_blocks(t, n, lang_c_like(m), &opens, &closes);
+        count = fold_top_blocks(t, n, (lang_c_like(m) ? FOLD_CAWARE : 0) | (lang_fold_brackets(m) ? FOLD_BRACKETS : 0), &opens, &closes);
         if (count > 0) {
             hs = (unsigned int *)malloc(count * sizeof(unsigned int));
             he = (unsigned int *)malloc(count * sizeof(unsigned int));

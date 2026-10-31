@@ -73,6 +73,18 @@ int main(void)
     free(os); free(cs);
     n = widen("", t);
     CHECK(fold_top_blocks(t, n, 1, &os, &cs) == 0);
+    /* JSON arrays fold too, with the bracket flag */
+    {
+        const char *js = "{\n  \"a\": [\n    1,\n    2\n  ],\n  \"b\": \"]\"\n}\n";
+        unsigned o2, c2, *os2, *cs2, kk;
+        n = widen(js, t);
+        CHECK(fold_find_block(t, n, (unsigned)(strstr(js, "\"a\"") - js), FOLD_CAWARE | FOLD_BRACKETS, &o2, &c2) && js[o2] == '[' && js[c2] == ']');
+        CHECK(fold_find_block(t, n, (unsigned)(strstr(js, "\"a\"") - js), FOLD_CAWARE, &o2, &c2) && js[o2] == '{' && o2 == 0);       /* without it: the enclosing brace */
+        CHECK(fold_find_block(t, n, (unsigned)(strstr(js, "    1") - js), FOLD_CAWARE | FOLD_BRACKETS, &o2, &c2) && js[o2] == '[');
+        kk = fold_top_blocks(t, n, FOLD_CAWARE | FOLD_BRACKETS, &os2, &cs2);
+        CHECK(kk == 1 && os2[0] == 0 && js[cs2[0]] == '}');
+        free(os2); free(cs2);
+    }
     /* folding by indentation */
     {
         const char *py = "import os\n\ndef f(x):\n    a = 1\n\n    if x:\n        b = 2\n        c = 3\n    return a\n\nclass K:\n    def m(self):\n        pass\n\nprint(1)\n";

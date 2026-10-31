@@ -376,6 +376,29 @@ int main(void)
         CHECK([[tv string] isEqualToString:src]);
         CHECK([gd foldStateForLineStart:brace] == 1);
     }
+    {   /* the newer modes: JSON arrays and Ruby def/end fold; zsh and Ruby keyword pairs match */
+        EditorDoc *jd = [[[EditorDoc alloc] initWithOwner:nil] autorelease];
+        EditTextView *tv = [jd textView];
+        NSString *js = @"{\n  \"list\": [\n    1,\n    2\n  ],\n  \"k\": 0\n}\n";
+        NSString *rb = @"class A\n  def m\n    1\n  end\nend\n";
+        [jd setMode:@"JSON"];
+        [tv setString:js];
+        [tv setSelectedRange:NSMakeRange([js rangeOfString:@"\"list\""].location, 0)];
+        [jd toggleFold];
+        CHECK([[tv string] rangeOfString:@"[ ... 3 lines ~"].location != NSNotFound);          /* the array, not the object */
+        CHECK([[jd expandedString:[tv string]] isEqualToString:js]);
+        [jd expandAllFolds];
+        [jd setMode:@"Ruby"];
+        [tv setString:rb];
+        [tv setSelectedRange:NSMakeRange([rb rangeOfString:@"def m"].location, 0)];
+        [jd toggleFold];
+        CHECK([[tv string] rangeOfString:@"def m ... 2 lines ~"].location != NSNotFound);
+        CHECK([[tv string] rangeOfString:@"end\nend\n"].location != NSNotFound);
+        [jd expandAllFolds];
+        [tv setSelectedRange:NSMakeRange([rb rangeOfString:@"class"].location + 1, 0)];
+        [jd gotoMatchingBracket:NO];
+        CHECK([tv selectedRange].location == [rb length] - 1);                  /* just after the last end */
+    }
     {   /* Shell > Filter Selection: the selection goes through a command and comes back, as one undo step */
         EditorDoc *sd = [[[EditorDoc alloc] initWithOwner:nil] autorelease];
         NSTextView *tv = [sd textView];

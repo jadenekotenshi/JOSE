@@ -60,7 +60,7 @@ static int line_has_word(const u16 *t, unsigned n, unsigned from, const char *w)
 /* Classifies a word at a command position; *after is whether a command can follow it directly. */
 static int classify_sh(const u16 *t, unsigned s, unsigned e, int csh, int *after)
 {
-    static const char *const sh_open[] = { "if", "case", "while", "until", "for", "select", NULL };
+    static const char *const sh_open[] = { "if", "case", "while", "until", "for", "select", "repeat", NULL };
     static const char *const sh_close[] = { "fi", "esac", "done", NULL };
     static const char *const sh_mid[] = { "then", "elif", "else", "do", NULL };
     static const char *const csh_open[] = { "foreach", "while", "switch", NULL };
@@ -142,6 +142,74 @@ static int scan_sh(const u16 *t, unsigned n, int csh, TokList *l)
     return 1;
 }
 
+
+/* ---- Ruby ---- */
+
+static int scan_ruby(const u16 *t, unsigned n, TokList *l)
+{
+    static const char *const open_any[] = { "def", "class", "module", NULL };           /* openers wherever they stand */
+    static const char *const open_cmd[] = { "if", "unless", "while", "until", "case", "begin", "for", NULL };    /* ... only at the start of a statement */
+    static const char *const mids[] = { "else", "elsif", "when", "rescue", "ensure", "then", "in", NULL };
+    unsigned i = 0, j, end, lines, id, k;
+    int cmd = 1, loop_stmt = 0, bol = 1;
+
+    while (i < n) {
+        u16 c = t[i];
+        if (c == '\n') { cmd = 1; loop_stmt = 0; bol = 1; i++; continue; }
+        if (c == ' ' && i + 5 < n && t[i + 1] == '.' && fold_token_at(t, n, i, &end, &lines, &id)) { i = end; cmd = 1; continue; }
+        if (c == ' ' || c == '\t' || c == '\r') { i++; continue; }
+        if (bol && c == '=' && word_is(t, i + 1, i + 6, "begin")) {            /* =begin ... =end */
+            for (j = i; j < n; j++) {
+                if (t[j] == '\n' && j + 4 < n && t[j + 1] == '=' && word_is(t, j + 2, j + 5, "end")) { j += 5; break; }
+            }
+            while (j < n && t[j] != '\n') j++;
+            i = j;
+            continue;
+        }
+        bol = 0;
+        if (c == '\\') { i += (i + 1 < n) ? 2 : 1; continue; }
+        if (c == '#') { while (i < n && t[i] != '\n') i++; continue; }
+        if (c == '\'' || c == '"') {
+            for (j = i + 1; j < n && t[j] != c; j++) if (t[j] == '\\') j++;
+            i = j + 1;
+            cmd = 0;
+            continue;
+        }
+        if (c == ';' || c == '(' || c == '{' || c == '=') { cmd = 1; i++; continue; }
+        if (is_wc(c)) {
+            u16 prev = i > 0 ? t[i - 1] : 0, next, next2;
+            int bad, type = 0, after = 0;
+
+            for (j = i; j < n && is_wc(t[j]); j++) ;
+            next = j < n ? t[j] : 0;
+            next2 = j + 1 < n ? t[j + 1] : 0;
+            bad = prev == '.' || prev == ':' || prev == '@' || prev == '$' || next == '?' || next == '!' ||
+                  (next == ':' && next2 != ':');
+            if (!bad) {
+                if (word_is(t, i, j, "end")) { type = T_CLOSE; }
+                else if (word_is(t, i, j, "do")) {
+                    if (loop_stmt) { loop_stmt = 0; type = 0; after = 1; }       /* `while x do`: the loop's own end */
+                    else type = T_OPEN;
+                    after = 1;
+                } else {
+                    for (k = 0; open_any[k]; k++) if (word_is(t, i, j, open_any[k])) type = T_OPEN;
+                    if (!type && cmd) for (k = 0; open_cmd[k]; k++) if (word_is(t, i, j, open_cmd[k])) { type = T_OPEN; break; }
+                    if (type == T_OPEN && cmd && (word_is(t, i, j, "while") || word_is(t, i, j, "until") || word_is(t, i, j, "for"))) loop_stmt = 1;
+                    if (!type) for (k = 0; mids[k]; k++) if (word_is(t, i, j, mids[k])) { type = T_MID; after = 1; break; }
+                    if (type == T_OPEN && word_is(t, i, j, "begin")) after = 1;
+                }
+                if (type != 0 && !add_tok(l, i, j, type)) return 0;
+            }
+            cmd = (type == T_MID || after) ? 1 : 0;
+            i = j;
+            continue;
+        }
+        cmd = 0;
+        i++;
+    }
+    return 1;
+}
+
 /* ---- the C preprocessor ---- */
 
 static int scan_cpp(const u16 *t, unsigned n, TokList *l)
@@ -199,6 +267,7 @@ int words_scan(const u16 *t, unsigned n, int kind, WordBlocks *out)
     if (kind == WORDS_SH) ok = scan_sh(t, n, 0, &l);
     else if (kind == WORDS_CSH) ok = scan_sh(t, n, 1, &l);
     else if (kind == WORDS_CPP) ok = scan_cpp(t, n, &l);
+    else if (kind == WORDS_RUBY) ok = scan_ruby(t, n, &l);
     else return 1;
     if (!ok) { free(l.v); return 0; }
     if (l.n == 0) { free(l.v); return 1; }

@@ -10,7 +10,11 @@
 typedef unsigned short u16;
 #endif
 
-#define FOLD_MAX_TOKEN 48              /* room that fold_make_token needs */
+#define FOLD_MAX_TOKEN 48
+
+/* Flags for the `c_aware` argument of the block finders: */
+#define FOLD_CAWARE   1      /* strings and comments (C style) are skipped when matching */
+#define FOLD_BRACKETS 2      /* `[ ]` blocks fold as well as `{ }` (JSON, JavaScript) */              /* room that fold_make_token needs */
 
 /* Writes the token for a block that hides `lines` line breaks, standing for number `id`; returns its length. */
 unsigned fold_make_token(u16 *out, unsigned lines, unsigned id);
@@ -37,10 +41,10 @@ unsigned fold_hidden_lines(const u16 *t, unsigned n, unsigned limit);
 /* The block to fold for the insertion point at `pos`: the first `{` on its line whose `}` is on a later line, else the block
  * that the line's `}` closes, else the innermost block around `pos` that spans several lines.  *open and *close are the
  * indexes of the two braces.  Returns 0 if there is none. */
-int fold_find_block(const u16 *t, unsigned n, unsigned pos, int c_aware, unsigned *open, unsigned *close);
+int fold_find_block(const u16 *t, unsigned n, unsigned pos, int flags, unsigned *open, unsigned *close);
 
 /* Every outermost `{ ... }` that spans several lines, in order (malloc'd arrays of the brace indexes; free them).  Returns how
  * many. */
-unsigned fold_top_blocks(const u16 *t, unsigned n, int c_aware, unsigned **opens, unsigned **closes);
+unsigned fold_top_blocks(const u16 *t, unsigned n, int flags, unsigned **opens, unsigned **closes);
 
 #endif

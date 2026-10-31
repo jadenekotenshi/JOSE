@@ -40,10 +40,10 @@ static int cmp_entry(const void *a, const void *b)
 enum { S_CODE, S_LINE, S_BLOCK, S_STR, S_CHR };
 
 /* braces: every `{` whose `}` is on a later line */
-static int scan_braces(const u16 *t, unsigned n, int c_aware, List *l)
+static int scan_braces(const u16 *t, unsigned n, int flags, List *l)
 {
     unsigned *stack_start = NULL, *stack_line = NULL, top = 0, cap = 0, i, line = 0;
-    int state = S_CODE, ok = 1;
+    int state = S_CODE, ok = 1, c_aware = (flags & FOLD_CAWARE) != 0, brackets = (flags & FOLD_BRACKETS) != 0;
 
     for (i = 0; i < n && ok; i++) {
         u16 ch = t[i];
@@ -61,7 +61,7 @@ static int scan_braces(const u16 *t, unsigned n, int c_aware, List *l)
             if (ch == '"') { state = S_STR; continue; }
             if (ch == '\'') { state = S_CHR; continue; }
         }
-        if (ch == '{') {
+        if (ch == '{' || (brackets && ch == '[')) {
             if (top == cap) {
                 unsigned nc = cap ? cap * 2 : 64;
                 unsigned *a = (unsigned *)realloc(stack_start, nc * sizeof(unsigned));
@@ -74,7 +74,7 @@ static int scan_braces(const u16 *t, unsigned n, int c_aware, List *l)
             stack_start[top] = line_start_of(t, i);
             stack_line[top] = line;
             top++;
-        } else if (ch == '}' && top > 0) {
+        } else if ((ch == '}' || (brackets && ch == ']')) && top > 0) {
             top--;
             if (stack_line[top] != line && !add(l, stack_start[top], 0)) ok = 0;
         }
@@ -128,7 +128,7 @@ static int scan_words(const u16 *t, unsigned n, int kind, List *l)
     return ok;
 }
 
-int foldlines_scan(const u16 *t, unsigned n, int style, int c_aware, int word_kind, FoldLines *out)
+int foldlines_scan(const u16 *t, unsigned n, int style, int flags, int word_kind, FoldLines *out)
 {
     List l = { 0, 0, 0 };
     unsigned from = 0, st, en, lines, id, i, w;
@@ -137,7 +137,7 @@ int foldlines_scan(const u16 *t, unsigned n, int style, int c_aware, int word_ki
     memset(out, 0, sizeof *out);
     if (style == 'i') ok = scan_indent(t, n, &l);
     else if (style == 'w') ok = scan_words(t, n, word_kind, &l);
-    else ok = scan_braces(t, n, c_aware, &l);
+    else ok = scan_braces(t, n, flags, &l);
     while (ok && fold_token_find(t, n, from, &st, &en, &lines, &id)) {
         ok = add(&l, line_start_of(t, st), 1);
         from = en;

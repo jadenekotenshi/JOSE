@@ -102,10 +102,14 @@ static int has_newline(const u16 *t, unsigned a, unsigned b)
     return 0;
 }
 
-int fold_find_block(const u16 *t, unsigned n, unsigned pos, int c_aware, unsigned *open, unsigned *close)
+static int is_opener(u16 c, int brackets) { return c == '{' || (brackets && c == '['); }
+static int is_closer(u16 c, int brackets) { return c == '}' || (brackets && c == ']'); }
+
+int fold_find_block(const u16 *t, unsigned n, unsigned pos, int flags, unsigned *open, unsigned *close)
 {
     unsigned ls, le, i, m;
     long depth;
+    int c_aware = (flags & FOLD_CAWARE) != 0, brackets = (flags & FOLD_BRACKETS) != 0;
 
     if (pos > n) pos = n;
     ls = pos;
@@ -114,7 +118,7 @@ int fold_find_block(const u16 *t, unsigned n, unsigned pos, int c_aware, unsigne
     while (le < n && t[le] != '\n') le++;
     /* a block that opens on this line and ends on a later one */
     for (i = ls; i < le; i++) {
-        if (t[i] == '{' && brace_match(t, n, i, c_aware, &m) && m > i && has_newline(t, i, m)) {
+        if (is_opener(t[i], brackets) && brace_match(t, n, i, c_aware, &m) && m > i && has_newline(t, i, m)) {
             *open = i;
             *close = m;
             return 1;
@@ -122,12 +126,12 @@ int fold_find_block(const u16 *t, unsigned n, unsigned pos, int c_aware, unsigne
     }
     /* Allman style: this line has no brace, and the next one starts with one */
     for (i = ls; i < le && (t[i] == ' ' || t[i] == '\t' || t[i] == '\r'); i++) ;
-    if (i < le && t[i] != '{' && t[i] != '}' && le < n) {
+    if (i < le && !is_opener(t[i], brackets) && !is_closer(t[i], brackets) && le < n) {
         unsigned j = le + 1;
         int brace_on_line = 0;
-        for (i = ls; i < le; i++) if (t[i] == '{' || t[i] == '}') brace_on_line = 1;
+        for (i = ls; i < le; i++) if (is_opener(t[i], brackets) || is_closer(t[i], brackets)) brace_on_line = 1;
         while (j < n && (t[j] == ' ' || t[j] == '\t' || t[j] == '\r')) j++;
-        if (!brace_on_line && j < n && t[j] == '{' && brace_match(t, n, j, c_aware, &m) && m > j && has_newline(t, j, m)) {
+        if (!brace_on_line && j < n && is_opener(t[j], brackets) && brace_match(t, n, j, c_aware, &m) && m > j && has_newline(t, j, m)) {
             *open = j;
             *close = m;
             return 1;
@@ -135,7 +139,7 @@ int fold_find_block(const u16 *t, unsigned n, unsigned pos, int c_aware, unsigne
     }
     /* a line that closes a block */
     for (i = ls; i < le; i++) {
-        if (t[i] == '}' && brace_match(t, n, i, c_aware, &m) && m < i && has_newline(t, m, i)) {
+        if (is_closer(t[i], brackets) && brace_match(t, n, i, c_aware, &m) && m < i && has_newline(t, m, i)) {
             *open = m;
             *close = i;
             return 1;
@@ -145,8 +149,8 @@ int fold_find_block(const u16 *t, unsigned n, unsigned pos, int c_aware, unsigne
     depth = 0;
     for (i = ls; i > 0; i--) {
         u16 c = t[i - 1];
-        if (c == '}') depth++;
-        else if (c == '{') {
+        if (is_closer(c, brackets)) depth++;
+        else if (is_opener(c, brackets)) {
             if (depth > 0) depth--;
             else if (brace_match(t, n, i - 1, c_aware, &m) && m >= le && has_newline(t, i - 1, m)) {
                 *open = i - 1;
@@ -160,10 +164,10 @@ int fold_find_block(const u16 *t, unsigned n, unsigned pos, int c_aware, unsigne
 
 enum { S_CODE, S_LINE, S_BLOCK, S_STR, S_CHR };
 
-unsigned fold_top_blocks(const u16 *t, unsigned n, int c_aware, unsigned **opens, unsigned **closes)
+unsigned fold_top_blocks(const u16 *t, unsigned n, int flags, unsigned **opens, unsigned **closes)
 {
     unsigned count = 0, cap = 0, i, depth = 0, start = 0;
-    int state = S_CODE;
+    int state = S_CODE, c_aware = (flags & FOLD_CAWARE) != 0, brackets = (flags & FOLD_BRACKETS) != 0;
     unsigned *o = NULL, *c = NULL;
 
     *opens = *closes = NULL;
@@ -182,10 +186,10 @@ unsigned fold_top_blocks(const u16 *t, unsigned n, int c_aware, unsigned **opens
             if (ch == '"') { state = S_STR; continue; }
             if (ch == '\'') { state = S_CHR; continue; }
         }
-        if (ch == '{') {
+        if (is_opener(ch, brackets)) {
             if (depth == 0) start = i;
             depth++;
-        } else if (ch == '}' && depth > 0) {
+        } else if (is_closer(ch, brackets) && depth > 0) {
             depth--;
             if (depth == 0 && has_newline(t, start, i)) {
                 if (count == cap) {

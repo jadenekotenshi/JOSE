@@ -61,6 +61,17 @@ Status: **prototype (0.0.1)** -- nothing here has been run on OPENSTEP yet.
   back.  A call tip -- the declaration line from the tags file -- appears when you type `(` after a tagged name (switchable in
   the Preferences panel), or with *Show Call Tip* (cmd-9).  The tags file is read again when it changes.
 
+## Language modes
+
+C, C++, Objective-C and C headers, Python, Perl, Ruby, JavaScript, JSON, shell (sh/ksh/bash), zsh, csh/tcsh, GNU make, BSD make
+(`BSDmakefile`, `bsd.*.mk`), Imake (`Imakefile`, `*.tmpl`, `*.rules`), property lists, `.strings`, GSmarkup, ChangeLogs and plain
+text.  The mode is chosen from the file name, a `#!` line, or by hand from *Preferences > Language Mode*.  Plain `Makefile`s and
+`*.mk` files are taken to be GNU make; switch to *BSDMakefile* by hand where that is wrong.  Ruby folds and matches
+`def`/`class`/`if`/`do`...`end`; JSON and JavaScript fold arrays as well as objects; Imake files use the C preprocessor rules for
+matching and `XCOMM` for comment/uncomment.  The Ruby, JavaScript, JSON, BSD make, Imake and zsh syntax files are written by
+`tools/gen_syntax.py`; change that, not the files.  Not understood: Ruby and shell here-documents, JavaScript regular expression
+literals, and Ruby `%w[]`-style literals.
+
 ## Syntax files
 
 HighlighterKit's `.syntax` files are property lists of contexts.  JOSE adds one key: a context may have a `Parent`

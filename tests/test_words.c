@@ -91,6 +91,27 @@ int main(void)
         CHECK(partner_pos(c, "#else", WORDS_CPP) == (unsigned)(strstr(c, "#endif\n") - c));
     }
 
+    /* Ruby */
+    {
+        const char *rb = "class Foo\n  def bar(x)\n    if x then 1 else 2 end\n    puts 1 if x\n    [1].each do |i|\n      puts i\n    end.size\n    while x do\n      x -= 1\n    end\n    y = case x\n        when 1 then :end\n        end\n  end\n  attr_reader :class, :end\nend\n";
+        CHECK(partner_pos(rb, "class Foo", WORDS_RUBY) == (unsigned)(strlen(rb) - 4));
+        CHECK(strcmp(partner(rb, "def bar", WORDS_RUBY), "end") == 0);
+        CHECK(partner_pos(rb, "def bar", WORDS_RUBY) == (unsigned)(strstr(rb, "end\n  attr_reader") - rb));
+        CHECK(partner_pos(rb, "if x then", WORDS_RUBY) == (unsigned)(strstr(rb, "end\n    puts 1") - rb));      /* the one-line if: its own end */
+        CHECK(strcmp(partner(rb, "if x\n", WORDS_RUBY), "") == 0);                                              /* the modifier if opens nothing */
+        CHECK(partner_pos(rb, "do |i|", WORDS_RUBY) == (unsigned)(strstr(rb, "end.size") - rb));                /* end.size: a method call on the block's value */
+        CHECK(partner_pos(rb, "while x do", WORDS_RUBY) == (unsigned)(strstr(rb, "end\n    y = case") - rb));     /* the optional do does not open a second block */
+        CHECK(partner_pos(rb, "case x", WORDS_RUBY) == (unsigned)(strstr(rb, "end\n  end\n  attr") - rb));     /* x = case ... end */
+        CHECK(partner_pos(rb, "when 1", WORDS_RUBY) == (unsigned)(strstr(rb, "end\n  end\n  attr") - rb));
+        CHECK(strcmp(partner(rb, ":class", WORDS_RUBY), "") == 0);                                              /* a symbol is not a keyword */
+        CHECK(strcmp(partner("# end\nbegin\n  x\nrescue\n  y\nend\n=begin\nend\n=end\n", "begin", WORDS_RUBY), "end") == 0);
+        CHECK(partner_pos("# end\nbegin\n  x\nrescue\n  y\nend\n=begin\nend\n=end\n", "begin", WORDS_RUBY) == 27);
+        CHECK(partner_pos("def f; end\n", "def", WORDS_RUBY) == 7);
+        CHECK(partner_pos("x.each { |i| puts \"end\" }\nif a\n b\nend\n", "if a", WORDS_RUBY) == (unsigned)(strlen("x.each { |i| puts \"end\" }\nif a\n b\n")));
+    }
+    /* zsh's repeat ... done */
+    CHECK(strcmp(partner("repeat 3 do\n  echo x\ndone\n", "repeat", WORDS_SH), "done") == 0);
+
     /* folding */
     n = widen(sh, t);
     words_scan(t, n, WORDS_SH, &b);
