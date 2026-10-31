@@ -1128,6 +1128,30 @@ static BOOL ident_char(unichar c)
     [self refreshFoldInfo];
 }
 
+- (int)findUnmatchedBracket
+{
+    NSString *s;
+    unsigned int n, pos, opener;
+    u16 *t;
+    int r;
+
+    if (folds != nil && [folds count] > 0) [self expandAllFolds];
+    s = [textView string];
+    n = [s length];
+    if (n == 0) return 0;
+    t = (u16 *)malloc(n * sizeof(u16));
+    if (t == NULL) return 0;
+    [s getCharacters:t];
+    r = brace_find_unbalanced(t, n, lang_c_like(mode != nil ? [mode cString] : NULL), &pos, &opener);
+    free(t);
+    if (r != 0) {
+        [textView setSelectedRange:NSMakeRange(pos, 1)];
+        [textView scrollRangeToVisible:NSMakeRange(pos, 1)];
+        [window makeFirstResponder:textView];
+    }
+    return r;
+}
+
 - (void)gotoMatchingBracket:(BOOL)select
 {
     NSString *s = [textView string];

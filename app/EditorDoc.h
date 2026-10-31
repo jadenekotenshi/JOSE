@@ -91,6 +91,7 @@
 - (void)setLineNumbers:(BOOL)flag;
 - (BOOL)lineNumbers;
 - (void)gotoMatchingBracket:(BOOL)select;   /* the caret to the bracket that goes with the one at/before it, or select up to it */
+- (int)findUnmatchedBracket;                /* selects the first bracket without a partner: BRACE_STRAY / BRACE_MISMATCH / BRACE_UNCLOSED, or 0 if all are paired */
 - (void)setAutoIndent:(BOOL)flag;
 - (BOOL)autoIndent;
 - (void)setUseSpaces:(BOOL)flag;

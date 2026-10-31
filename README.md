@@ -48,6 +48,10 @@ Status: **prototype (0.0.1)** -- nothing here has been run on OPENSTEP yet.
 * **Preferences panel** (Preferences > Preferences Panel..., cmd-,): Light or Dark colours (light text on a dark background, with the
   syntax colours lightened to match), the background and text colours, the font and size (any fixed-pitch font installed), the
   include path, call tips and the fold margin.  Changes show in every window at once and are saved.
+* **Find Unmatched Bracket** (Search menu, cmd-U): reads the whole file for a `( ) [ ] { }` without a partner and selects the first
+  one it finds -- a closing bracket with nothing open, a closing bracket that does not fit the bracket open before it, or (if all
+  those are fine) the innermost bracket still open at the end, which is where a `}` is missing.  Strings, character constants and
+  comments are skipped in the C-like modes.  If everything is paired it says so.
 * **Split panes** (Windows > Split Pane, cmd-2; Close Pane, cmd-1): the window shows the same text in two panes, one above the
   other, each with its own scroll position, selection, line numbers and fold margin.  Edits, undo, folds and highlighting are
   shared; the commands act on the pane with the insertion point.  Close Pane closes that one and the other fills the window.

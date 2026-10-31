@@ -43,5 +43,24 @@ int main(void)
     CHECK(m("if (a) { b(); }", 14, 1) == 7);
     CHECK(m("(()", 0, 1) == -1);                                   /* unbalanced */
     CHECK(m("())", 2, 1) == -1);
+    {
+        u16 u[128];
+        unsigned pos, op, k;
+        const char *cases[] = { "int f() { return (1); }", "}", "a ( b ]", "void f() {\n if (x) {\n}\n", "s = \"{\"; /* ( */ // [\nx", "" };
+        int expect[] = { 0, BRACE_STRAY, BRACE_MISMATCH, BRACE_UNCLOSED, 0, 0 };
+        unsigned at[] = { 0, 0, 6, 9, 0, 0 };
+        int i;
+
+        for (i = 0; i < 6; i++) {
+            for (k = 0; cases[i][k]; k++) u[k] = (u16)(unsigned char)cases[i][k];
+            CHECK(brace_find_unbalanced(u, k, 1, &pos, &op) == expect[i]);
+            if (expect[i]) CHECK(pos == at[i]);
+        }
+        for (k = 0; "s = \"{\"\n"[k]; k++) u[k] = (u16)(unsigned char)"s = \"{\"\n"[k];
+        CHECK(brace_find_unbalanced(u, k, 0, &pos, &op) == BRACE_UNCLOSED && pos == 5);     /* plain text counts it */
+        for (k = 0; "a ( b ]"[k]; k++) u[k] = (u16)(unsigned char)"a ( b ]"[k];
+        brace_find_unbalanced(u, k, 1, &pos, &op);
+        CHECK(op == 2);
+    }
     TEST_DONE("brace");
 }
