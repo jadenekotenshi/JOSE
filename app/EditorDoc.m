@@ -225,7 +225,7 @@
     macroSuppress++;
     if (rectOn) [(EditorDoc *)editor rectDeleteBackward:YES];
     else if ([self selectedRange].length == 0 && [self selectedRange].location == 0) NSBeep();     /* nothing before the start */
-    else if ([(EditorDoc *)editor deleteAtEnd]) {}
+    else if ([(EditorDoc *)editor deleteNearEnd:NO]) {}
     else [super deleteBackward:sender];
     macroSuppress--;
 }
@@ -236,6 +236,7 @@
     macroSuppress++;
     if (rectOn) [(EditorDoc *)editor rectDeleteBackward:NO];
     else if ([self selectedRange].length == 0 && [self selectedRange].location >= [[self string] length]) NSBeep();   /* nothing after the end */
+    else if ([(EditorDoc *)editor deleteNearEnd:YES]) {}
     else [super deleteForward:sender];
     macroSuppress--;
 }
@@ -2070,17 +2071,25 @@ static NSString *rect_clip;                 /* what Copy last took from a rectan
     [self updateStatus];
 }
 
-/* Deleting the last character of the text through the text view crashed on 4.2 (an exception from the run storage while the view
- * redrew the last line in the middle of its own change).  Our own edits do not, so a deletion that reaches the end of the text is
- * done here: the selection, or the character before the insertion point. */
-- (BOOL)deleteAtEnd
+/* Deleting in the last few lines of the text through the text view crashed on 4.2 (an exception from the run storage while the view
+ * redrew the last lines in the middle of its own change; first seen deleting the last character, then deleting the newline before
+ * a final blank line).  Our own edits do not, so a deletion there is done here: the selection, or the character before (Backspace)
+ * or after (Delete) the insertion point.  Elsewhere the text view does it, and merges runs of them into one undo step. */
+- (BOOL)deleteNearEnd:(BOOL)forward
 {
+    NSString *s = [textView string];
     NSRange sel = [textView selectedRange], r = sel;
-    unsigned int n = [[textView string] length];
+    unsigned int n = [s length], idx, seen = 0;
 
-    if (r.length == 0 && r.location > 0) r = NSMakeRange(r.location - 1, 1);
-    if (r.length == 0 || NSMaxRange(r) != n) return NO;
-    SSTrace("deleteAtEnd: %u+%u of %u", (unsigned)r.location, (unsigned)r.length, n);
+    if (r.length == 0) {
+        if (forward && r.location < n) r = NSMakeRange(r.location, 1);
+        else if (!forward && r.location > 0) r = NSMakeRange(r.location - 1, 1);
+    }
+    if (r.length == 0 || NSMaxRange(r) > n) return NO;
+    for (idx = n; idx > 0; idx--)                     /* where the fourth line from the end begins */
+        if ([s characterAtIndex:idx - 1] == '\n' && ++seen == 4) break;
+    if (NSMaxRange(r) <= idx) return NO;
+    SSTrace("deleteNearEnd: %u+%u of %u", (unsigned)r.location, (unsigned)r.length, n);
     [textView rectClear];
     [self replaceRange:r with:@"" select:NSMakeRange(r.location, 0)];
     return YES;

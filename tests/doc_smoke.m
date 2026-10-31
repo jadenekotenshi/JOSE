@@ -819,6 +819,29 @@ int main(void)
         [tv deleteForward:nil];                                                  /* not at the end: the text view's own */
         CHECK([[tv string] isEqualToString:@""]);
     }
+    {   /* Backspace and Delete in the last few lines are done by hand; further up the text view does them */
+        EditorDoc *ed = [[[EditorDoc alloc] initWithOwner:nil] autorelease];
+        EditTextView *tv = [ed textView];
+        NSMutableString *body = [NSMutableString string];
+        int i;
+
+        for (i = 0; i < 20; i++) [body appendFormat:@"line %d\n", i];
+        [body appendString:@"X\n\n"];                                              /* ends with a blank line, as in the crash */
+        [tv setString:body];
+        [tv setSelectedRange:NSMakeRange([body length] - 1, 0)];                    /* between the last two newlines */
+        [tv deleteBackward:nil];                                                    /* the newline before the final blank line */
+        CHECK([[tv string] hasSuffix:@"X\n"] && ![[tv string] hasSuffix:@"X\n\n"] && [tv selectedRange].location == [[tv string] length]);
+        [tv setString:body];
+        [tv setSelectedRange:NSMakeRange([body length] - 2, 0)];                    /* after X */
+        [tv deleteForward:nil];                                                     /* deletes the newline after X */
+        CHECK([[tv string] hasSuffix:@"X\n"]);
+        [tv setString:body];
+        [tv setSelectedRange:NSMakeRange(8, 0)];                                    /* line 1, far from the end */
+        [tv deleteBackward:nil];
+        CHECK([[tv string] length] == [body length] - 1);
+        [ed undo];
+        CHECK([[tv string] isEqualToString:body]);
+    }
     [[NSFileManager defaultManager] removeItemAtPath:dir error:NULL];
     printf(failures ? "doc: FAILED\n" : "doc: ok\n");
     [pool release];
