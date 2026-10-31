@@ -6,10 +6,15 @@ OBJCFLAGS = -x objective-c -fno-objc-arc -w -g -Ihk -Icore -Iapp
 CFLAGS  = -std=c89 -pedantic -Wall -Wextra -Wdeclaration-after-statement \
           -Wno-long-long -Wno-unused-parameter -O2 -g -Icore
 
-test: $(BUILD)/test_core $(BUILD)/test_search $(BUILD)/test_edit
+test: $(BUILD)/test_core $(BUILD)/test_search $(BUILD)/test_edit $(BUILD)/test_brace
 	$(BUILD)/test_core
 	$(BUILD)/test_search
 	$(BUILD)/test_edit
+	$(BUILD)/test_brace
+
+$(BUILD)/test_brace: tests/test_brace.c tests/test.h core/brace.c core/brace.h
+	mkdir -p $(BUILD)
+	$(CC) $(CFLAGS) tests/test_brace.c core/brace.c -o $@
 
 $(BUILD)/test_edit: tests/test_edit.c tests/test.h core/edit.c core/edit.h core/langmodes.c core/langmodes.h
 	mkdir -p $(BUILD)
@@ -44,7 +49,7 @@ hk-smoke:
 
 doc-smoke:
 	mkdir -p $(BUILD)
-	for f in tests/doc_smoke.m app/EditorDoc.m app/UIHelpers.m hk/*.m; do \
+	for f in tests/doc_smoke.m app/EditorDoc.m app/UIHelpers.m app/LineNumberView.m hk/*.m; do \
 	  $(CC) -c $(OBJCFLAGS) -fsanitize=address,undefined $$f -o $(BUILD)/dc_$$(basename $$f .m).o || exit 1; \
 	done
 	for f in core/*.c; do $(CC) -c -w -g -Icore -fsanitize=address,undefined $$f -o $(BUILD)/dc_c_$$(basename $$f .c).o || exit 1; done

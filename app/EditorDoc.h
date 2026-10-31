@@ -3,6 +3,7 @@
 #include "undo.h"
 
 @class EditorDoc;
+@class LineNumberView;
 
 /* The text view of an editor window.  It asks the highlighter to colour what is about to be drawn. */
 @interface EditTextView : NSTextView
@@ -31,6 +32,8 @@
     unsigned long        savedVersion;     /* undo_version() when the file was last read or written */
     unsigned             expectedCaret;    /* where the insertion point should be after the last edit (to see when it moves away) */
     NSTimeInterval       clockBase;
+    LineNumberView      *ruler;            /* nil until line numbers are first shown */
+    BOOL                 lineNumbers;
     BOOL                 autoIndent;       /* Return copies the indentation (and adds a level after a brace/colon) */
     BOOL                 useSpaces;        /* indent with spaces rather than tabs; Tab inserts spaces */
     int                  indentWidth;      /* spaces per level */
@@ -56,6 +59,9 @@
 - (BOOL)canRedo;
 - (void)undo;
 - (void)redo;
+- (void)setLineNumbers:(BOOL)flag;
+- (BOOL)lineNumbers;
+- (void)gotoMatchingBracket:(BOOL)select;   /* the caret to the bracket that goes with the one at/before it, or select up to it */
 - (void)setAutoIndent:(BOOL)flag;
 - (BOOL)autoIndent;
 - (void)setUseSpaces:(BOOL)flag;

@@ -1,9 +1,14 @@
 /* Host-only: an EditorDoc end to end -- open, colour, edit, save, line endings.  make doc-smoke */
 #import "EditorDoc.h"
+#import "LineNumberView.h"
 #import "HKSyntaxDefinition.h"
 #include <stdio.h>
 
 static int failures = 0;
+
+/* Compat.h declares the PostScript operators for the host; nothing here draws, so empty ones will do. */
+void PSmoveto(float x, float y) { }
+void PSshow(const char *s) { }
 #define CHECK(c) do { if (!(c)) { printf("FAIL line %d: %s\n", __LINE__, #c); failures++; } } while (0)
 
 int main(void)
@@ -103,6 +108,46 @@ int main(void)
         [doc undo];
         CHECK([[ts string] isEqualToString:before] && ![doc isDirty]);
         [before release];
+    }
+
+    {   /* line numbers count right through edits, and brackets match */
+        NSTextStorage *ts = [[doc textView] textStorage];
+        LineNumberView *rv;
+        NSString *whole = [ts string];
+        unsigned int at = [whole rangeOfString:@"main"].location, line;
+
+        [doc setLineNumbers:YES];
+        CHECK([doc lineNumbers]);
+        rv = (LineNumberView *)[(NSScrollView *)[[doc textView] enclosingScrollView] verticalRulerView];
+        CHECK(rv != nil);
+        line = [rv lineNumberForChar:0];
+        CHECK(line == 1);
+        CHECK([rv lineNumberForChar:[whole length]] == 1 + [[whole componentsSeparatedByString:@"\n"] count] - 1);
+        [[doc textView] setSelectedRange:NSMakeRange(0, 0)];
+        [[doc textView] insertText:@"\n\n"];                                 /* two lines in front: every number moves on */
+        whole = [ts string];
+        CHECK([rv lineNumberForChar:[whole rangeOfString:@"main"].location] == line + 2 + (at == NSNotFound ? 0 : 0));
+        [doc undo];
+        CHECK([rv lineNumberForChar:[whole length] - 2] >= 1);
+        [doc setLineNumbers:NO];
+        CHECK(![doc lineNumbers]);
+
+        [[doc textView] setSelectedRange:NSMakeRange(0, 0)];
+        [doc setMode:@"C"];
+        whole = [ts string];
+        {
+            unsigned int open = [whole rangeOfString:@"{"].location;
+            if (open != NSNotFound) {
+                [[doc textView] setSelectedRange:NSMakeRange(open, 0)];
+                [doc gotoMatchingBracket:NO];
+                CHECK([[doc textView] selectedRange].location > open);              /* past the closing brace */
+                [doc gotoMatchingBracket:NO];
+                CHECK([[doc textView] selectedRange].location == open);             /* and back to the opening one */
+                [[doc textView] setSelectedRange:NSMakeRange(open, 0)];
+                [doc gotoMatchingBracket:YES];
+                CHECK([[doc textView] selectedRange].length > 2);
+            }
+        }
     }
 
     [[NSFileManager defaultManager] removeItemAtPath:dir error:NULL];

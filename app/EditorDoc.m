@@ -1,9 +1,11 @@
 #import "EditorDoc.h"
 #import "UIHelpers.h"
 #import "AppController.h"
+#import "LineNumberView.h"
 #include "langmodes.h"
 #include "eol.h"
 #include "edit.h"
+#include "brace.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -84,6 +86,7 @@ static void line_col(NSString *s, unsigned int loc, unsigned int *line, unsigned
 - (void)markEdited;
 - (unsigned long)nowMillis;
 - (void)recordEditInRange:(NSRange)range replacement:(NSString *)replacement;
+- (void)noteLineChangeAt:(unsigned int)loc removed:(const u16 *)rem count:(unsigned int)nrem inserted:(const u16 *)ins count:(unsigned int)nins;
 - (void)updateTitle;
 - (void)updateStatus;
 - (void)buildWindow;
@@ -122,6 +125,7 @@ static void line_col(NSString *s, unsigned int loc, unsigned int *line, unsigned
     [highlighter detach];
     [highlighter release];
     undo_free(undo);
+    [ruler release];
     [path release];
     [mode release];
     [super dealloc];
@@ -214,6 +218,17 @@ static void line_col(NSString *s, unsigned int loc, unsigned int *line, unsigned
 }
 
 /* The change is about to happen: remember what it replaces, so that it can be undone. */
+/* Tells the line-number ruler (if there is one) that text changed. */
+- (void)noteLineChangeAt:(unsigned int)loc removed:(const u16 *)rem count:(unsigned int)nrem inserted:(const u16 *)ins count:(unsigned int)nins
+{
+    unsigned int i, r = 0, a = 0;
+
+    if (ruler == nil) return;
+    for (i = 0; i < nrem; i++) if (rem[i] == '\n') r++;
+    for (i = 0; i < nins; i++) if (ins[i] == '\n') a++;
+    [ruler textChangedAt:loc removedNewlines:r insertedNewlines:a];
+}
+
 /* Remembers an edit that is about to happen on the history. */
 - (void)recordEditInRange:(NSRange)range replacement:(NSString *)replacement
 {
@@ -231,6 +246,7 @@ static void line_col(NSString *s, unsigned int loc, unsigned int *line, unsigned
         else nins = 0;
     }
     undo_record(undo, range.location, rem, nrem, ins, nins, [self nowMillis]);
+    [self noteLineChangeAt:range.location removed:rem count:nrem inserted:ins count:nins];
     free(rem);
     free(ins);
     expectedCaret = range.location + nins;
@@ -281,6 +297,7 @@ static void line_col(NSString *s, unsigned int loc, unsigned int *line, unsigned
     NSString *str = nwith > 0 ? [NSString stringWithCharacters:with length:nwith] : @"";
 
     [ts replaceCharactersInRange:NSMakeRange(step->pos, nold) withString:str];
+    [self noteLineChangeAt:step->pos removed:(undoing ? step->inserted : step->removed) count:nold inserted:with count:nwith];
     expectedCaret = step->pos + nwith;
     [textView setSelectedRange:NSMakeRange(expectedCaret, 0)];
     [textView scrollRangeToVisible:NSMakeRange(expectedCaret, 0)];
@@ -379,6 +396,7 @@ static void line_col(NSString *s, unsigned int loc, unsigned int *line, unsigned
     [path release];
     path = [aPath copy];
     [textView setString:text];
+    [ruler textReplaced];
     undo_clear(undo);
     savedVersion = undo_version(undo);
     dirty = NO;
@@ -480,6 +498,54 @@ static void line_col(NSString *s, unsigned int loc, unsigned int *line, unsigned
     dirty = NO;
     [window close];
     return YES;
+}
+
+/* ---- line numbers and brackets ---- */
+
+- (BOOL)lineNumbers { return lineNumbers; }
+
+- (void)setLineNumbers:(BOOL)flag
+{
+    lineNumbers = flag;
+    if (flag && ruler == nil) {
+        if (![scroll respondsToSelector:@selector(setVerticalRulerView:)]) { SSTrace("line numbers: no scroll view rulers here"); lineNumbers = NO; return; }
+        ruler = [[LineNumberView alloc] initWithScrollView:scroll textView:textView];
+        [scroll setVerticalRulerView:ruler];
+        [scroll setHasVerticalRuler:YES];
+        [ruler textReplaced];
+    }
+    if (ruler != nil) {
+        [scroll setRulersVisible:flag];
+        if (flag) [ruler textReplaced];
+    }
+}
+
+- (void)gotoMatchingBracket:(BOOL)select
+{
+    NSString *s = [textView string];
+    NSRange sel = [textView selectedRange];
+    unsigned int n = [s length], pos, match;
+    u16 *t;
+    BOOL found = NO;
+
+    if (n == 0) { NSBeep(); return; }
+    t = (u16 *)malloc(n * sizeof(u16));
+    if (t == NULL) return;
+    [s getCharacters:t];
+    pos = sel.location;
+    if (pos < n && brace_is_bracket(t[pos])) found = YES;
+    else if (pos > 0 && pos <= n && brace_is_bracket(t[pos - 1])) { pos--; found = YES; }
+    if (found)
+        found = brace_match(t, n, pos, lang_c_like(mode != nil ? [mode cString] : NULL), &match) != 0;
+    free(t);
+    if (!found) { NSBeep(); return; }
+    if (select) {
+        unsigned int lo = pos < match ? pos : match, hi = pos < match ? match : pos;
+        [textView setSelectedRange:NSMakeRange(lo, hi + 1 - lo)];
+    } else {
+        [textView setSelectedRange:NSMakeRange(match > pos ? match + 1 : match, 0)];       /* ends where a second use returns */
+    }
+    [textView scrollRangeToVisible:[textView selectedRange]];
 }
 
 /* ---- indentation and commenting ---- */

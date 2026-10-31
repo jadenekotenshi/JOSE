@@ -97,3 +97,10 @@ int lang_smart_indent(const char *mode)
         return 'b';
     return 0;
 }
+
+int lang_c_like(const char *mode)
+{
+    if (mode == NULL) return 0;
+    return strcmp(mode, "C") == 0 || strcmp(mode, "C-Header") == 0 || strcmp(mode, "C++") == 0 || strcmp(mode, "ObjC") == 0 ||
+           strcmp(mode, "ObjC++") == 0;
+}

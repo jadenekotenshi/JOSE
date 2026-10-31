@@ -16,4 +16,7 @@ int lang_comment_style(const char *mode, const char **open, const char **close);
  * (just copy the indentation). */
 int lang_smart_indent(const char *mode);
 
+/* 1 for the modes whose text is C-like (strings, character constants and C comments, for matching brackets). */
+int lang_c_like(const char *mode);
+
 #endif

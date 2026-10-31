@@ -7,8 +7,49 @@
 #define TAG_MODE_BASE 1000             /* the Language Mode items: the tag is this plus the mode's index; plain text is TAG_MODE_BASE - 1 */
 
 @interface AppController (Private)
+- (void)loadPreferences;
+- (void)savePreferences;
 - (void)applyIndentPrefsTo:(EditorDoc *)d;
 - (void)applyIndentPrefs;
+/* ---- saved preferences (NSUserDefaults, as strings: the one form every release of it reads back alike) ---- */
+
+static BOOL pref_bool(NSUserDefaults *ud, NSString *key, BOOL def)
+{
+    NSString *v = [ud stringForKey:key];
+
+    return v == nil ? def : [v isEqualToString:@"YES"];
+}
+
+static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
+{
+    [ud setObject:(value ? @"YES" : @"NO") forKey:key];
+}
+
+- (void)loadPreferences
+{
+    NSUserDefaults *ud = [NSUserDefaults standardUserDefaults];
+    NSString *w = [ud stringForKey:@"IndentWidth"];
+
+    prefAutoIndent = pref_bool(ud, @"AutoIndent", YES);
+    prefUseSpaces = pref_bool(ud, @"UseSpaces", NO);
+    prefIndentWidth = w != nil ? [w intValue] : 4;
+    if (prefIndentWidth < 1 || prefIndentWidth > 16) prefIndentWidth = 4;
+    prefWrap = pref_bool(ud, @"WrapLines", NO);
+    prefLineNumbers = pref_bool(ud, @"LineNumbers", NO);
+}
+
+- (void)savePreferences
+{
+    NSUserDefaults *ud = [NSUserDefaults standardUserDefaults];
+
+    set_pref_bool(ud, @"AutoIndent", prefAutoIndent);
+    set_pref_bool(ud, @"UseSpaces", prefUseSpaces);
+    [ud setObject:[NSString stringWithFormat:@"%d", prefIndentWidth] forKey:@"IndentWidth"];
+    set_pref_bool(ud, @"WrapLines", prefWrap);
+    set_pref_bool(ud, @"LineNumbers", prefLineNumbers);
+    [ud synchronize];
+}
+
 - (id)addItem:(NSString *)title action:(SEL)action key:(NSString *)key target:(id)target toMenu:(NSMenu *)menu;
 - (NSMenu *)keepMenu:(NSMenu *)menu;
 - (NSMenu *)submenuNamed:(NSString *)title inMenu:(NSMenu *)parent;
@@ -21,9 +62,7 @@
     self = [super init];
     if (self) {
         docs = [[NSMutableArray alloc] init];
-        prefAutoIndent = YES;
-        prefUseSpaces = NO;
-        prefIndentWidth = 4;
+        [self loadPreferences];
         menuKeepers = [[NSMutableArray alloc] init];
         syntaxDir = [[[NSBundle mainBundle] bundlePath] stringByAppendingPathComponent:@"syntax"];
         [syntaxDir retain];
@@ -124,10 +163,13 @@
     [self addItem:@"Find Previous" action:@selector(findPrevious:) key:@"G" target:self toMenu:m];
     [self addItem:@"Find Selection" action:@selector(findSelection:) key:@"e" target:self toMenu:m];
     [self addItem:@"Replace..." action:@selector(showFind:) key:@"r" target:self toMenu:m];
+    [self addItem:@"Go to Matching Bracket" action:@selector(gotoBracket:) key:@"b" target:self toMenu:m];
+    [self addItem:@"Select to Matching Bracket" action:@selector(selectBracket:) key:@"B" target:self toMenu:m];
     [self addItem:@"Go to Line..." action:@selector(gotoLine:) key:@"l" target:self toMenu:m];
 
     m = [self submenuNamed:@"Preferences" inMenu:main];
     [[self addItem:@"Wrap Lines" action:@selector(toggleWrap:) key:@"" target:self toMenu:m] setTag:1];
+    [self addItem:@"Line Numbers" action:@selector(toggleLineNumbers:) key:@"" target:self toMenu:m];
     [self addItem:@"Auto Indent" action:@selector(toggleAutoIndent:) key:@"" target:self toMenu:m];
     [self addItem:@"Spaces for Indentation" action:@selector(toggleUseSpaces:) key:@"" target:self toMenu:m];
     {
@@ -189,8 +231,9 @@
     if (a == @selector(saveDoc:) || a == @selector(saveDocAs:) || a == @selector(closeDoc:) || a == @selector(gotoLine:) || a == @selector(showFind:) || a == @selector(findAgain:)
         || a == @selector(findPrevious:) || a == @selector(findSelection:)
         || a == @selector(toggleWrap:) || a == @selector(setMode:)
-        || a == @selector(shiftLeft:) || a == @selector(shiftRight:) || a == @selector(commentLines:) || a == @selector(uncommentLines:))
+        || a == @selector(gotoBracket:) || a == @selector(selectBracket:) || a == @selector(shiftLeft:) || a == @selector(shiftRight:) || a == @selector(commentLines:) || a == @selector(uncommentLines:))
         if (d == nil) return NO;
+    if (a == @selector(toggleLineNumbers:)) [item setState:prefLineNumbers ? NSOnState : NSOffState];
     if (a == @selector(toggleAutoIndent:)) [item setState:prefAutoIndent ? NSOnState : NSOffState];
     if (a == @selector(toggleUseSpaces:)) [item setState:prefUseSpaces ? NSOnState : NSOffState];
     if (a == @selector(setIndentWidth:)) [item setState:tag == prefIndentWidth ? NSOnState : NSOffState];
@@ -213,6 +256,7 @@
     EditorDoc *d = [[EditorDoc alloc] initWithOwner:self];
 
     [self applyIndentPrefsTo:d];
+    [d setWrap:prefWrap];
     [docs addObject:d];
     [d release];
     [d showWindow];
@@ -230,6 +274,7 @@
     }
     d = [[EditorDoc alloc] initWithOwner:self];
     [self applyIndentPrefsTo:d];
+    [d setWrap:prefWrap];
     if (![d openFile:path]) { [d release]; return nil; }
     [docs addObject:d];
     [d release];
@@ -286,6 +331,7 @@
 /* Pushes the indentation settings to a document. */
 - (void)applyIndentPrefsTo:(EditorDoc *)d
 {
+    if ([d lineNumbers] != prefLineNumbers) [d setLineNumbers:prefLineNumbers];
     [d setAutoIndent:prefAutoIndent];
     [d setUseSpaces:prefUseSpaces];
     [d setIndentWidth:prefIndentWidth];
@@ -298,9 +344,21 @@
     for (i = 0; i < [docs count]; i++) [self applyIndentPrefsTo:[docs objectAtIndex:i]];
 }
 
-- (void)toggleAutoIndent:(id)sender { prefAutoIndent = !prefAutoIndent; [self applyIndentPrefs]; }
-- (void)toggleUseSpaces:(id)sender { prefUseSpaces = !prefUseSpaces; [self applyIndentPrefs]; }
-- (void)setIndentWidth:(id)sender { prefIndentWidth = [sender tag]; [self applyIndentPrefs]; }
+- (void)toggleAutoIndent:(id)sender { prefAutoIndent = !prefAutoIndent; [self applyIndentPrefs]; [self savePreferences]; }
+- (void)toggleUseSpaces:(id)sender { prefUseSpaces = !prefUseSpaces; [self applyIndentPrefs]; [self savePreferences]; }
+- (void)setIndentWidth:(id)sender { prefIndentWidth = [sender tag]; [self applyIndentPrefs]; [self savePreferences]; }
+
+- (void)toggleLineNumbers:(id)sender
+{
+    unsigned int i;
+
+    prefLineNumbers = !prefLineNumbers;
+    for (i = 0; i < [docs count]; i++) [[docs objectAtIndex:i] setLineNumbers:prefLineNumbers];
+    [self savePreferences];
+}
+
+- (void)gotoBracket:(id)sender { [[self frontDocument] gotoMatchingBracket:NO]; }
+- (void)selectBracket:(id)sender { [[self frontDocument] gotoMatchingBracket:YES]; }
 - (void)shiftLeft:(id)sender { [[self frontDocument] shiftSelection:-1]; }
 - (void)shiftRight:(id)sender { [[self frontDocument] shiftSelection:1]; }
 - (void)commentLines:(id)sender { [[self frontDocument] commentSelection:YES]; }
@@ -310,7 +368,11 @@
 {
     EditorDoc *d = [self frontDocument];
 
-    if (d != nil) [d setWrap:![d wrap]];
+    if (d != nil) {
+        [d setWrap:![d wrap]];
+        prefWrap = [d wrap];
+        [self savePreferences];
+    }
 }
 
 - (FindController *)finder

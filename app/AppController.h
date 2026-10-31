@@ -15,6 +15,8 @@
     BOOL            prefAutoIndent;     /* indentation settings, applied to every document */
     BOOL            prefUseSpaces;
     int             prefIndentWidth;
+    BOOL            prefWrap;           /* the setting new windows start with */
+    BOOL            prefLineNumbers;
     BOOL            launched;
     NSMutableArray *startupFiles;      /* named on the command line; opened once the event loop runs */
 }
