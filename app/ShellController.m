@@ -116,7 +116,7 @@
     NSRange region = sel.length > 0 ? sel : NSMakeRange(0, [text length]);
     BOOL endsInNewline;
 
-    input = [text substringWithRange:region];
+    input = [doc expandedString:[text substringWithRange:region]];            /* folded code goes through the command too */
     endsInNewline = [input length] > 0 && [input characterAtIndex:[input length] - 1] == '\n';
     if (![self run:command input:input in:doc result:&output]) return;
     /* a filter that ends its output with a newline that the selection did not have should not add one */

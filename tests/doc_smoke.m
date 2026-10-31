@@ -170,6 +170,92 @@ int main(void)
         CHECK([[tv string] isEqualToString:@"one two\nthree four\nfive six\nseven eight\n\nnext\nparagraph\nhere\n"]);
         CHECK([[tv string] rangeOfString:@"here\n"].location != NSNotFound);
     }
+    {   /* code folding: fold, undo, nested, save in full, copy in full, markers cannot be cut in two */
+        NSString *full = @"int f(void)\n{\n  a;\n  if (x) {\n    b;\n  }\n  c;\n}\nint g(void)\n{\n  d;\n}\n";
+        NSString *ffile = [dir stringByAppendingPathComponent:@"fold.c"];
+        EditorDoc *fd = [[[EditorDoc alloc] initWithOwner:nil] autorelease];
+        EditTextView *tv;
+        NSString *folded, *got;
+        unsigned int at;
+        [full writeToFile:ffile atomically:YES encoding:NSASCIIStringEncoding error:NULL];
+        CHECK([fd openFile:ffile]);
+        tv = [fd textView];
+        [tv setSelectedRange:NSMakeRange(2, 0)];                                /* on "int f(void)" */
+        [fd toggleFold];
+        folded = [tv string];
+        CHECK([fd hasFolds]);
+        CHECK([folded hasPrefix:@"int f(void)\n{ ... 6 lines ~1 }\nint g"]);
+        CHECK(![fd isDirty]);                                                   /* folding does not make a clean file dirty */
+        CHECK([[fd expandedString:folded] isEqualToString:full]);
+        [fd undo];
+        CHECK([[tv string] isEqualToString:full]);
+        [fd redo];
+        CHECK([[tv string] isEqualToString:folded]);
+        at = [[tv string] rangeOfString:@"int g"].location;
+        [tv setSelectedRange:NSMakeRange(at, 0)];
+        [fd toggleFold];
+        CHECK([[tv string] rangeOfString:@"~2"].location != NSNotFound);
+        CHECK([fd save]);                                                       /* the file gets everything */
+        got = [NSString stringWithContentsOfFile:ffile];
+        CHECK([got isEqualToString:full]);
+        /* the line numbers go on counting the hidden lines */
+        {
+            LineNumberView *rv;
+            [fd setLineNumbers:YES];
+            rv = (LineNumberView *)[(NSScrollView *)[tv enclosingScrollView] verticalRulerView];
+            CHECK([rv lineNumberForChar:[[tv string] rangeOfString:@"int g"].location] == 9);
+            CHECK([rv lineNumberForChar:[[tv string] length]] == 13);
+            [fd expandAllFolds];
+            CHECK([rv lineNumberForChar:[[tv string] rangeOfString:@"int g"].location] == 9);
+            [fd undo];
+            CHECK([rv lineNumberForChar:[[tv string] rangeOfString:@"int g"].location] == 9);
+            [fd setLineNumbers:NO];
+        }
+        /* typing into a marker is refused, next to it is fine */
+        at = [[tv string] rangeOfString:@"lines"].location;
+        [tv setSelectedRange:NSMakeRange(at, 0)];
+        CHECK([fd textView:tv shouldChangeTextInRange:NSMakeRange(at, 0) replacementString:@"x"] == NO);
+        CHECK([fd textView:tv shouldChangeTextInRange:NSMakeRange(at, 3) replacementString:@""] == NO);
+        at = [[tv string] rangeOfString:@"{ ... "].location + 1;                  /* the space where the marker starts */
+        CHECK([fd textView:tv shouldChangeTextInRange:NSMakeRange(at, 0) replacementString:@"x"] == YES);
+        CHECK([fd textView:tv shouldChangeTextInRange:NSMakeRange(at - 2, 4) replacementString:@""] == NO);   /* half in, half out */
+        /* copying a selection that holds a marker puts the code on the pasteboard */
+        [tv setSelectedRange:NSMakeRange(0, [[tv string] length])];
+        CHECK([fd copyExpandedSelectionAndCut:NO]);
+        CHECK([[[NSPasteboard generalPasteboard] stringForType:NSStringPboardType] isEqualToString:full]);
+        /* expand everything at once, one undo step */
+        [fd expandAllFolds];
+        CHECK([[tv string] isEqualToString:full]);
+        [fd undo];
+        CHECK([[tv string] rangeOfString:@"~1"].location != NSNotFound);
+        [fd redo];
+        /* fold all, then the lines that follow a marker still count as their own */
+        [fd foldAll];
+        CHECK([[tv string] rangeOfString:@"~"].location != NSNotFound);
+        CHECK([[fd expandedString:[tv string]] isEqualToString:full]);
+        [fd expandAllFolds];
+        /* nested: fold the inner block, then the outer one over it */
+        at = [full rangeOfString:@"if (x)"].location;
+        [tv setSelectedRange:NSMakeRange(at, 0)];
+        [fd toggleFold];
+        CHECK([[tv string] rangeOfString:@"if (x) { ... 2 lines"].location != NSNotFound);
+        [tv setSelectedRange:NSMakeRange(2, 0)];
+        [fd toggleFold];
+        CHECK([[fd expandedString:[tv string]] isEqualToString:full]);
+        CHECK([[tv string] rangeOfString:@"{ ... 6 lines"].location != NSNotFound);
+        [fd undo];
+        [fd expandAllFolds];
+        CHECK([[tv string] isEqualToString:full]);
+        /* unfold with the caret on the marker's line */
+        [tv setSelectedRange:NSMakeRange(2, 0)];
+        [fd toggleFold];
+        [tv setSelectedRange:NSMakeRange(2, 0)];
+        [fd toggleFold];                                                        /* the line "int f(void)" has no marker: this folds again ... */
+        at = [[tv string] rangeOfString:@"{ ... "].location;
+        [tv setSelectedRange:NSMakeRange(at, 0)];
+        [fd toggleFold];
+        CHECK([[tv string] isEqualToString:full]);
+    }
     {   /* Shell > Filter Selection: the selection goes through a command and comes back, as one undo step */
         EditorDoc *sd = [[[EditorDoc alloc] initWithOwner:nil] autorelease];
         NSTextView *tv = [sd textView];

@@ -307,6 +307,11 @@ static u16 *units_of(NSString *s, unsigned int *n)
     if (d == nil) return;
     s = [self compiledSearch];
     if (s == NULL) return;
+    if ([d hasFolds]) {                                /* a replacement must not reach into a fold marker */
+        if (lo != 0 || hi < [[[d textView] string] length]) { [self say:@"Open the folded blocks before replacing in a selection."]; NSBeep(); return; }
+        [d expandAllFolds];
+        hi = [[[d textView] string] length];
+    }
     text = units_of([[d textView] string], &n);
     repl = units_of([replaceField stringValue], &nrepl);
     if (text == NULL || repl == NULL) { free(text); free(repl); [self say:@"Out of memory."]; return; }

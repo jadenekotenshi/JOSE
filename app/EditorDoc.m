@@ -8,6 +8,7 @@
 #include "brace.h"
 #include "fill.h"
 #include "rect.h"
+#include "fold.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -46,6 +47,8 @@
 }
 
 /* ---- rectangular selection: Option-drag; everything is done in columns of a fixed-pitch font ---- */
+
+- (BOOL)mouseActive { return mouseActive; }
 
 - (BOOL)rectActive { return rectOn; }
 
@@ -97,9 +100,13 @@
 {
     if (([event modifierFlags] & NSAlternateKeyMask) == 0) {
         [self rectClear];
+        mouseActive = YES;
         [super mouseDown:event];
+        mouseActive = NO;
+        [(EditorDoc *)editor mouseSelectionDone];
         return;
     }
+    if ([(EditorDoc *)editor hasFolds]) [(EditorDoc *)editor expandAllFolds];       /* columns of folded text mean nothing */
     {
         NSPoint p = [self convertPoint:[event locationInWindow] fromView:nil];
         unsigned int ls, col;
@@ -159,12 +166,14 @@
 
 - (void)copy:(id)sender
 {
-    if (rectOn) [(EditorDoc *)editor rectCopyAndCut:NO]; else [super copy:sender];
+    if (rectOn) [(EditorDoc *)editor rectCopyAndCut:NO];
+    else if (![(EditorDoc *)editor copyExpandedSelectionAndCut:NO]) [super copy:sender];
 }
 
 - (void)cut:(id)sender
 {
-    if (rectOn) [(EditorDoc *)editor rectCopyAndCut:YES]; else [super cut:sender];
+    if (rectOn) [(EditorDoc *)editor rectCopyAndCut:YES];
+    else if (![(EditorDoc *)editor copyExpandedSelectionAndCut:YES]) [super cut:sender];
 }
 
 - (void)delete:(id)sender
@@ -267,6 +276,14 @@ static void line_col(NSString *s, unsigned int loc, unsigned int *line, unsigned
 - (unsigned long)nowMillis;
 - (void)recordEditInRange:(NSRange)range replacement:(NSString *)replacement;
 - (void)noteLineChangeAt:(unsigned int)loc removed:(const u16 *)rem count:(unsigned int)nrem inserted:(const u16 *)ins count:(unsigned int)nins;
+- (unsigned int)hiddenLinesBefore:(unsigned int)loc;
+- (NSString *)hiddenTextForNumber:(unsigned int)fid;
+- (BOOL)editAllowedInRange:(NSRange)range;
+- (void)foldReplaceRange:(NSRange)range with:(NSString *)str select:(NSRange)sel;
+- (void)expandMarkerAt:(unsigned int)start;
+- (void)expandMarkerAtNumber:(NSNumber *)start;
+- (BOOL)markerStrictlyInside:(unsigned int)loc start:(unsigned int *)st;
+- (void)checkFoldSelection;
 - (void)updateTitle;
 - (void)updateStatus;
 - (void)buildWindow;
@@ -290,6 +307,7 @@ static void line_col(NSString *s, unsigned int loc, unsigned int *line, unsigned
         useSpaces = NO;
         indentWidth = 4;
         undo = undo_new(2000, 2000000UL);
+        folds = [[NSMutableDictionary alloc] init];
         clockBase = [NSDate timeIntervalSinceReferenceDate];
         [self buildWindow];
         [self setMode:nil];
@@ -306,6 +324,7 @@ static void line_col(NSString *s, unsigned int loc, unsigned int *line, unsigned
     [highlighter release];
     undo_free(undo);
     [ruler release];
+    [folds release];
     [path release];
     [mode release];
     [super dealloc];
@@ -388,6 +407,7 @@ static void line_col(NSString *s, unsigned int loc, unsigned int *line, unsigned
     NSRange sel = [textView selectedRange];
 
     line_col([textView string], sel.location, &line, &col);
+    if ([folds count] > 0) line += [self hiddenLinesBefore:sel.location];
     [status setStringValue:[NSString stringWithFormat:@"Line %u, col %u    %@    %@", line, col,
                             mode != nil ? mode : @"Plain Text", eol == 1 ? @"CRLF" : (eol == 2 ? @"CR" : @"LF")]];
 }
@@ -406,6 +426,8 @@ static void line_col(NSString *s, unsigned int loc, unsigned int *line, unsigned
     if (ruler == nil) return;
     for (i = 0; i < nrem; i++) if (rem[i] == '\n') r++;
     for (i = 0; i < nins; i++) if (ins[i] == '\n') a++;
+    r += fold_hidden_lines(rem, nrem, nrem);               /* lines that a fold marker stands for are still lines */
+    a += fold_hidden_lines(ins, nins, nins);
     [ruler textChangedAt:loc removedNewlines:r insertedNewlines:a];
 }
 
@@ -435,6 +457,7 @@ static void line_col(NSString *s, unsigned int loc, unsigned int *line, unsigned
 - (BOOL)textView:(NSTextView *)tv shouldChangeTextInRange:(NSRange)range replacementString:(NSString *)replacement
 {
     if (replacement == nil) return YES;                        /* attributes only */
+    if ([folds count] > 0 && ![self editAllowedInRange:range]) { NSBeep(); return NO; }
     [self recordEditInRange:range replacement:replacement];
     return YES;
 }
@@ -463,6 +486,8 @@ static void line_col(NSString *s, unsigned int loc, unsigned int *line, unsigned
 
     if (sel.length > 0 || sel.location != expectedCaret) undo_break(undo);
     [textView rectSelectionMoved];
+    [self checkFoldSelection];
+    prevSel = [textView selectedRange];
     [self updateStatus];
 }
 
@@ -577,6 +602,7 @@ static void line_col(NSString *s, unsigned int loc, unsigned int *line, unsigned
 
     [path release];
     path = [aPath copy];
+    [folds removeAllObjects];
     [textView setString:text];
     [ruler textReplaced];
     undo_clear(undo);
@@ -593,7 +619,7 @@ static void line_col(NSString *s, unsigned int loc, unsigned int *line, unsigned
 
 - (BOOL)writeTo:(NSString *)aPath
 {
-    NSData *enc = ui_utf8_cstring([textView string]);          /* UTF-8, plus a NUL we do not write */
+    NSData *enc = ui_utf8_cstring([self expandedString:[textView string]]);   /* UTF-8, plus a NUL we do not write; folded code goes in full */
     unsigned int n = [enc length] - 1;
     size_t outn = eol_expanded_size((const char *)[enc bytes], n, eol);
     char *buf = (char *)malloc(outn + 1);
@@ -883,6 +909,7 @@ static void line_col(NSString *s, unsigned int loc, unsigned int *line, unsigned
 /* A programmatic edit (search and replace): one undo step of its own, then the text selected. */
 - (void)replaceRange:(NSRange)range with:(NSString *)str select:(NSRange)sel
 {
+    if ([folds count] > 0 && ![self editAllowedInRange:range]) { NSBeep(); return; }     /* it would cut a fold marker in two */
     undo_break(undo);
     [self recordEditInRange:range replacement:str];
     undo_break(undo);
@@ -1078,9 +1105,330 @@ static NSString *rect_clip;                 /* what Copy last took from a rectan
     return path != nil ? [path stringByDeletingLastPathComponent] : NSHomeDirectory();
 }
 
-- (void)goToLine:(int)line
+/* ---- code folding ----
+ * A folded block is replaced in the text by a marker (see core/fold.h) and the code it hides is kept in `folds`.  Entries are
+ * never removed, so undo and redo, which only move text about, always find what a marker stands for. */
+
+- (BOOL)hasFolds { return [folds count] > 0; }
+
+- (NSString *)hiddenTextForNumber:(unsigned int)fid
+{
+    return [folds objectForKey:[NSNumber numberWithUnsignedInt:fid]];
+}
+
+/* The text with every marker we know replaced, over and over, by the code it hides. */
+- (NSString *)expandedString:(NSString *)s
+{
+    int depth;
+
+    if ([folds count] == 0) return s;
+    for (depth = 0; depth < 64; depth++) {
+        unsigned int n = [s length], pos = 0, from = 0, st, en, lines, fid;
+        u16 *t = (u16 *)malloc((n + 1) * sizeof(u16));
+        NSMutableString *out = nil;
+
+        if (t == NULL) return s;
+        if (n > 0) [s getCharacters:t];
+        while (fold_token_find(t, n, from, &st, &en, &lines, &fid)) {
+            NSString *hidden = [self hiddenTextForNumber:fid];
+
+            if (hidden == nil) { from = st + 1; continue; }
+            if (out == nil) out = [NSMutableString stringWithCapacity:n];
+            if (st > pos) [out appendString:[s substringWithRange:NSMakeRange(pos, st - pos)]];
+            [out appendString:hidden];
+            pos = en;
+            from = en;
+        }
+        free(t);
+        if (out == nil) return s;
+        if (pos < n) [out appendString:[s substringWithRange:NSMakeRange(pos, n - pos)]];
+        s = out;
+    }
+    return s;
+}
+
+/* The line breaks that fold markers before `loc` stand for. */
+- (unsigned int)hiddenLinesBefore:(unsigned int)loc
 {
     NSString *s = [textView string];
+    unsigned int total = [s length], pos = 0, sum = 0;
+    unichar buf[1024 + 64];
+
+    if (loc > total) loc = total;
+    while (pos < loc) {
+        unsigned int got = loc - pos, avail;
+
+        if (got > 1024) got = 1024;
+        avail = total - pos < got + 64 ? total - pos : got + 64;
+        [s getCharacters:buf range:NSMakeRange(pos, avail)];
+        sum += fold_hidden_lines((const u16 *)buf, avail, got);
+        pos += got;
+    }
+    return sum;
+}
+
+/* Would an edit of `range` leave every marker whole?  An edit may touch the ends of a marker, or take it away altogether
+ * (deleting the block it stands for), but not change part of it. */
+- (BOOL)editAllowedInRange:(NSRange)range
+{
+    NSString *s = [textView string];
+    unsigned int n = [s length], lo, hi, from = 0, st, en, lines, fid, len;
+    u16 *t;
+
+    if (range.location > n) return YES;
+    lo = range.location > 64 ? range.location - 64 : 0;
+    hi = NSMaxRange(range) + 64 > n ? n : NSMaxRange(range) + 64;
+    len = hi - lo;
+    t = (u16 *)malloc((len + 1) * sizeof(u16));
+    if (t == NULL) return YES;
+    if (len > 0) [s getCharacters:t range:NSMakeRange(lo, len)];
+    while (fold_token_find(t, len, from, &st, &en, &lines, &fid)) {
+        unsigned int a = lo + st, b = lo + en;
+
+        from = st + 1;
+        if ([self hiddenTextForNumber:fid] == nil) continue;
+        if (range.length == 0) {
+            if (range.location > a && range.location < b) { free(t); return NO; }
+        } else if (range.location < b && NSMaxRange(range) > a) {
+            if (!(range.location <= a && NSMaxRange(range) >= b)) { free(t); return NO; }
+        }
+    }
+    free(t);
+    return YES;
+}
+
+/* A fold or unfold: an edit like any other (so it can be undone), except that it does not make a clean document dirty. */
+- (void)foldReplaceRange:(NSRange)range with:(NSString *)str select:(NSRange)sel
+{
+    BOOL wasClean = !dirty;
+
+    [self replaceRange:range with:str select:sel];
+    [ruler textReplaced];
+    if (wasClean) {
+        savedVersion = undo_version(undo);
+        dirty = NO;
+        [self updateTitle];
+    }
+    [self updateStatus];
+}
+
+- (void)toggleFold
+{
+    NSString *s = [textView string];
+    NSRange sel = [textView selectedRange];
+    unsigned int n = [s length], ls, le, st, en, lines, fid, open, close, from;
+    NSRange lr = [s lineRangeForRange:NSMakeRange(sel.location, 0)];
+    u16 *t;
+    BOOL ok;
+
+    if (n == 0) { NSBeep(); return; }
+    t = (u16 *)malloc((n + 1) * sizeof(u16));
+    if (t == NULL) return;
+    [s getCharacters:t];
+    ls = lr.location;
+    le = NSMaxRange(lr);
+    while (le > ls && t[le - 1] == '\n') le--;
+    from = ls;
+    /* a marker on this line opens */
+    while (fold_token_find(t, le, from, &st, &en, &lines, &fid)) {
+        if (st >= ls && [self hiddenTextForNumber:fid] != nil) { free(t); [self expandMarkerAt:st]; return; }
+        from = st + 1;
+    }
+    ok = fold_find_block(t, n, sel.location, lang_c_like(mode != nil ? [mode cString] : NULL), &open, &close) != 0;
+    if (ok) {
+        NSRange inner = NSMakeRange(open + 1, close - open - 1);
+        NSString *hidden = [s substringWithRange:inner];
+        NSString *full = [self expandedString:hidden];
+        unsigned int k, nl = 0, fl = [full length];
+        u16 tok[FOLD_MAX_TOKEN];
+
+        for (k = 0; k < fl; k++) if ([full characterAtIndex:k] == '\n') nl++;
+        if (nl == 0) ok = NO;
+        else {
+            unsigned int tn;
+
+            foldNext++;
+            [folds setObject:hidden forKey:[NSNumber numberWithUnsignedInt:foldNext]];
+            tn = fold_make_token(tok, nl, foldNext);
+            [self foldReplaceRange:inner with:[NSString stringWithCharacters:tok length:tn]
+                            select:NSMakeRange(open + 1 + tn, 0)];
+        }
+    }
+    free(t);
+    if (!ok) NSBeep();
+}
+
+- (void)foldAll
+{
+    NSString *s = [textView string];
+    unsigned int n = [s length], count, i, pos, *opens, *closes;
+    u16 *t;
+    NSMutableString *out;
+    NSRange region;
+
+    if (n == 0) { NSBeep(); return; }
+    t = (u16 *)malloc((n + 1) * sizeof(u16));
+    if (t == NULL) return;
+    [s getCharacters:t];
+    count = fold_top_blocks(t, n, lang_c_like(mode != nil ? [mode cString] : NULL), &opens, &closes);
+    free(t);
+    if (count == 0) { NSBeep(); return; }
+    region = NSMakeRange(opens[0] + 1, closes[count - 1] - opens[0] - 1);
+    out = [NSMutableString stringWithCapacity:region.length];
+    pos = region.location;
+    for (i = 0; i < count; i++) {
+        NSRange inner = NSMakeRange(opens[i] + 1, closes[i] - opens[i] - 1);
+        NSString *hidden = [s substringWithRange:inner], *full = [self expandedString:hidden];
+        unsigned int k, nl = 0, fl = [full length], tn;
+        u16 tok[FOLD_MAX_TOKEN];
+
+        for (k = 0; k < fl; k++) if ([full characterAtIndex:k] == '\n') nl++;
+        [out appendString:[s substringWithRange:NSMakeRange(pos, inner.location - pos)]];
+        foldNext++;
+        [folds setObject:hidden forKey:[NSNumber numberWithUnsignedInt:foldNext]];
+        tn = fold_make_token(tok, nl, foldNext);
+        [out appendString:[NSString stringWithCharacters:tok length:tn]];
+        pos = NSMaxRange(inner);
+    }
+    free(opens);
+    free(closes);
+    [self foldReplaceRange:region with:out select:NSMakeRange(region.location, 0)];
+}
+
+- (void)expandAllFolds
+{
+    NSString *s = [textView string];
+    unsigned int n = [s length], from = 0, st, en, lines, fid, first = 0, last = 0;
+    BOOL any = NO;
+    u16 *t;
+
+    if ([folds count] == 0 || n == 0) return;
+    t = (u16 *)malloc((n + 1) * sizeof(u16));
+    if (t == NULL) return;
+    [s getCharacters:t];
+    while (fold_token_find(t, n, from, &st, &en, &lines, &fid)) {
+        from = st + 1;
+        if ([self hiddenTextForNumber:fid] == nil) continue;
+        if (!any) first = st;
+        any = YES;
+        last = en;
+    }
+    free(t);
+    if (!any) return;
+    {
+        NSRange region = NSMakeRange(first, last - first);
+        NSString *full = [self expandedString:[s substringWithRange:region]];
+
+        [self foldReplaceRange:region with:full select:NSMakeRange(first, 0)];
+    }
+}
+
+/* The marker that starts at `start` is replaced by the code it hides. */
+- (void)expandMarkerAt:(unsigned int)start
+{
+    NSString *s = [textView string];
+    unsigned int n = [s length], st, en, lines, fid;
+    unsigned int len = n - start < FOLD_MAX_TOKEN ? n - start : FOLD_MAX_TOKEN;
+    u16 t[FOLD_MAX_TOKEN];
+    NSString *hidden;
+
+    if (start >= n) return;
+    [s getCharacters:t range:NSMakeRange(start, len)];
+    if (!fold_token_find(t, len, 0, &st, &en, &lines, &fid) || st != 0) return;
+    hidden = [self hiddenTextForNumber:fid];
+    if (hidden == nil) return;
+    [self foldReplaceRange:NSMakeRange(start, en) with:hidden select:NSMakeRange(start, 0)];
+}
+
+- (void)expandMarkerAtNumber:(NSNumber *)start
+{
+    [self expandMarkerAt:[start unsignedIntValue]];
+}
+
+/* Is `loc` strictly inside a marker (not at either end)?  *st is where the marker starts. */
+- (BOOL)markerStrictlyInside:(unsigned int)loc start:(unsigned int *)st
+{
+    NSString *s = [textView string];
+    unsigned int n = [s length], lo = loc > 64 ? loc - 64 : 0, hi = loc + 64 > n ? n : loc + 64, len = hi - lo;
+    unsigned int from = 0, a, b, lines, fid;
+    u16 *t;
+    BOOL found = NO;
+
+    if (loc > n) return NO;
+    t = (u16 *)malloc((len + 1) * sizeof(u16));
+    if (t == NULL) return NO;
+    if (len > 0) [s getCharacters:t range:NSMakeRange(lo, len)];
+    while (fold_token_find(t, len, from, &a, &b, &lines, &fid)) {
+        from = a + 1;
+        if (lo + a < loc && loc < lo + b && [self hiddenTextForNumber:fid] != nil) { *st = lo + a; found = YES; break; }
+    }
+    free(t);
+    return found;
+}
+
+/* The selection moved.  A caret that arrives inside a marker by the keyboard steps over it; a selection that cuts into one
+ * (a search hit, Shift-arrow) opens it.  Clicks are dealt with when the mouse goes up. */
+- (void)checkFoldSelection
+{
+    NSRange sel = [textView selectedRange];
+    unsigned int st, en = NSMaxRange(sel);
+
+    if ([folds count] == 0 || snapping || [textView mouseActive]) return;
+    if (sel.length == 0) {
+        if ([self markerStrictlyInside:sel.location start:&st]) {
+            unsigned int mid = sel.location, to;
+            NSString *s = [textView string];
+            unsigned int lines, fid, e2, s2;
+            u16 t[FOLD_MAX_TOKEN];
+            unsigned int len = [s length] - st < FOLD_MAX_TOKEN ? [s length] - st : FOLD_MAX_TOKEN;
+
+            [s getCharacters:t range:NSMakeRange(st, len)];
+            if (!fold_token_find(t, len, 0, &s2, &e2, &lines, &fid)) return;
+            to = mid < prevSel.location ? st : st + e2;                   /* the way the caret was going */
+            snapping = YES;
+            [textView setSelectedRange:NSMakeRange(to, 0)];
+            snapping = NO;
+        }
+    } else if ([self markerStrictlyInside:sel.location start:&st]) {
+        [self performSelector:@selector(expandMarkerAtNumber:) withObject:[NSNumber numberWithUnsignedInt:st] afterDelay:0.0];
+    } else if ([self markerStrictlyInside:en start:&st]) {
+        [self performSelector:@selector(expandMarkerAtNumber:) withObject:[NSNumber numberWithUnsignedInt:st] afterDelay:0.0];
+    }
+}
+
+- (void)mouseSelectionDone
+{
+    NSRange sel = [textView selectedRange];
+    unsigned int st;
+
+    if ([folds count] == 0) return;
+    if ([self markerStrictlyInside:sel.location start:&st] || [self markerStrictlyInside:NSMaxRange(sel) start:&st])
+        [self expandMarkerAt:st];
+}
+
+- (BOOL)copyExpandedSelectionAndCut:(BOOL)cut
+{
+    NSRange sel = [textView selectedRange];
+    NSString *text, *full;
+    NSPasteboard *pb;
+
+    if ([folds count] == 0 || sel.length == 0) return NO;
+    text = [[textView string] substringWithRange:sel];
+    full = [self expandedString:text];
+    if ([full isEqualToString:text]) return NO;
+    pb = [NSPasteboard generalPasteboard];
+    [pb declareTypes:[NSArray arrayWithObject:NSStringPboardType] owner:nil];
+    [pb setString:full forType:NSStringPboardType];
+    if (cut) [textView delete:nil];
+    return YES;
+}
+
+- (void)goToLine:(int)line
+{
+    NSString *s;
+
+    [self expandAllFolds];                       /* line numbers are those of the whole text */
+    s = [textView string];
     unsigned int pos = 0, n = [s length];
     int l = 1;
     NSRange r;

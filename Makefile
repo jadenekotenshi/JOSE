@@ -6,17 +6,22 @@ OBJCFLAGS = -x objective-c -fno-objc-arc -w -g -Ihk -Icore -Iapp
 CFLAGS  = -std=c89 -pedantic -Wall -Wextra -Wdeclaration-after-statement \
           -Wno-long-long -Wno-unused-parameter -O2 -g -Icore
 
-test: $(BUILD)/test_core $(BUILD)/test_search $(BUILD)/test_edit $(BUILD)/test_brace $(BUILD)/test_fill $(BUILD)/test_shell
+test: $(BUILD)/test_core $(BUILD)/test_search $(BUILD)/test_edit $(BUILD)/test_brace $(BUILD)/test_fill $(BUILD)/test_shell $(BUILD)/test_fold
 	$(BUILD)/test_core
 	$(BUILD)/test_search
 	$(BUILD)/test_edit
 	$(BUILD)/test_brace
 	$(BUILD)/test_fill
 	$(BUILD)/test_shell
+	$(BUILD)/test_fold
 
 $(BUILD)/test_fill: tests/test_fill.c tests/test.h core/fill.c core/fill.h core/rect.c core/rect.h
 	mkdir -p $(BUILD)
 	$(CC) $(CFLAGS) tests/test_fill.c core/fill.c core/rect.c -o $@
+
+$(BUILD)/test_fold: tests/test_fold.c tests/test.h core/fold.c core/fold.h core/brace.c core/brace.h
+	mkdir -p $(BUILD)
+	$(CC) $(CFLAGS) tests/test_fold.c core/fold.c core/brace.c -o $@
 
 $(BUILD)/test_shell: tests/test_shell.c tests/test.h core/shellrun.c core/shellrun.h
 	mkdir -p $(BUILD)

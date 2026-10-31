@@ -1,5 +1,6 @@
 #import "LineNumberView.h"
 #import "UIHelpers.h"
+#include "fold.h"
 
 #define CHUNK 1024
 
@@ -37,18 +38,20 @@
     return (float)d * [font widthOfString:@"0"] + 10.0;
 }
 
-/* The number of newlines in [from, to) of the text. */
+/* The number of line breaks in [from, to) of the text, counting those that a fold marker hides. */
 - (unsigned int)newlinesFrom:(unsigned int)from to:(unsigned int)to
 {
     NSString *s = [textView string];
-    unichar buf[CHUNK];
-    unsigned int n = 0, pos = from, got, i;
+    unichar buf[CHUNK + 64];
+    unsigned int n = 0, pos = from, total = [s length], got, avail, i;
 
     while (pos < to) {
         got = to - pos;
         if (got > CHUNK) got = CHUNK;
-        [s getCharacters:buf range:NSMakeRange(pos, got)];
+        avail = total - pos < got + 64 ? total - pos : got + 64;
+        [s getCharacters:buf range:NSMakeRange(pos, avail)];
         for (i = 0; i < got; i++) if (buf[i] == '\n') n++;
+        n += fold_hidden_lines((const u16 *)buf, avail, got);
         pos += got;
     }
     return n;

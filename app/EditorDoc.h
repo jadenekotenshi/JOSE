@@ -16,9 +16,11 @@
     unsigned int         rectAnchorCol;
     unsigned int         rectCurLine;      /* ... and where it is now */
     unsigned int         rectCurCol;
+    BOOL                 mouseActive;      /* a click or drag is in progress */
 }
 - (void)setHighlighter:(HKSyntaxHighlighter *)h;
 - (void)setEditor:(id)anEditor;
+- (BOOL)mouseActive;
 - (BOOL)rectActive;
 - (void)rectClear;
 - (void)rectSelectionMoved;                /* the selection changed: forget the rectangle unless it caused it */
@@ -51,6 +53,10 @@
     BOOL                 useSpaces;        /* indent with spaces rather than tabs; Tab inserts spaces */
     int                  indentWidth;      /* spaces per level */
     int                  eol;              /* 0 = LF, 1 = CRLF, 2 = CR: what the file used, kept on save */
+    NSMutableDictionary *folds;            /* fold number -> the text it hides; only ever added to, so undo can always find it */
+    unsigned int         foldNext;
+    BOOL                 snapping;         /* the selection is being moved off a fold marker */
+    NSRange              prevSel;
 }
 - (id)initWithOwner:(id)anOwner;
 - (BOOL)openFile:(NSString *)aPath;        /* NO (and an alert) if it cannot be read */
@@ -94,5 +100,12 @@
 - (BOOL)rectPaste;                         /* the pasteboard as a block at the rectangle or the insertion point; NO if it is not */
 - (BOOL)pasteIsRectangle;                  /* the pasteboard holds what Copy last took from a rectangle */
 - (NSString *)workingDirectory;            /* the file's folder, or the home folder */
+- (BOOL)hasFolds;                          /* some code is folded */
+- (void)toggleFold;                        /* fold the block at the insertion point, or unfold the marker on its line */
+- (void)foldAll;                           /* fold every outermost block that spans several lines */
+- (void)expandAllFolds;                    /* put all hidden code back (one undo step) */
+- (NSString *)expandedString:(NSString *)s;   /* s with every fold marker replaced by the code it hides */
+- (BOOL)copyExpandedSelectionAndCut:(BOOL)cut;   /* a selection that holds markers goes to the pasteboard with the code; NO if it holds none */
+- (void)mouseSelectionDone;                /* a click ended: a marker that was clicked on opens */
 - (void)showWindow;
 @end

@@ -1,0 +1,77 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include "test.h"
+#include "fold.h"
+
+static unsigned widen(const char *s, u16 *out)
+{
+    unsigned n = 0;
+    while (s[n]) { out[n] = (unsigned char)s[n]; n++; }
+    return n;
+}
+
+static int block(const char *text, unsigned pos, unsigned *o, unsigned *c)
+{
+    u16 t[2048];
+    return fold_find_block(t, widen(text, t), pos, 1, o, c);
+}
+
+int main(void)
+{
+    u16 t[512], tok[FOLD_MAX_TOKEN];
+    unsigned n, tn, st, en, lines, id, o, c, *os, *cs, k;
+    const char *src = "int f(void)\n{\n  if (x) {\n    a;\n  }\n  return 0;\n}\nint g() { return 1; }\n";
+
+    /* tokens */
+    tn = fold_make_token(tok, 12, 7);
+    CHECK(tn == 18 || tn == 17 || tn > 10);
+    memcpy(t, tok, tn * sizeof(u16));
+    CHECK(fold_token_find(t, tn, 0, &st, &en, &lines, &id) && st == 0 && en == tn && lines == 12 && id == 7);
+    n = widen("a {", t);
+    memcpy(t + n, tok, tn * sizeof(u16));
+    n += tn;
+    t[n++] = '}';
+    CHECK(fold_token_find(t, n, 0, &st, &en, &lines, &id) && st == 3 && en == n - 1 && lines == 12 && id == 7);
+    CHECK(!fold_token_find(t, n, 4, &st, &en, &lines, &id));
+    CHECK(fold_hidden_lines(t, n, n) == 12);
+    CHECK(fold_hidden_lines(t, n, 3) == 0);
+    CHECK(fold_hidden_lines(t, n, 4) == 12);                   /* it starts before the limit, even if it ends after it */
+    n = widen("x ... 3 lines ~ y", t);
+    CHECK(!fold_token_find(t, n, 0, &st, &en, &lines, &id));    /* no number after the tilde */
+    n = widen("x ... 3 lines 4 ", t);
+    CHECK(!fold_token_find(t, n, 0, &st, &en, &lines, &id));
+    n = widen(" ... 3 lines ~4 ", t);
+    CHECK(fold_token_find(t, n, 0, &st, &en, &lines, &id) && lines == 3 && id == 4 && en == n);
+    CHECK(fold_make_token(tok, 123456, 99) < FOLD_MAX_TOKEN);
+
+    /* finding the block */
+    {
+        const char *p = strstr(src, "if (x) {");
+        unsigned f_open = (unsigned)(strchr(src, '{') - src);                 /* the lone "{" on the second line */
+        unsigned f_close = (unsigned)(strstr(src, "}\nint g") - src);
+        unsigned want_open = (unsigned)(p - src) + 7;
+        CHECK(block(src, 0, &o, &c) && o == f_open && c == f_close);          /* "int f(void)": Allman style, the brace is on the next line */
+        CHECK(block(src, f_open, &o, &c) && o == f_open && c == f_close);     /* on the lone "{" */
+        CHECK(block(src, (unsigned)(p - src), &o, &c) && o == want_open && src[c] == '}');
+        CHECK(block(src, (unsigned)(strstr(src, "a;") - src), &o, &c) && o == want_open);     /* inside: the innermost */
+        CHECK(block(src, (unsigned)(strstr(src, "return 0") - src), &o, &c) && o == f_open);   /* after the inner block: the outer */
+        CHECK(block(src, f_close, &o, &c) && o == f_open && c == f_close);                      /* on the closing line */
+        n = widen(src, t);
+        k = fold_top_blocks(t, n, 1, &os, &cs);
+        CHECK(k == 1 && os[0] == f_open && cs[0] == f_close);                  /* g's block is on one line */
+        free(os); free(cs);
+    }
+    CHECK(!block("int g() { return 1; }\n", 5, &o, &c));                    /* one line: nothing to fold */
+    CHECK(!block("no braces\n", 3, &o, &c));
+    CHECK(block("a { // }\n  b;\n}\n", 0, &o, &c) && o == 2 && c == 14);        /* a brace in a comment is not counted */
+
+    /* the top-level blocks */
+    n = widen("a {\n}\nb {\n x {\n }\n}\nc { \"}\" /* } */\n}\n", t);
+    k = fold_top_blocks(t, n, 1, &os, &cs);
+    CHECK(k == 3 && t[os[0]] == '{' && t[cs[2]] == '}');
+    free(os); free(cs);
+    n = widen("", t);
+    CHECK(fold_top_blocks(t, n, 1, &os, &cs) == 0);
+    TEST_DONE("fold");
+}

@@ -162,6 +162,9 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
     [self addItem:@"Comment" action:@selector(commentLines:) key:@"/" target:self toMenu:m];
     [self addItem:@"Uncomment" action:@selector(uncommentLines:) key:@"\\" target:self toMenu:m];
     [self addItem:@"Fill Paragraph" action:@selector(fillParagraph:) key:@"j" target:self toMenu:m];
+    [self addItem:@"Fold/Unfold Block" action:@selector(toggleFold:) key:@"k" target:self toMenu:m];
+    [self addItem:@"Fold All Blocks" action:@selector(foldAll:) key:@"" target:self toMenu:m];
+    [self addItem:@"Expand All Blocks" action:@selector(expandAll:) key:@"" target:self toMenu:m];
 
     m = [self submenuNamed:@"Search" inMenu:main];
     [self addItem:@"Find..." action:@selector(showFind:) key:@"f" target:self toMenu:m];
@@ -252,7 +255,7 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
         || a == @selector(findPrevious:) || a == @selector(findSelection:)
         || a == @selector(toggleWrap:) || a == @selector(setMode:)
         || a == @selector(gotoBracket:) || a == @selector(selectBracket:) || a == @selector(shiftLeft:) || a == @selector(shiftRight:) || a == @selector(commentLines:) || a == @selector(uncommentLines:)
-        || a == @selector(fillParagraph:) || a == @selector(filterSelection:) || a == @selector(executeCommand:) || a == @selector(sortLines:))
+        || a == @selector(fillParagraph:) || a == @selector(toggleFold:) || a == @selector(foldAll:) || a == @selector(expandAll:) || a == @selector(filterSelection:) || a == @selector(executeCommand:) || a == @selector(sortLines:))
         if (d == nil) return NO;
     if (a == @selector(setFillWidth:)) [item setState:tag == prefFillWidth ? NSOnState : NSOffState];
     if (a == @selector(toggleLineNumbers:)) [item setState:prefLineNumbers ? NSOnState : NSOffState];
@@ -412,7 +415,17 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
 - (void)filterSelection:(id)sender { [[self shellController] filterSelection]; }
 - (void)executeCommand:(id)sender { [[self shellController] executeCommand]; }
 - (void)sortLines:(id)sender { [[self shellController] sortLines]; }
-- (void)fillParagraph:(id)sender { [[self frontDocument] fillWithWidth:prefFillWidth]; }
+- (void)fillParagraph:(id)sender
+{
+    EditorDoc *d = [self frontDocument];
+
+    [d expandAllFolds];                      /* a marker must not be re-flowed */
+    [d fillWithWidth:prefFillWidth];
+}
+
+- (void)toggleFold:(id)sender { [[self frontDocument] toggleFold]; }
+- (void)foldAll:(id)sender { [[self frontDocument] foldAll]; }
+- (void)expandAll:(id)sender { [[self frontDocument] expandAllFolds]; }
 
 - (void)setFillWidth:(id)sender
 {

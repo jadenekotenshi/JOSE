@@ -27,6 +27,15 @@ Status: **prototype (0.0.1)** -- nothing here has been run on OPENSTEP yet.
   file's folder; the editor waits for them for up to a minute.  Output on stderr or a non-zero status is shown in an alert
   and, for a failure, the text is left alone.
 
+* **Code folding** (Edit > Fold/Unfold Block, cmd-K; Fold All Blocks; Expand All Blocks): collapses the block between matching
+  braces, the one that opens on the insertion point's line, closes on it, or surrounds it, into `{ ... 12 lines ~7 }`.
+  Click the marker, or press cmd-K on its line, to open it again.  Fold All Blocks folds every outermost block that spans
+  several lines (every function body, in C).  The hidden code stays in the document: Save writes it in full, Copy and Cut
+  put it on the pasteboard in full, line numbers and the status line count it, folds are undone and redone like any edit, and
+  folding does not make a clean file dirty.  What a fold cannot do: a marker cannot be edited in part (it is refused, or opens
+  if you select into it), and Find sees only the markers, not the folded code; Go to Line, Fill, rectangular selection and
+  Replace All open all folds first.  Folds are not remembered when a file is closed.
+
 ## Syntax files
 
 HighlighterKit's `.syntax` files are property lists of contexts.  JOSE adds one key: a context may have a `Parent`
@@ -44,7 +53,7 @@ Roughly in this order; the list is not a promise.
 1. Search: Find, Replace, Find Again/Previous, Find Selection, regular expressions, case/word options, Replace All and In Selection (one undo step) -- done, awaiting a check on 4.2; multi-file replace still to do.
 2. Editing: undo/redo, auto-indent, smart indent (brace languages, Python), shift left/right, comment/uncomment, spaces-for-tabs
    and indent width -- done and checked on 4.2; match brace, line numbers and saved settings -- done and checked;
-   fill paragraph and rectangular selection -- done, awaiting a check on 4.2.
+   fill paragraph, rectangular selection, shell commands -- done and checked; code folding -- done, awaiting a check on 4.2.
 3. Highlighting: nested contexts -- done (see above), awaiting a check on 4.2; more language modes, a preferences panel for
    the colours and fonts.
 4. Shell commands (filter, execute, sort) -- done, awaiting a check on 4.2; a macro language, learn/replay, tags files (ctags)
