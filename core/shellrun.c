@@ -57,7 +57,7 @@ int shell_run(const char *cmd, const char *dir, const char *in, size_t nin, unsi
               ShellResult *r)
 {
     int inp[2], outp[2], errp[2];
-    pid_t pid;
+    int pid;
     Grow go = { 0, 0, 0 }, ge = { 0, 0, 0 };
     size_t written = 0;
     int in_open, out_open = 1, err_open = 1, status = 0, reaped = 0;
@@ -140,7 +140,7 @@ int shell_run(const char *cmd, const char *dir, const char *in, size_t nin, unsi
     if (out_open) close(outp[0]);
     if (err_open) close(errp[0]);
     while (!reaped) {
-        pid_t w = waitpid(pid, &status, 0);
+        int w = waitpid(pid, &status, 0);
         if (w == pid) reaped = 1;
         else if (w < 0 && errno != EINTR) break;
     }
