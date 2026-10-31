@@ -22,9 +22,13 @@
 {
     if (highlighter != nil) {
         NSLayoutManager *lm = [self layoutManager];
-        NSRange drawn = [lm glyphRangeForBoundingRect:frame inTextContainer:[self textContainer]];
+        NSRange drawn;
 
+        SSTrace("draw: layout for y=%d h=%d ...", (int)frame.origin.y, (int)frame.size.height);
+        drawn = [lm glyphRangeForBoundingRect:frame inTextContainer:[self textContainer]];
+        SSTrace("draw: glyphs %u+%u laid out, highlighting", drawn.location, drawn.length);
         [highlighter highlightRange:drawn];
+        SSTrace("draw: highlighted");
     }
     [super drawRect:frame];
 }
