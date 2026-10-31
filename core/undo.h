@@ -5,7 +5,10 @@
  * with `ninserted` units; typing and deleting a character at a time are merged into one step.  Plain C so that it can be
  * tested on the host. */
 
+#ifndef U16_DEFINED
+#define U16_DEFINED
 typedef unsigned short u16;
+#endif
 
 typedef struct Undo Undo;
 

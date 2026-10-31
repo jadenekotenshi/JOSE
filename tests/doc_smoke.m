@@ -89,6 +89,22 @@ int main(void)
         CHECK([[ts string] isEqualToString:before]);
     }
 
+    {   /* a programmatic replace is one undo step, and undo puts everything back */
+        NSTextStorage *ts = [[doc textView] textStorage];
+        NSString *before = [[ts string] copy];
+        NSRange r = NSMakeRange(0, 3);
+        [doc replaceRange:r with:@"XYZW" select:NSMakeRange(0, 4)];
+        CHECK([[ts string] hasPrefix:@"XYZW main"] || [[ts string] hasPrefix:@"XYZW "]);
+        CHECK(NSEqualRanges([[doc textView] selectedRange], NSMakeRange(0, 4)));
+        CHECK([doc isDirty]);
+        [doc replaceRange:NSMakeRange(0, 4) with:@"Q" select:NSMakeRange(0, 1)];     /* two replaces are two steps */
+        [doc undo];
+        CHECK([[ts string] hasPrefix:@"XYZW"]);
+        [doc undo];
+        CHECK([[ts string] isEqualToString:before] && ![doc isDirty]);
+        [before release];
+    }
+
     [[NSFileManager defaultManager] removeItemAtPath:dir error:NULL];
     printf(failures ? "doc: FAILED\n" : "doc: ok\n");
     [pool release];

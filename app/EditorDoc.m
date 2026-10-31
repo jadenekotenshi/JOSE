@@ -58,6 +58,7 @@ static void line_col(NSString *s, unsigned int loc, unsigned int *line, unsigned
 - (void)applyStep:(const UndoStep *)step undoing:(BOOL)undoing;
 - (void)markEdited;
 - (unsigned long)nowMillis;
+- (void)recordEditInRange:(NSRange)range replacement:(NSString *)replacement;
 - (void)updateTitle;
 - (void)updateStatus;
 - (void)buildWindow;
@@ -184,15 +185,15 @@ static void line_col(NSString *s, unsigned int loc, unsigned int *line, unsigned
 }
 
 /* The change is about to happen: remember what it replaces, so that it can be undone. */
-- (BOOL)textView:(NSTextView *)tv shouldChangeTextInRange:(NSRange)range replacementString:(NSString *)replacement
+/* Remembers an edit that is about to happen on the history. */
+- (void)recordEditInRange:(NSRange)range replacement:(NSString *)replacement
 {
     unsigned int nrem = range.length, nins = replacement != nil ? [replacement length] : 0;
     u16 *rem = NULL, *ins = NULL;
 
-    if (replacement == nil) return YES;                        /* attributes only */
     if (nrem > 0) {
         rem = (u16 *)malloc(nrem * sizeof(u16));
-        if (rem != NULL) [[tv string] getCharacters:rem range:range];
+        if (rem != NULL) [[textView string] getCharacters:rem range:range];
         else nrem = 0;
     }
     if (nins > 0) {
@@ -204,6 +205,12 @@ static void line_col(NSString *s, unsigned int loc, unsigned int *line, unsigned
     free(rem);
     free(ins);
     expectedCaret = range.location + nins;
+}
+
+- (BOOL)textView:(NSTextView *)tv shouldChangeTextInRange:(NSRange)range replacementString:(NSString *)replacement
+{
+    if (replacement == nil) return YES;                        /* attributes only */
+    [self recordEditInRange:range replacement:replacement];
     return YES;
 }
 
@@ -444,6 +451,20 @@ static void line_col(NSString *s, unsigned int loc, unsigned int *line, unsigned
     dirty = NO;
     [window close];
     return YES;
+}
+
+/* A programmatic edit (search and replace): one undo step of its own, then the text selected. */
+- (void)replaceRange:(NSRange)range with:(NSString *)str select:(NSRange)sel
+{
+    undo_break(undo);
+    [self recordEditInRange:range replacement:str];
+    undo_break(undo);
+    [[textView textStorage] replaceCharactersInRange:range withString:str];
+    expectedCaret = range.location + [str length];
+    [textView setSelectedRange:sel];
+    [textView scrollRangeToVisible:sel];
+    [self markEdited];
+    [self updateStatus];
 }
 
 - (void)goToLine:(int)line

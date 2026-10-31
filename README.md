@@ -19,7 +19,7 @@ Status: **prototype (0.0.1)** -- nothing here has been run on OPENSTEP yet.
 
 Roughly in this order; the list is not a promise.
 
-1. Search: Find, Replace, Find Again, selection search, regular expressions, case/word options, multi-file replace.
+1. Search: Find, Replace, Find Again/Previous, Find Selection, regular expressions, case/word options, Replace All and In Selection (one undo step) -- done, awaiting a check on 4.2; multi-file replace still to do.
 2. Editing: undo/redo, auto-indent, smart indent for C, shift left/right, comment/uncomment, fill paragraph,
    rectangular selection and its operations, match brace, tabs/emulated tabs.
 3. Highlighting: nested patterns (NEdit-style `.pats`), more language modes, a preferences panel for the colours and fonts.

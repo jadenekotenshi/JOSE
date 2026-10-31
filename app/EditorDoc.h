@@ -46,6 +46,7 @@
 - (NSWindow *)window;
 - (EditTextView *)textView;
 - (void)goToLine:(int)line;
+- (void)replaceRange:(NSRange)range with:(NSString *)str select:(NSRange)sel;   /* one undoable step */
 - (BOOL)canUndo;
 - (BOOL)canRedo;
 - (void)undo;

@@ -1,5 +1,6 @@
 #import "AppController.h"
 #import "EditorDoc.h"
+#import "FindController.h"
 #import "UIHelpers.h"
 #import "HKSyntaxDefinition.h"
 
@@ -109,6 +110,11 @@
     [self addItem:@"Select All" action:@selector(selectAll:) key:@"a" target:nil toMenu:m];
 
     m = [self submenuNamed:@"Search" inMenu:main];
+    [self addItem:@"Find..." action:@selector(showFind:) key:@"f" target:self toMenu:m];
+    [self addItem:@"Find Again" action:@selector(findAgain:) key:@"g" target:self toMenu:m];
+    [self addItem:@"Find Previous" action:@selector(findPrevious:) key:@"G" target:self toMenu:m];
+    [self addItem:@"Find Selection" action:@selector(findSelection:) key:@"e" target:self toMenu:m];
+    [self addItem:@"Replace..." action:@selector(showFind:) key:@"r" target:self toMenu:m];
     [self addItem:@"Go to Line..." action:@selector(gotoLine:) key:@"l" target:self toMenu:m];
 
     m = [self submenuNamed:@"Preferences" inMenu:main];
@@ -152,7 +158,8 @@
     SEL a = [item action];
     int tag = [item tag];
 
-    if (a == @selector(saveDoc:) || a == @selector(saveDocAs:) || a == @selector(closeDoc:) || a == @selector(gotoLine:)
+    if (a == @selector(saveDoc:) || a == @selector(saveDocAs:) || a == @selector(closeDoc:) || a == @selector(gotoLine:) || a == @selector(showFind:) || a == @selector(findAgain:)
+        || a == @selector(findPrevious:) || a == @selector(findSelection:)
         || a == @selector(toggleWrap:) || a == @selector(setMode:))
         if (d == nil) return NO;
     if (a == @selector(undoDoc:)) return d != nil && [d canUndo];
@@ -248,6 +255,17 @@
 
     if (d != nil) [d setWrap:![d wrap]];
 }
+
+- (FindController *)finder
+{
+    if (finder == nil) finder = [[FindController alloc] initWithOwner:self];
+    return finder;
+}
+
+- (void)showFind:(id)sender { [[self finder] showPanel]; }
+- (void)findAgain:(id)sender { [[self finder] findAgain]; }
+- (void)findPrevious:(id)sender { [[self finder] findPrevious]; }
+- (void)findSelection:(id)sender { [[self finder] findSelection]; }
 
 /* Go to Line: a small panel with a field. */
 - (void)gotoOK:(id)sender { [NSApp stopModalWithCode:NSOKButton]; }
