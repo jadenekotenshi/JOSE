@@ -830,7 +830,7 @@ int main(void)
         [tv setString:body];
         [tv setSelectedRange:NSMakeRange([body length] - 1, 0)];                    /* between the last two newlines */
         [tv deleteBackward:nil];                                                    /* the newline before the final blank line */
-        CHECK([[tv string] hasSuffix:@"X\n"] && ![[tv string] hasSuffix:@"X\n\n"] && [tv selectedRange].location == [[tv string] length]);
+        CHECK([[tv string] hasSuffix:@"X\n"] && ![[tv string] hasSuffix:@"X\n\n"] && [tv selectedRange].location == [[tv string] length] - 1);
         [tv setString:body];
         [tv setSelectedRange:NSMakeRange([body length] - 2, 0)];                    /* after X */
         [tv deleteForward:nil];                                                     /* deletes the newline after X */
