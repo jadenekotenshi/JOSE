@@ -62,6 +62,11 @@
     BOOL                 snapping;         /* the selection is being moved off a fold marker */
     NSRange              prevSel;
     FoldLines            foldInfo;         /* the lines that can be folded or are folded, for the fold margin */
+    EditTextView        *originalView;     /* the first pane's view: never taken away, so the text storage it owns stays put */
+    NSSplitView         *split;            /* nil unless the window is split into two panes */
+    NSScrollView        *altScroll;        /* the pane that is not the active one (nil if not split); textView/scroll/ruler are the active pane */
+    EditTextView        *altView;
+    LineNumberView      *altRuler;
 }
 - (id)initWithOwner:(id)anOwner;
 - (BOOL)openFile:(NSString *)aPath;        /* NO (and an alert) if it cannot be read */
@@ -125,5 +130,9 @@
 - (void)macroNoteAction:(NSString *)selectorName;
 - (void)macroStateChanged;                 /* learning began or ended: the status line says so */
 - (void)applyAppearance;                   /* the font or colours changed */
+- (void)splitPane;                          /* a second view of the same text under (or over) the first */
+- (void)closePane;                         /* closes the pane with the insertion point; the other one fills the window */
+- (BOOL)hasSplit;
+- (void)paneActivated:(EditTextView *)view;   /* a pane took the focus: it becomes the one the commands work on */
 - (void)showWindow;
 @end

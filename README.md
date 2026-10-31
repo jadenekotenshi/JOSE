@@ -48,6 +48,9 @@ Status: **prototype (0.0.1)** -- nothing here has been run on OPENSTEP yet.
 * **Preferences panel** (Preferences > Preferences Panel..., cmd-,): Light or Dark colours (light text on a dark background, with the
   syntax colours lightened to match), the background and text colours, the font and size (any fixed-pitch font installed), the
   include path, call tips and the fold margin.  Changes show in every window at once and are saved.
+* **Split panes** (Windows > Split Pane, cmd-2; Close Pane, cmd-1): the window shows the same text in two panes, one above the
+  other, each with its own scroll position, selection, line numbers and fold margin.  Edits, undo, folds and highlighting are
+  shared; the commands act on the pane with the insertion point.  Close Pane closes that one and the other fills the window.
 * **Find in Files** (Search > Find in Files..., shift-cmd-F): looks for text in the files of a folder, with the same case, regular
   expression and whole-word options as Find, a list of file-name patterns (`*.c *.h`; `*` and `?`), and subfolders on or off
   (`.`-folders and `CVS` are skipped).  The matching lines are listed as `file:line: text`; double-click one to open the file
@@ -131,7 +134,7 @@ Roughly in this order; the list is not a promise.
    fill paragraph, rectangular selection, shell commands -- done and checked; code folding -- done and checked.
 3. Highlighting: nested contexts -- done and checked; the Preferences panel (colours, dark mode, font), recent files, Open Included
    File, tags with call tips and the fold margin -- done, awaiting a check on 4.2; more language modes.
-4. Shell commands (filter, execute, sort) -- done and checked; per-mode preferences -- done, awaiting a check on 4.2; still to do: split panes.
+4. Shell commands (filter, execute, sort) -- done and checked; per-mode preferences -- done, awaiting a check on 4.2; split panes -- done, awaiting a check on 4.2.
 
 ## Building
 

@@ -30,6 +30,14 @@
     editor = anEditor;
 }
 
+- (BOOL)becomeFirstResponder
+{
+    BOOL ok = [super becomeFirstResponder];
+
+    if (ok && editor != nil) [(EditorDoc *)editor paneActivated:self];
+    return ok;
+}
+
 - (void)insertNewline:(id)sender
 {
     if (macroSuppress == 0) [(EditorDoc *)editor macroNoteAction:@"insertNewline:"];
@@ -401,6 +409,12 @@ static void line_col(NSString *s, unsigned int loc, unsigned int *line, unsigned
 - (void)applyFont;
 - (void)applyColors;
 - (void)updateRuler;
+- (void)updateRulerOf:(LineNumberView **)slot scroll:(NSScrollView *)sc view:(EditTextView *)tv;
+- (void)rulersTextReplaced;
+- (void)rulersRedraw;
+- (void)wrapPane:(EditTextView *)tv scroll:(NSScrollView *)sc;
+- (void)swapPanes;
+- (NSScrollView *)paneScrollOf:(EditTextView *)view;
 - (void)refreshFoldInfo;
 - (void)scheduleFoldRefresh;
 - (BOOL)writeTo:(NSString *)aPath;
@@ -440,6 +454,7 @@ static void line_col(NSString *s, unsigned int loc, unsigned int *line, unsigned
     [highlighter release];
     undo_free(undo);
     [ruler release];
+    [altRuler release];
     [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(refreshFoldInfo) object:nil];
     foldlines_free(&foldInfo);
     [folds release];
@@ -481,6 +496,7 @@ static void line_col(NSString *s, unsigned int loc, unsigned int *line, unsigned
     [textView setDelegate:self];
     [textView setEditor:self];
     [scroll setDocumentView:textView];
+    originalView = textView;
     [self applyFont];
     [self applyColors];
     [[window contentView] addSubview:scroll];
@@ -497,6 +513,7 @@ static void line_col(NSString *s, unsigned int loc, unsigned int *line, unsigned
 - (void)applyFont
 {
     [textView setFont:[HKSyntaxHighlighter defaultFont]];
+    if (altView != nil) [altView setFont:[HKSyntaxHighlighter defaultFont]];
 }
 
 /* The scheme's background and text colours for the view (the highlighter colours what it knows about on top of them). */
@@ -508,6 +525,14 @@ static void line_col(NSString *s, unsigned int loc, unsigned int *line, unsigned
     if ([textView respondsToSelector:@selector(setInsertionPointColor:)])
         [textView setInsertionPointColor:[Appearance textColor]];
     [scroll setBackgroundColor:[Appearance backgroundColor]];
+    if (altView != nil) {
+        [altView setDrawsBackground:YES];
+        [altView setBackgroundColor:[Appearance backgroundColor]];
+        [altView setTextColor:[Appearance textColor]];
+        if ([altView respondsToSelector:@selector(setInsertionPointColor:)])
+            [altView setInsertionPointColor:[Appearance textColor]];
+        [altScroll setBackgroundColor:[Appearance backgroundColor]];
+    }
 }
 
 static BOOL ident_char(unichar c)
@@ -656,8 +681,9 @@ static BOOL ident_char(unichar c)
     [self applyFont];
     [self applyColors];
     [self setMode:m];
-    [ruler setNeedsDisplay:YES];
+    [self rulersRedraw];
     [textView setNeedsDisplay:YES];
+    [altView setNeedsDisplay:YES];
 }
 
 - (void)showWindow
@@ -710,6 +736,7 @@ static BOOL ident_char(unichar c)
     r += fold_hidden_lines(rem, nrem, nrem);               /* lines that a fold marker stands for are still lines */
     a += fold_hidden_lines(ins, nins, nins);
     [ruler textChangedAt:loc removedNewlines:r insertedNewlines:a];
+    [altRuler textChangedAt:loc removedNewlines:r insertedNewlines:a];
 }
 
 /* Remembers an edit that is about to happen on the history. */
@@ -764,7 +791,10 @@ static BOOL ident_char(unichar c)
 /* Moving the insertion point away from where the typing was ends the step being built. */
 - (void)textViewDidChangeSelection:(NSNotification *)notification
 {
-    NSRange sel = [textView selectedRange];
+    NSRange sel;
+
+    if ([notification object] != nil && [notification object] != textView) return;     /* the other pane's own selection */
+    sel = [textView selectedRange];
 
     if (sel.length > 0 || sel.location != expectedCaret) undo_break(undo);
     [textView rectSelectionMoved];
@@ -817,6 +847,7 @@ static BOOL ident_char(unichar c)
 
     [highlighter detach];
     [textView setHighlighter:nil];
+    [altView setHighlighter:nil];
     [highlighter release];
     highlighter = nil;
     [mode release];
@@ -831,29 +862,38 @@ static BOOL ident_char(unichar c)
         if (highlighter == nil) { [mode release]; mode = nil; }
     }
     [textView setHighlighter:highlighter];
+    [altView setHighlighter:highlighter];
     [textView setNeedsDisplay:YES];
+    [altView setNeedsDisplay:YES];
     [self scheduleFoldRefresh];
     [self updateStatus];
 }
 
 - (void)setWrap:(BOOL)flag
 {
-    NSSize cs = [scroll contentSize];
-
     wrap = flag;
-    [scroll setHasHorizontalScroller:!flag];
-    [[textView textContainer] setWidthTracksTextView:flag];
-    if (flag) {
-        [textView setHorizontallyResizable:NO];
-        [textView setAutoresizingMask:NSViewWidthSizable];
-        [[textView textContainer] setContainerSize:NSMakeSize(cs.width, 1.0e7)];
-        [textView setFrameSize:NSMakeSize(cs.width, [textView frame].size.height)];
+    [self wrapPane:textView scroll:scroll];
+    if (altView != nil) [self wrapPane:altView scroll:altScroll];
+}
+
+/* One pane's wrapping, as the document's wrap setting says. */
+- (void)wrapPane:(EditTextView *)tv scroll:(NSScrollView *)sc
+{
+    NSSize cs = [sc contentSize];
+
+    [sc setHasHorizontalScroller:!wrap];
+    [[tv textContainer] setWidthTracksTextView:wrap];
+    if (wrap) {
+        [tv setHorizontallyResizable:NO];
+        [tv setAutoresizingMask:NSViewWidthSizable];
+        [[tv textContainer] setContainerSize:NSMakeSize(cs.width, 1.0e7)];
+        [tv setFrameSize:NSMakeSize(cs.width, [tv frame].size.height)];
     } else {
-        [textView setHorizontallyResizable:YES];
-        [textView setAutoresizingMask:NSViewNotSizable];
-        [[textView textContainer] setContainerSize:NSMakeSize(1.0e7, 1.0e7)];
+        [tv setHorizontallyResizable:YES];
+        [tv setAutoresizingMask:NSViewNotSizable];
+        [[tv textContainer] setContainerSize:NSMakeSize(1.0e7, 1.0e7)];
     }
-    [textView setNeedsDisplay:YES];
+    [tv setNeedsDisplay:YES];
 }
 
 /* ---- reading and writing ---- */
@@ -888,7 +928,7 @@ static BOOL ident_char(unichar c)
     path = [aPath copy];
     [folds removeAllObjects];
     [textView setString:text];
-    [ruler textReplaced];
+    [self rulersTextReplaced];
     undo_clear(undo);
     savedVersion = undo_version(undo);
     dirty = NO;
@@ -1002,23 +1042,41 @@ static BOOL ident_char(unichar c)
 /* The margin on the left of the text: line numbers and the fold column, whichever are wanted. */
 - (void)updateRuler
 {
+    [self updateRulerOf:&ruler scroll:scroll view:textView];
+    if (altView != nil) [self updateRulerOf:&altRuler scroll:altScroll view:altView];
+}
+
+- (void)updateRulerOf:(LineNumberView **)slot scroll:(NSScrollView *)sc view:(EditTextView *)tv
+{
     BOOL fold = [Appearance foldMargin], show = lineNumbers || fold;
 
-    if (show && ruler == nil) {
-        if (![scroll respondsToSelector:@selector(setVerticalRulerView:)]) { SSTrace("line numbers: no scroll view rulers here"); lineNumbers = NO; return; }
-        ruler = [[LineNumberView alloc] initWithScrollView:scroll textView:textView];
-        [scroll setVerticalRulerView:ruler];
-        [scroll setHasVerticalRuler:YES];
+    if (show && *slot == nil) {
+        if (![sc respondsToSelector:@selector(setVerticalRulerView:)]) { SSTrace("line numbers: no scroll view rulers here"); lineNumbers = NO; return; }
+        *slot = [[LineNumberView alloc] initWithScrollView:sc textView:tv];
+        [sc setVerticalRulerView:*slot];
+        [sc setHasVerticalRuler:YES];
     }
-    if (ruler != nil) {
-        [ruler setFoldSource:self];
-        [ruler setShowNumbers:lineNumbers showFold:fold];
-        [scroll setRulersVisible:show];
+    if (*slot != nil) {
+        [*slot setFoldSource:self];
+        [*slot setShowNumbers:lineNumbers showFold:fold];
+        [sc setRulersVisible:show];
         if (show) {
-            [ruler textReplaced];
+            [*slot textReplaced];
             [self scheduleFoldRefresh];
         }
     }
+}
+
+- (void)rulersTextReplaced
+{
+    [ruler textReplaced];
+    [altRuler textReplaced];
+}
+
+- (void)rulersRedraw
+{
+    [ruler setNeedsDisplay:YES];
+    [altRuler setNeedsDisplay:YES];
 }
 
 - (BOOL)lineNumbers { return lineNumbers; }
@@ -1041,13 +1099,13 @@ static BOOL ident_char(unichar c)
     const char *m = mode != nil ? [mode cString] : NULL;
 
     foldlines_free(&foldInfo);
-    if (ruler == nil || ![Appearance foldMargin] || n == 0 || n > FOLD_SCAN_LIMIT) { [ruler setNeedsDisplay:YES]; return; }
+    if (ruler == nil || ![Appearance foldMargin] || n == 0 || n > FOLD_SCAN_LIMIT) { [self rulersRedraw]; return; }
     t = (u16 *)malloc((n + 1) * sizeof(u16));
     if (t == NULL) return;
     [s getCharacters:t];
     foldlines_scan(t, n, lang_fold_style(m), (lang_c_like(m) ? FOLD_CAWARE : 0) | (lang_fold_brackets(m) ? FOLD_BRACKETS : 0), lang_word_kind(m), &foldInfo);
     free(t);
-    [ruler setNeedsDisplay:YES];
+    [self rulersRedraw];
 }
 
 /* After a pause: scanning for every keystroke would be wasteful. */
@@ -1566,7 +1624,7 @@ static NSString *rect_clip;                 /* what Copy last took from a rectan
     BOOL wasClean = !dirty;
 
     [self replaceRange:range with:str select:sel];
-    [ruler textReplaced];
+    [self rulersTextReplaced];
     [self refreshFoldInfo];
     if (wasClean) {
         savedVersion = undo_version(undo);
@@ -1851,6 +1909,153 @@ static NSString *rect_clip;                 /* what Copy last took from a rectan
     [textView setSelectedRange:NSMakeRange(pos, 0)];
     [textView scrollRangeToVisible:NSMakeRange(pos, 0)];
     [window makeFirstResponder:textView];
+}
+
+
+/* ---- split panes ---- */
+
+- (BOOL)hasSplit { return altView != nil; }
+
+/* The pane that took the focus is the one the commands work on: its pointers become textView, scroll and ruler. */
+- (void)swapPanes
+{
+    EditTextView *tv = textView;
+    NSScrollView *sc = scroll;
+    LineNumberView *rl = ruler;
+
+    textView = altView;
+    scroll = altScroll;
+    ruler = altRuler;
+    altView = tv;
+    altScroll = sc;
+    altRuler = rl;
+}
+
+- (void)paneActivated:(EditTextView *)view
+{
+    if (altView == nil || view == textView || view != altView) return;
+    [self swapPanes];
+    prevSel = [textView selectedRange];
+    expectedCaret = prevSel.location;
+    [self updateStatus];
+}
+
+- (void)splitPane
+{
+    NSRect b;
+    NSSize cs;
+    NSTextStorage *ts;
+    NSLayoutManager *lm;
+    NSTextContainer *tc;
+    NSRange sel;
+    NSPoint top;
+
+    if (altView != nil) return;
+    ts = [textView textStorage];
+    b = [scroll frame];
+    sel = [textView selectedRange];
+    top = [[scroll contentView] bounds].origin;
+
+    split = [[NSSplitView alloc] initWithFrame:b];
+    [split setVertical:NO];
+    [split setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
+    [scroll retain];
+    [scroll removeFromSuperview];
+    [scroll setFrame:NSMakeRect(0, 0, b.size.width, b.size.height / 2.0)];
+    [split addSubview:scroll];
+    [scroll release];
+
+    altScroll = [[[NSScrollView alloc] initWithFrame:NSMakeRect(0, 0, b.size.width, b.size.height / 2.0)] autorelease];
+    [altScroll setHasVerticalScroller:YES];
+    [altScroll setHasHorizontalScroller:YES];
+    [altScroll setBorderType:NSNoBorder];
+    [altScroll setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
+    cs = [altScroll contentSize];
+
+    /* A second layout of the same text storage.  The layout manager and the container are deliberately not released: the
+     * storage and the view hold them, and if either of those holds them differently on some release, a leak is cheaper than
+     * a crash. */
+    lm = [[NSLayoutManager alloc] init];
+    [ts addLayoutManager:lm];
+    tc = [[NSTextContainer alloc] initWithContainerSize:NSMakeSize(1.0e7, 1.0e7)];
+    [lm addTextContainer:tc];
+    altView = [[[EditTextView alloc] initWithFrame:NSMakeRect(0, 0, cs.width, cs.height) textContainer:tc] autorelease];
+    [altView setMinSize:NSMakeSize(0.0, cs.height)];
+    [altView setMaxSize:NSMakeSize(1.0e7, 1.0e7)];
+    [altView setVerticallyResizable:YES];
+    [altView setHorizontallyResizable:YES];
+    [altView setAutoresizingMask:NSViewNotSizable];
+    [[altView textContainer] setWidthTracksTextView:NO];
+    [altView setRichText:NO];
+    [altView setDelegate:self];
+    [altView setEditor:self];
+    [altView setHighlighter:highlighter];
+    [altScroll setDocumentView:altView];
+    [split addSubview:altScroll];
+    [[window contentView] addSubview:split];
+    [split release];                                   /* the content view holds it now (see closePane) */
+    [split adjustSubviews];
+
+    [self wrapPane:altView scroll:altScroll];
+    [self updateRuler];
+    [self applyAppearance];                            /* font, colours and a fresh highlighter for both views */
+    [altView setSelectedRange:sel];
+    [altView scrollRangeToVisible:sel];
+    [[altScroll contentView] scrollToPoint:top];
+    [altScroll reflectScrolledClipView:[altScroll contentView]];
+    [window makeFirstResponder:altView];
+}
+
+- (NSScrollView *)paneScrollOf:(EditTextView *)view
+{
+    return view == textView ? scroll : altScroll;
+}
+
+/* Closes the pane with the insertion point.  The first pane's view is never the one taken away (it owns the text storage), so
+ * when it is the one being closed the other pane's place and selection move into it. */
+- (void)closePane
+{
+    NSTextStorage *ts;
+    NSRect fr;
+    NSRange sel;
+    NSPoint top;
+
+    if (altView == nil) return;
+    ts = [originalView textStorage];
+    if (textView == originalView) {                    /* closing the first pane: it takes over the other's place */
+        sel = [altView selectedRange];
+        top = [[altScroll contentView] bounds].origin;
+    } else {
+        sel = [originalView selectedRange];
+        top = [[[self paneScrollOf:originalView] contentView] bounds].origin;
+    }
+    if (textView != originalView) [self swapPanes];    /* now the first pane is textView, and altView is the one to go */
+    fr = [split frame];
+    [altScroll removeFromSuperview];
+    [ts removeLayoutManager:[altView layoutManager]];
+    [altView setHighlighter:nil];
+    [altView setDelegate:nil];
+    [altView setEditor:nil];
+    altView = nil;
+    altScroll = nil;
+    [altRuler release];
+    altRuler = nil;
+
+    [scroll retain];
+    [scroll removeFromSuperview];
+    [scroll setFrame:fr];
+    [[window contentView] addSubview:scroll];
+    [scroll release];
+    [split removeFromSuperview];
+    split = nil;
+
+    [textView setSelectedRange:sel];
+    [[scroll contentView] scrollToPoint:top];
+    [scroll reflectScrolledClipView:[scroll contentView]];
+    [self wrapPane:textView scroll:scroll];
+    [window makeFirstResponder:textView];
+    prevSel = [textView selectedRange];
+    [self updateStatus];
 }
 
 @end

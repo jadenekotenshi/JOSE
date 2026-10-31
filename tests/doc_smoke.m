@@ -623,6 +623,50 @@ int main(void)
         CHECK([[[od textView] string] isEqualToString:@"x foo y\n"]);                                    /* one undo step */
         search_free(se);
     }
+    {   /* split panes: a second view of the same text; the active pane changes with the focus; closing either one */
+        EditorDoc *sd = [[[EditorDoc alloc] initWithOwner:nil] autorelease];
+        EditTextView *first = [sd textView], *second;
+        NSString *body = @"one\ntwo\nthree\nfour\n";
+
+        [sd setLineNumbers:YES];
+        [first setString:body];
+        [first setSelectedRange:NSMakeRange(4, 0)];
+        CHECK(![sd hasSplit]);
+        [sd splitPane];
+        CHECK([sd hasSplit]);
+        second = [sd textView];
+        CHECK(second != first);                                                  /* the new pane has the focus */
+        CHECK([[second string] isEqualToString:body] && [[first string] isEqualToString:body]);
+        CHECK([second selectedRange].location == 4);
+        CHECK([sd valueForKey:@"altRuler"] != nil && [sd valueForKey:@"ruler"] != nil);
+        [second setSelectedRange:NSMakeRange(0, 0)];
+        [second insertText:@"X"];
+        CHECK([[first string] isEqualToString:@"Xone\ntwo\nthree\nfour\n"]);      /* one text, two views */
+        CHECK([sd isDirty]);
+        [sd undo];
+        CHECK([[first string] isEqualToString:body]);
+        [sd paneActivated:first];                                                /* a click in the first pane */
+        CHECK([sd textView] == first);
+        [sd setWrap:YES];
+        CHECK([sd wrap]);
+        [sd setMode:@"C"];
+        [sd setWrap:NO];
+        [sd closePane];                                                          /* closes the first pane: the other one stays */
+        CHECK(![sd hasSplit] && [sd textView] == first);
+        CHECK([[first string] isEqualToString:body]);
+        [sd splitPane];
+        CHECK([sd textView] != first);
+        [sd closePane];                                                          /* closes the new pane */
+        CHECK(![sd hasSplit] && [sd textView] == first);
+        [first insertText:@"Y"];
+        CHECK([[first string] hasPrefix:@"Y"] || [[first string] length] == [body length] + 1);
+        [sd splitPane];
+        [sd splitPane];                                                          /* already split: nothing happens */
+        CHECK([sd hasSplit]);
+        [sd closePane];
+        [sd closePane];                                                          /* not split: nothing happens */
+        CHECK(![sd hasSplit]);
+    }
     [[NSFileManager defaultManager] removeItemAtPath:dir error:NULL];
     printf(failures ? "doc: FAILED\n" : "doc: ok\n");
     [pool release];

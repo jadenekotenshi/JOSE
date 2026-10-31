@@ -340,6 +340,8 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
     m = [self submenuNamed:@"Windows" inMenu:main];
     [self addItem:@"Arrange in Front" action:@selector(arrangeInFront:) key:@"" target:nil toMenu:m];
     [self addItem:@"Miniaturize Window" action:@selector(performMiniaturize:) key:@"m" target:nil toMenu:m];
+    [self addItem:@"Split Pane" action:@selector(splitPane:) key:@"2" target:self toMenu:m];
+    [self addItem:@"Close Pane" action:@selector(closePane:) key:@"1" target:self toMenu:m];
     [NSApp setWindowsMenu:m];
 
     m = [self submenuNamed:@"Services" inMenu:main];
@@ -381,6 +383,8 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
         || a == @selector(gotoBracket:) || a == @selector(selectBracket:) || a == @selector(shiftLeft:) || a == @selector(shiftRight:) || a == @selector(commentLines:) || a == @selector(uncommentLines:)
         || a == @selector(fillParagraph:) || a == @selector(toggleFold:) || a == @selector(foldAll:) || a == @selector(expandAll:) || a == @selector(filterSelection:) || a == @selector(executeCommand:) || a == @selector(sortLines:))
         if (d == nil) return NO;
+    if (a == @selector(splitPane:)) return d != nil && ![d hasSplit];
+    if (a == @selector(closePane:)) return d != nil && [d hasSplit];
     if (a == @selector(learnMacro:)) {
         BOOL rec = [self macroRecording];
         [item setTitle:rec ? @"Stop Learning" : @"Learn Macro"];
@@ -832,6 +836,9 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
     [[d textView] setString:[@"# JOSE macro\n" stringByAppendingString:[[self macroController] lastAsText]]];
     [d setMode:@"JOSEMacro"];
 }
+
+- (void)splitPane:(id)sender { [[self frontDocument] splitPane]; }
+- (void)closePane:(id)sender { [[self frontDocument] closePane]; }
 
 - (void)showFiles:(id)sender
 {
