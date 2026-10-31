@@ -11,6 +11,7 @@
 - (unsigned int)newlinesFrom:(unsigned int)from to:(unsigned int)to;
 - (void)updateThickness;
 - (void)drawNumber:(unsigned int)n atY:(float)y height:(float)h;
+- (void)drawLabelsInRect:(NSRect)rect;
 - (void)drawMark:(const char *)mark atY:(float)y height:(float)h;
 - (float)totalThickness;
 @end
@@ -167,6 +168,15 @@
 
 - (void)drawHashMarksAndLabelsInRect:(NSRect)rect
 {
+    NS_DURING
+        [self drawLabelsInRect:rect];
+    NS_HANDLER
+        SSTrace("line numbers: draw raised %s -- %s", SSCS([localException name]), SSCS([localException reason]));
+    NS_ENDHANDLER
+}
+
+- (void)drawLabelsInRect:(NSRect)rect
+{
     NSLayoutManager *lm = [textView layoutManager];
     NSTextContainer *tc = [textView textContainer];
     NSString *str = [textView string];
@@ -174,7 +184,7 @@
     NSRect vis = [textView visibleRect];
     NSRect inContainer = NSMakeRect(vis.origin.x - origin.x, vis.origin.y - origin.y, vis.size.width, vis.size.height);
     NSRange glyphs;
-    unsigned int g;
+    unsigned int g, ngl;
 
     [[Appearance gutterBackground] set];
     NSRectFill(rect);
@@ -186,6 +196,8 @@
     [font set];
     [[Appearance gutterText] set];
     glyphs = [lm glyphRangeForBoundingRect:inContainer inTextContainer:tc];
+    ngl = [lm numberOfGlyphs];
+    if (NSMaxRange(glyphs) > ngl) glyphs.length = glyphs.location < ngl ? ngl - glyphs.location : 0;     /* the layout may be a step behind an edit */
     g = glyphs.location;
     while (g < NSMaxRange(glyphs)) {
         NSRange eff;
@@ -194,7 +206,7 @@
         NSRect r = [self convertRect:NSMakeRect(fr.origin.x + origin.x, fr.origin.y + origin.y, fr.size.width, fr.size.height)
                             fromView:textView];
 
-        if (ch == 0 || [str characterAtIndex:ch - 1] == '\n') {
+        if (ch == 0 || (ch <= [str length] && [str characterAtIndex:ch - 1] == '\n')) {
             if (showNumbers) [self drawNumber:[self lineNumberForChar:ch] atY:r.origin.y height:r.size.height];
             if (showFold && foldSource != nil) {
                 int st = [foldSource foldStateForLineStart:ch];

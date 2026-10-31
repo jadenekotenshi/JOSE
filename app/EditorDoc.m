@@ -361,7 +361,11 @@
         SSTrace("draw: layout for y=%d h=%d ...", (int)frame.origin.y, (int)frame.size.height);
         drawn = [lm glyphRangeForBoundingRect:frame inTextContainer:[self textContainer]];
         SSTrace("draw: glyphs %u+%u laid out, highlighting", drawn.location, drawn.length);
-        [highlighter highlightRange:drawn];
+        NS_DURING
+            [highlighter highlightRange:drawn];
+        NS_HANDLER
+            SSTrace("draw: highlighting raised %s -- %s", SSCS([localException name]), SSCS([localException reason]));
+        NS_ENDHANDLER
         SSTrace("draw: highlighted");
     }
     [super drawRect:frame];
