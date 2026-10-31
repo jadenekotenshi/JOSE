@@ -127,5 +127,24 @@ int main(void)
     n = widen("", t);
     CHECK(words_scan(t, n, WORDS_SH, &b) && b.npairs == 0);
     words_free(&b);
+    {   /* words without a partner */
+        const char *txt = "if a; then\n  while b; do\n    c\n  fi\nelse\nesac\n";
+        n = widen(txt, t);
+        words_scan(t, n, WORDS_SH, &b);                       /* fi does not close while: the while is never closed, esac closes nothing */
+        CHECK(b.nlone == 3);
+        CHECK(b.lone[0].type == WORD_LONE_OPEN && b.lone[0].s == (unsigned)(strstr(txt, "while") - txt));   /* skipped over by fi */
+        CHECK(b.npairs == 1 && b.pairs[0].os == 0 && b.pairs[0].cs == (unsigned)(strstr(txt, "fi") - txt));
+        CHECK(b.lone[1].type == WORD_LONE_MID && b.lone[1].s == (unsigned)(strstr(txt, "else") - txt));        /* its if was closed by the fi */
+        CHECK(b.lone[2].type == WORD_LONE_CLOSE && b.lone[2].s == (unsigned)(strstr(txt, "esac") - txt));
+        words_free(&b);
+        n = widen("else\n#if X\n#endif\n#elif Y\n#endif\n", t);
+        words_scan(t, n, WORDS_CPP, &b);
+        CHECK(b.nlone == 2 && b.lone[0].type == WORD_LONE_MID && b.lone[1].type == WORD_LONE_CLOSE);   /* #elif outside, last #endif stray */
+        words_free(&b);
+        n = widen("if a; then b; fi\n", t);
+        words_scan(t, n, WORDS_SH, &b);
+        CHECK(b.nlone == 0 && b.npairs == 1);
+        words_free(&b);
+    }
     TEST_DONE("words");
 }

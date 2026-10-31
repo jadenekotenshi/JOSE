@@ -667,6 +667,26 @@ int main(void)
         [sd closePane];                                                          /* not split: nothing happens */
         CHECK(![sd hasSplit]);
     }
+    {   /* Find Unmatched Bracket / Keyword: each call goes on to the next problem and wraps round */
+        EditorDoc *ud = [[[EditorDoc alloc] initWithOwner:nil] autorelease];
+        EditTextView *tv = [ud textView];
+
+        [ud setMode:@"C"];
+        [tv setString:@"a }\nb (\nc { }\n#if X\n"];
+        [tv setSelectedRange:NSMakeRange(0, 0)];
+        CHECK([ud findUnmatchedBracket] == 3);
+        CHECK([tv selectedRange].location == 2 && [tv selectedRange].length == 1);          /* the stray } */
+        CHECK([ud findUnmatchedBracket] == 3 && [tv selectedRange].location == 6);          /* the ( never closed */
+        CHECK([ud findUnmatchedBracket] == 3 && [tv selectedRange].location == 14 && [tv selectedRange].length == 3);   /* the #if */
+        CHECK([ud findUnmatchedBracket] == 3 && [tv selectedRange].location == 2);          /* round to the first */
+        [ud setMode:@"Shell"];
+        [tv setString:@"if a; then\n  echo x\nesac\n"];
+        [tv setSelectedRange:NSMakeRange(0, 0)];
+        CHECK([ud findUnmatchedBracket] == 2);
+        CHECK([tv selectedRange].location == 0 && [tv selectedRange].length == 2);          /* the if */
+        [tv setString:@"if a; then\n  echo x\nfi\n(x)\n"];
+        CHECK([ud findUnmatchedBracket] == 0);
+    }
     [[NSFileManager defaultManager] removeItemAtPath:dir error:NULL];
     printf(failures ? "doc: FAILED\n" : "doc: ok\n");
     [pool release];

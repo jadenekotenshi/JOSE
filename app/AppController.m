@@ -283,7 +283,7 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
     [self addItem:@"Find in Files..." action:@selector(showFiles:) key:@"F" target:self toMenu:m];
     [self addItem:@"Go to Matching Bracket" action:@selector(gotoBracket:) key:@"b" target:self toMenu:m];
     [self addItem:@"Select to Matching Bracket" action:@selector(selectBracket:) key:@"B" target:self toMenu:m];
-    [self addItem:@"Find Unmatched Bracket" action:@selector(findUnmatched:) key:@"u" target:self toMenu:m];
+    [self addItem:@"Find Unmatched Bracket / Keyword" action:@selector(findUnmatched:) key:@"u" target:self toMenu:m];
     [self addItem:@"Go to Line..." action:@selector(gotoLine:) key:@"l" target:self toMenu:m];
     [self addItem:@"Find Definition" action:@selector(findDefinition:) key:@"t" target:self toMenu:m];
     [self addItem:@"Return from Definition" action:@selector(returnFromDefinition:) key:@"T" target:self toMenu:m];
@@ -569,8 +569,7 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
     EditorDoc *d = [self frontDocument];
     int r = [d findUnmatchedBracket];
 
-    if (r == 0) NSRunAlertPanel(@"Find Unmatched Bracket", @"Every ( ) [ ] { } in this file has a partner.", @"OK", nil, nil);
-    else NSBeep();                                  /* the bracket is selected: a stray closer, a mismatched one, or one never closed */
+    if (r == 0) NSRunAlertPanel(@"Find Unmatched Bracket", @"Every bracket and block keyword in this file has a partner.", @"OK", nil, nil);
 }
 
 - (void)gotoBracket:(id)sender { [self macroNote:@"match-bracket"]; [[self frontDocument] gotoMatchingBracket:NO]; }

@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "test.h"
+#include <stdlib.h>
 #include "brace.h"
 
 static unsigned widen(const char *s, u16 *out)
@@ -45,22 +46,41 @@ int main(void)
     CHECK(m("())", 2, 1) == -1);
     {
         u16 u[128];
-        unsigned pos, op, k;
+        BraceProblem *bp;
+        unsigned k, n;
         const char *cases[] = { "int f() { return (1); }", "}", "a ( b ]", "void f() {\n if (x) {\n}\n", "s = \"{\"; /* ( */ // [\nx", "" };
-        int expect[] = { 0, BRACE_STRAY, BRACE_MISMATCH, BRACE_UNCLOSED, 0, 0 };
+        unsigned count[] = { 0, 1, 1, 1, 0, 0 };
+        int kind[] = { 0, BRACE_STRAY, BRACE_MISMATCH, BRACE_UNCLOSED, 0, 0 };
         unsigned at[] = { 0, 0, 6, 9, 0, 0 };
         int i;
 
         for (i = 0; i < 6; i++) {
             for (k = 0; cases[i][k]; k++) u[k] = (u16)(unsigned char)cases[i][k];
-            CHECK(brace_find_unbalanced(u, k, 1, &pos, &op) == expect[i]);
-            if (expect[i]) CHECK(pos == at[i]);
+            n = brace_scan_problems(u, k, 1, &bp);
+            CHECK(n == count[i]);
+            if (n == 1) CHECK(bp[0].kind == kind[i] && bp[0].pos == at[i]);
+            free(bp);
         }
         for (k = 0; "s = \"{\"\n"[k]; k++) u[k] = (u16)(unsigned char)"s = \"{\"\n"[k];
-        CHECK(brace_find_unbalanced(u, k, 0, &pos, &op) == BRACE_UNCLOSED && pos == 5);     /* plain text counts it */
+        n = brace_scan_problems(u, k, 0, &bp);
+        CHECK(n == 1 && bp[0].kind == BRACE_UNCLOSED && bp[0].pos == 5);          /* plain text counts it */
+        free(bp);
         for (k = 0; "a ( b ]"[k]; k++) u[k] = (u16)(unsigned char)"a ( b ]"[k];
-        brace_find_unbalanced(u, k, 1, &pos, &op);
-        CHECK(op == 2);
+        n = brace_scan_problems(u, k, 1, &bp);
+        CHECK(n == 1 && bp[0].other == 2);
+        free(bp);
+        /* a missing closer in the middle: the opener skipped over is reported, and the rest still pairs */
+        for (k = 0; "{ ( x }  ) ]"[k]; k++) u[k] = (u16)(unsigned char)"{ ( x }  ) ]"[k];
+        n = brace_scan_problems(u, k, 1, &bp);
+        CHECK(n == 3 && bp[0].pos == 2 && bp[0].kind == BRACE_UNCLOSED);          /* the ( that the } skipped over */
+        CHECK(bp[1].pos == 9 && bp[1].kind == BRACE_STRAY);                        /* then ) and ] have nothing open */
+        CHECK(bp[2].pos == 11 && bp[2].kind == BRACE_STRAY);
+        free(bp);
+        /* several problems come back in order */
+        for (k = 0; "} ( { ] )"[k]; k++) u[k] = (u16)(unsigned char)"} ( { ] )"[k];
+        n = brace_scan_problems(u, k, 1, &bp);
+        CHECK(n == 2 && bp[0].pos == 0 && bp[0].kind == BRACE_STRAY && bp[1].pos == 6 && bp[1].kind == BRACE_MISMATCH && bp[1].other == 4);   /* the ) pairs with the ( */
+        free(bp);
     }
     TEST_DONE("brace");
 }

@@ -89,14 +89,37 @@ int brace_match(const u16 *t, unsigned len, unsigned pos, int c_aware, unsigned 
     return 0;
 }
 
-int brace_find_unbalanced(const u16 *t, unsigned len, int c_aware, unsigned *pos, unsigned *opener)
+static int problem_add(BraceProblem **v, unsigned *n, unsigned *cap, unsigned pos, int kind, unsigned other)
 {
-    unsigned *stack = NULL, cap = 0, top = 0, i, c;
-    int state = S_CODE, result = 0;
+    if (*n == *cap) {
+        unsigned nc = *cap ? *cap * 2 : 16;
+        BraceProblem *nv = (BraceProblem *)realloc(*v, nc * sizeof(BraceProblem));
 
-    *pos = 0;
-    *opener = 0;
-    for (i = 0; i < len && result == 0; i++) {
+        if (nv == NULL) return 0;
+        *v = nv;
+        *cap = nc;
+    }
+    (*v)[*n].pos = pos;
+    (*v)[*n].kind = kind;
+    (*v)[*n].other = other;
+    (*n)++;
+    return 1;
+}
+
+static int problem_cmp(const void *a, const void *b)
+{
+    unsigned x = ((const BraceProblem *)a)->pos, y = ((const BraceProblem *)b)->pos;
+
+    return x < y ? -1 : (x > y ? 1 : 0);
+}
+
+unsigned brace_scan_problems(const u16 *t, unsigned len, int c_aware, BraceProblem **out)
+{
+    unsigned *stack = NULL, cap = 0, top = 0, i, c, np = 0, pcap = 0;
+    int state = S_CODE, ok = 1;
+
+    *out = NULL;
+    for (i = 0; i < len && ok; i++) {
         c = t[i];
         if (c_aware && state == S_LINE) {
             if (c == '\n') state = S_CODE;
@@ -113,18 +136,28 @@ int brace_find_unbalanced(const u16 *t, unsigned len, int c_aware, unsigned *pos
             if (top == cap) {
                 unsigned nc = cap ? cap * 2 : 64;
                 unsigned *ns = (unsigned *)realloc(stack, nc * sizeof(unsigned));
-                if (ns == NULL) { free(stack); return 0; }
+                if (ns == NULL) { ok = 0; break; }
                 stack = ns;
                 cap = nc;
             }
             stack[top++] = i;
         } else if (brace_is_bracket(c)) {
-            if (top == 0) { result = BRACE_STRAY; *pos = i; }
-            else if (partner(c) != t[stack[top - 1]]) { result = BRACE_MISMATCH; *pos = i; *opener = stack[top - 1]; }
-            else top--;
+            unsigned j = top;
+
+            while (j > 0 && partner(c) != t[stack[j - 1]]) j--;      /* the nearest open bracket that this one closes */
+            if (top == 0) ok = problem_add(out, &np, &pcap, i, BRACE_STRAY, 0);
+            else if (j == 0) {                                        /* closes nothing that is open: a typo for the innermost */
+                ok = problem_add(out, &np, &pcap, i, BRACE_MISMATCH, stack[top - 1]);
+                top--;
+            } else {
+                while (ok && top > j) { ok = problem_add(out, &np, &pcap, stack[top - 1], BRACE_UNCLOSED, 0); top--; }
+                top--;                                                /* the pair itself */
+            }
         }
     }
-    if (result == 0 && top > 0) { result = BRACE_UNCLOSED; *pos = stack[top - 1]; }
+    while (ok && top > 0) { ok = problem_add(out, &np, &pcap, stack[top - 1], BRACE_UNCLOSED, 0); top--; }
     free(stack);
-    return result;
+    if (!ok) { free(*out); *out = NULL; return 0; }
+    if (np > 1) qsort(*out, np, sizeof(BraceProblem), problem_cmp);
+    return np;
 }

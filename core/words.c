@@ -256,6 +256,22 @@ static int scan_cpp(const u16 *t, unsigned n, TokList *l)
 
 /* ---- pairing ---- */
 
+/* Which closing word a shell or csh block word goes with: 1 if/fi (endif), 2 case/esac (switch/endsw), 3 loops/done (end). */
+static int family(const u16 *t, const Tok *k, int csh)
+{
+    if (word_is(t, k->s, k->e, "if") || word_is(t, k->s, k->e, "fi") || word_is(t, k->s, k->e, "endif")) return 1;
+    if (word_is(t, k->s, k->e, csh ? "switch" : "case") || word_is(t, k->s, k->e, csh ? "endsw" : "esac")) return 2;
+    return 3;
+}
+
+static void add_lone(WordBlocks *b, unsigned s, unsigned e, int type)
+{
+    b->lone[b->nlone].s = s;
+    b->lone[b->nlone].e = e;
+    b->lone[b->nlone].type = type;
+    b->nlone++;
+}
+
 int words_scan(const u16 *t, unsigned n, int kind, WordBlocks *out)
 {
     TokList l = { 0, 0, 0 };
@@ -275,7 +291,8 @@ int words_scan(const u16 *t, unsigned n, int kind, WordBlocks *out)
     pair_of = (int *)malloc(l.n * sizeof(int));
     out->pairs = (WordPair *)malloc(l.n * sizeof(WordPair));
     out->mids = (WordMid *)malloc(l.n * sizeof(WordMid));
-    if (!stack || !pair_of || !out->pairs || !out->mids) { free(stack); free(pair_of); words_free(out); free(l.v); return 0; }
+    out->lone = (WordLone *)malloc(l.n * sizeof(WordLone));
+    if (!stack || !pair_of || !out->pairs || !out->mids || !out->lone) { free(stack); free(pair_of); words_free(out); free(l.v); return 0; }
     for (i = 0; i < l.n; i++) pair_of[i] = -1;
     /* mids wait for their opener's pair, so remember which opener each belongs to */
     {
@@ -286,16 +303,28 @@ int words_scan(const u16 *t, unsigned n, int kind, WordBlocks *out)
         for (i = 0; i < l.n; i++) {
             if (l.v[i].type == T_OPEN) stack[top++] = i;
             else if (l.v[i].type == T_CLOSE) {
-                if (top > 0) {
-                    unsigned o = stack[--top];
+                unsigned j = top;
+
+                if (kind == WORDS_SH || kind == WORDS_CSH) {           /* the nearest open word that this one closes */
+                    int f = family(t, &l.v[i], kind == WORDS_CSH);
+
+                    while (j > 0 && family(t, &l.v[stack[j - 1]], kind == WORDS_CSH) != f) j--;
+                }
+                if (top > 0 && j > 0) {
+                    unsigned o;
+
+                    while (top > j) { top--; add_lone(out, l.v[stack[top]].s, l.v[stack[top]].e, WORD_LONE_OPEN); }
+                    o = stack[--top];
                     out->pairs[out->npairs].os = l.v[o].s;
                     out->pairs[out->npairs].oe = l.v[o].e;
                     out->pairs[out->npairs].cs = l.v[i].s;
                     out->pairs[out->npairs].ce = l.v[i].e;
                     pair_of[o] = (int)out->npairs;
                     out->npairs++;
-                }
-            } else if (top > 0) {
+                } else add_lone(out, l.v[i].s, l.v[i].e, WORD_LONE_CLOSE);
+            } else if (top == 0) {
+                add_lone(out, l.v[i].s, l.v[i].e, WORD_LONE_MID);
+            } else {
                 out->mids[nmid].s = l.v[i].s;
                 out->mids[nmid].e = l.v[i].e;
                 mid_open[nmid] = stack[top - 1];
@@ -310,6 +339,7 @@ int words_scan(const u16 *t, unsigned n, int kind, WordBlocks *out)
             }
         }
         free(mid_open);
+        while (top > 0) { top--; add_lone(out, l.v[stack[top]].s, l.v[stack[top]].e, WORD_LONE_OPEN); }
     }
     free(stack);
     free(pair_of);
@@ -319,6 +349,9 @@ int words_scan(const u16 *t, unsigned n, int kind, WordBlocks *out)
 
 void words_free(WordBlocks *b)
 {
+    free(b->lone);
+    b->lone = NULL;
+    b->nlone = 0;
     free(b->pairs);
     free(b->mids);
     b->pairs = NULL;

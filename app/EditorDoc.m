@@ -455,6 +455,7 @@ static void line_col(NSString *s, unsigned int loc, unsigned int *line, unsigned
     undo_free(undo);
     [ruler release];
     [altRuler release];
+    [statusNote release];
     [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(refreshFoldInfo) object:nil];
     foldlines_free(&foldInfo);
     [folds release];
@@ -716,7 +717,7 @@ static BOOL ident_char(unichar c)
     if ([folds count] > 0) line += [self hiddenLinesBefore:sel.location];
     [status setStringValue:[NSString stringWithFormat:@"Line %u, col %u    %@    %@%@", line, col,
                             mode != nil ? mode : @"Plain Text", eol == 1 ? @"CRLF" : (eol == 2 ? @"CR" : @"LF"),
-                            ([owner respondsToSelector:@selector(macroRecording)] && [owner macroRecording]) ? @"    Learning a macro" : @""]];
+                            ([owner respondsToSelector:@selector(macroRecording)] && [owner macroRecording]) ? @"    Learning a macro" : (statusNote != nil ? [@"    " stringByAppendingString:statusNote] : @"")]];
 }
 
 - (unsigned long)nowMillis
@@ -794,6 +795,8 @@ static BOOL ident_char(unichar c)
     NSRange sel;
 
     if ([notification object] != nil && [notification object] != textView) return;     /* the other pane's own selection */
+    [statusNote release];
+    statusNote = nil;
     sel = [textView selectedRange];
 
     if (sel.length > 0 || sel.location != expectedCaret) undo_break(undo);
@@ -1128,12 +1131,31 @@ static BOOL ident_char(unichar c)
     [self refreshFoldInfo];
 }
 
+/* A problem found: where it is, how long, and what to say about it. */
+typedef struct { unsigned pos, len; int kind; unsigned other; } Unmatched;
+
+static int unmatched_cmp(const void *a, const void *b)
+{
+    unsigned x = ((const Unmatched *)a)->pos, y = ((const Unmatched *)b)->pos;
+
+    return x < y ? -1 : (x > y ? 1 : 0);
+}
+
+#define UM_WORD_OPEN  10
+#define UM_WORD_CLOSE 11
+#define UM_WORD_MID   12
+
 - (int)findUnmatchedBracket
 {
     NSString *s;
-    unsigned int n, pos, opener;
+    unsigned int n, i, nb, total = 0, pick;
     u16 *t;
-    int r;
+    BraceProblem *bp = NULL;
+    Unmatched *all;
+    NSRange cur;
+    NSString *what;
+    const char *m = mode != nil ? [mode cString] : NULL;
+    int wk = lang_word_kind(m);
 
     if (folds != nil && [folds count] > 0) [self expandAllFolds];
     s = [textView string];
@@ -1142,14 +1164,71 @@ static BOOL ident_char(unichar c)
     t = (u16 *)malloc(n * sizeof(u16));
     if (t == NULL) return 0;
     [s getCharacters:t];
-    r = brace_find_unbalanced(t, n, lang_c_like(mode != nil ? [mode cString] : NULL), &pos, &opener);
-    free(t);
-    if (r != 0) {
-        [textView setSelectedRange:NSMakeRange(pos, 1)];
-        [textView scrollRangeToVisible:NSMakeRange(pos, 1)];
-        [window makeFirstResponder:textView];
+    nb = brace_scan_problems(t, n, lang_c_like(m), &bp);
+    all = (Unmatched *)malloc((nb + n / 2 + 1) * sizeof(Unmatched));       /* a word needs two characters at least */
+    if (all == NULL) { free(t); free(bp); return 0; }
+    for (i = 0; i < nb; i++) {
+        all[total].pos = bp[i].pos;
+        all[total].len = 1;
+        all[total].kind = bp[i].kind;
+        all[total].other = bp[i].other;
+        total++;
     }
-    return r;
+    free(bp);
+    if (wk != 0) {
+        WordBlocks wb;
+
+        if (words_scan(t, n, wk, &wb)) {
+            for (i = 0; i < wb.nlone && total < nb + n / 2 + 1; i++) {
+                all[total].pos = wb.lone[i].s;
+                all[total].len = wb.lone[i].e - wb.lone[i].s;
+                all[total].kind = wb.lone[i].type == WORD_LONE_OPEN ? UM_WORD_OPEN
+                                : (wb.lone[i].type == WORD_LONE_CLOSE ? UM_WORD_CLOSE : UM_WORD_MID);
+                all[total].other = 0;
+                total++;
+            }
+            words_free(&wb);
+        }
+    }
+    if (total == 0) { free(all); free(t); return 0; }
+    if (total > 1) qsort(all, total, sizeof(Unmatched), unmatched_cmp);
+
+    cur = [textView selectedRange];
+    pick = total;                                                           /* the first problem after the selection, else wrap */
+    for (i = 0; i < total; i++) {
+        if (cur.length == all[i].len && cur.location == all[i].pos) { pick = i + 1; break; }
+        if (all[i].pos >= cur.location) { pick = i; break; }
+    }
+    if (pick >= total) pick = 0;
+
+    {
+        char word[40];
+        unsigned k, line, col;
+
+        for (k = 0; k < all[pick].len && k < 38; k++) word[k] = (char)(t[all[pick].pos + k] < 128 ? t[all[pick].pos + k] : '?');
+        word[k] = '\0';
+        switch (all[pick].kind) {
+        case BRACE_STRAY:    what = [NSString stringWithFormat:@"'%s' closes nothing", word]; break;
+        case BRACE_MISMATCH:
+            line_col(s, all[pick].other, &line, &col);
+            what = [NSString stringWithFormat:@"'%s' does not fit the bracket opened on line %u", word, line];
+            break;
+        case BRACE_UNCLOSED: what = [NSString stringWithFormat:@"'%s' is never closed", word]; break;
+        case UM_WORD_OPEN:   what = [NSString stringWithFormat:@"'%s' is never closed", word]; break;
+        case UM_WORD_CLOSE:  what = [NSString stringWithFormat:@"'%s' closes nothing", word]; break;
+        default:             what = [NSString stringWithFormat:@"'%s' is outside any block", word]; break;
+        }
+        what = [NSString stringWithFormat:@"Problem %u of %u: %@", pick + 1, total, what];
+    }
+    [textView setSelectedRange:NSMakeRange(all[pick].pos, all[pick].len)];
+    [textView scrollRangeToVisible:NSMakeRange(all[pick].pos, all[pick].len)];
+    [window makeFirstResponder:textView];
+    [statusNote release];
+    statusNote = [what retain];
+    [self updateStatus];
+    free(all);
+    free(t);
+    return (int)total;
 }
 
 - (void)gotoMatchingBracket:(BOOL)select

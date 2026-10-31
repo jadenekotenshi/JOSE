@@ -21,7 +21,15 @@ typedef unsigned short u16;
 typedef struct { unsigned os, oe, cs, ce; } WordPair;        /* the opening and closing words: [os, oe) and [cs, ce) */
 typedef struct { unsigned s, e; unsigned pair; } WordMid;    /* `else` and its like, and the pair that they belong to */
 
+/* A block word with no partner: an opener never closed, a closer with nothing open, or an `else` and its like outside a block. */
+#define WORD_LONE_OPEN  1
+#define WORD_LONE_CLOSE 2
+#define WORD_LONE_MID   3
+typedef struct { unsigned s, e; int type; } WordLone;
+
 typedef struct {
+    WordLone *lone;
+    unsigned nlone;
     WordPair *pairs;
     unsigned npairs;
     WordMid *mids;

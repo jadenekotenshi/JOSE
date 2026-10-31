@@ -67,6 +67,7 @@
     NSScrollView        *altScroll;        /* the pane that is not the active one (nil if not split); textView/scroll/ruler are the active pane */
     EditTextView        *altView;
     LineNumberView      *altRuler;
+    NSString            *statusNote;       /* extra words for the status line until the selection moves */
 }
 - (id)initWithOwner:(id)anOwner;
 - (BOOL)openFile:(NSString *)aPath;        /* NO (and an alert) if it cannot be read */
@@ -91,7 +92,7 @@
 - (void)setLineNumbers:(BOOL)flag;
 - (BOOL)lineNumbers;
 - (void)gotoMatchingBracket:(BOOL)select;   /* the caret to the bracket that goes with the one at/before it, or select up to it */
-- (int)findUnmatchedBracket;                /* selects the first bracket without a partner: BRACE_STRAY / BRACE_MISMATCH / BRACE_UNCLOSED, or 0 if all are paired */
+- (int)findUnmatchedBracket;                /* selects the next bracket or block word without a partner (after the selection, wrapping round); returns how many such there are, 0 if all are paired */
 - (void)setAutoIndent:(BOOL)flag;
 - (BOOL)autoIndent;
 - (void)setUseSpaces:(BOOL)flag;
