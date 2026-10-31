@@ -141,15 +141,23 @@
     [NSApp setMainMenu:main];
 }
 
-- (EditorDoc *)frontDocument
+/* The document being worked on: the key window's, or, when a panel (Find) is the key window, the main window's. */
+- (EditorDoc *)documentForWindow:(NSWindow *)w
 {
-    NSWindow *w = [NSApp keyWindow];
     unsigned int i;
 
-    if (w == nil) w = [NSApp mainWindow];
+    if (w == nil) return nil;
     for (i = 0; i < [docs count]; i++)
         if ([[docs objectAtIndex:i] window] == w) return [docs objectAtIndex:i];
     return nil;
+}
+
+- (EditorDoc *)frontDocument
+{
+    EditorDoc *d = [self documentForWindow:[NSApp keyWindow]];
+
+    if (d == nil) d = [self documentForWindow:[NSApp mainWindow]];
+    return d;
 }
 
 - (BOOL)validateMenuItem:(id)item

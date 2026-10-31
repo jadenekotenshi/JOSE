@@ -177,7 +177,7 @@ static u16 *units_of(NSString *s, unsigned int *n)
     SearchMatch m;
     BOOL found;
 
-    if (d == nil) return NO;
+    if (d == nil) { SSTrace("find: no front document"); [self say:@"No document to search."]; return NO; }
     s = [self compiledSearch];
     if (s == NULL) return NO;
     text = units_of([[d textView] string], &n);
