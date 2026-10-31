@@ -138,16 +138,22 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
     unsigned int i;
 
     if (recentMenu == nil) return;
-    while ([recentMenu numberOfItems] > 0) [recentMenu removeItemAtIndex:0];
-    for (i = 0; i < [recentFiles count]; i++) {
-        NSString *p = [recentFiles objectAtIndex:i];
-        NSString *title = [NSString stringWithFormat:@"%@  (%@)", [p lastPathComponent],
-                           [[p stringByDeletingLastPathComponent] stringByAbbreviatingWithTildeInPath]];
-        [[self addItem:title action:@selector(openRecent:) key:@"" target:self toMenu:recentMenu] setTag:(int)i];
-    }
-    if ([recentFiles count] > 0) [self addItem:@"Clear Menu" action:@selector(clearRecent:) key:@"" target:self toMenu:recentMenu];
-    else [[self addItem:@"(none)" action:NULL key:@"" target:self toMenu:recentMenu] setEnabled:NO];
-    if ([recentMenu respondsToSelector:@selector(sizeToFit)]) [recentMenu sizeToFit];
+    NS_DURING
+        /* OPENSTEP 4.2's NSMenu has itemArray and removeItem: but no numberOfItems or removeItemAtIndex: */
+        NSArray *old = [NSArray arrayWithArray:[recentMenu itemArray]];
+        for (i = 0; i < [old count]; i++) [recentMenu removeItem:[old objectAtIndex:i]];
+        for (i = 0; i < [recentFiles count]; i++) {
+            NSString *p = [recentFiles objectAtIndex:i];
+            NSString *title = [NSString stringWithFormat:@"%@  (%@)", [p lastPathComponent],
+                               [[p stringByDeletingLastPathComponent] stringByAbbreviatingWithTildeInPath]];
+            [[self addItem:title action:@selector(openRecent:) key:@"" target:self toMenu:recentMenu] setTag:(int)i];
+        }
+        if ([recentFiles count] > 0) [self addItem:@"Clear Menu" action:@selector(clearRecent:) key:@"" target:self toMenu:recentMenu];
+        else [[self addItem:@"(none)" action:NULL key:@"" target:self toMenu:recentMenu] setEnabled:NO];
+        if ([recentMenu respondsToSelector:@selector(sizeToFit)]) [recentMenu sizeToFit];
+    NS_HANDLER
+        SSTrace("Open Recent menu: %s -- %s", SSCS([localException name]), SSCS([localException reason]));
+    NS_ENDHANDLER
 }
 
 - (void)noteRecentFile:(NSString *)path
