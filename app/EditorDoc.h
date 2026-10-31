@@ -107,6 +107,11 @@
 - (NSString *)expandedString:(NSString *)s;   /* s with every fold marker replaced by the code it hides */
 - (BOOL)copyExpandedSelectionAndCut:(BOOL)cut;   /* a selection that holds markers goes to the pasteboard with the code; NO if it holds none */
 - (void)mouseSelectionDone;                /* a click ended: a marker that was clicked on opens */
+- (NSString *)wordAtCaret;                  /* the identifier the insertion point is in or next to, or nil */
+- (NSString *)wordBeforeParenAt:(unsigned int *)at;   /* the name before a `(` just before the insertion point (*at: that paren); else nil, and *at the caret */
+- (NSRect)screenRectForCharAt:(unsigned int)idx;      /* where a character is, in screen coordinates */
+- (void)revealLine:(int)line pattern:(NSString *)pattern name:(NSString *)name;   /* select a definition: the line with this text, else this line number */
+- (void)didTypeOpenParen;                  /* a `(` was typed: perhaps show a call tip */
 - (NSString *)lineAtCaret;                  /* the text of the line with the insertion point (no newline) */
 - (NSString *)selectedString;              /* the selected text, or nil */
 - (void)applyAppearance;                   /* the font or colours changed */

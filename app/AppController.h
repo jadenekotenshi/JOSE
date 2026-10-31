@@ -4,6 +4,7 @@
 @class FindController;
 @class ShellController;
 @class PrefsController;
+@class TagsController;
 
 /* Owns every open document and the menus. */
 @interface AppController : NSObject
@@ -16,6 +17,7 @@
     FindController *finder;
     ShellController *shell;
     PrefsController *prefs;
+    TagsController *tags;
     NSMutableArray *recentFiles;        /* paths, most recent first */
     NSMenu         *recentMenu;         /* File > Open Recent */
     int             prefFillWidth;      /* the right margin of Fill Paragraph */
@@ -37,6 +39,8 @@
 - (void)documentDidClose:(EditorDoc *)doc;
 - (NSString *)syntaxDirectory;
 - (void)noteRecentFile:(NSString *)path;  /* a file was opened or saved: it goes to the top of Open Recent */
+- (void)hideCallTip;                    /* the call tip, if one is showing, goes away */
+- (void)showCallTipAfterParenIn:(EditorDoc *)doc;
 - (void)appearanceChanged;              /* the font or colours changed: every window shows them */
 - (NSArray *)modeNames;                 /* the language modes available (sorted) */
 @end

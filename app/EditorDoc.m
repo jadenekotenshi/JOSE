@@ -46,6 +46,7 @@
     if (rectOn && [str isKindOfClass:[NSString class]]) { [(EditorDoc *)editor rectType:str]; return; }
     if ([str isKindOfClass:[NSString class]]) [(EditorDoc *)editor willInsertText:str];
     [super insertText:str];
+    if ([str isKindOfClass:[NSString class]] && [str isEqualToString:@"("]) [(EditorDoc *)editor didTypeOpenParen];
 }
 
 /* ---- rectangular selection: Option-drag; everything is done in columns of a fixed-pitch font ---- */
@@ -396,6 +397,113 @@ static void line_col(NSString *s, unsigned int loc, unsigned int *line, unsigned
     [scroll setBackgroundColor:[Appearance backgroundColor]];
 }
 
+static BOOL ident_char(unichar c)
+{
+    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_';
+}
+
+- (NSString *)wordAtCaret
+{
+    NSString *s = [textView string];
+    unsigned int n = [s length], a = [textView selectedRange].location, b;
+
+    if (a > n) a = n;
+    b = a;
+    while (a > 0 && ident_char([s characterAtIndex:a - 1])) a--;
+    while (b < n && ident_char([s characterAtIndex:b])) b++;
+    return b > a ? [s substringWithRange:NSMakeRange(a, b - a)] : nil;
+}
+
+- (NSString *)wordBeforeParenAt:(unsigned int *)at
+{
+    NSString *s = [textView string];
+    unsigned int caret = [textView selectedRange].location, a, b;
+
+    *at = caret;
+    if (caret == 0 || caret > [s length] || [s characterAtIndex:caret - 1] != '(') return nil;
+    *at = caret - 1;
+    b = caret - 1;
+    while (b > 0 && [s characterAtIndex:b - 1] == ' ') b--;
+    a = b;
+    while (a > 0 && ident_char([s characterAtIndex:a - 1])) a--;
+    return b > a ? [s substringWithRange:NSMakeRange(a, b - a)] : nil;
+}
+
+- (void)didTypeOpenParen
+{
+    if ([owner respondsToSelector:@selector(showCallTipAfterParenIn:)]) [owner showCallTipAfterParenIn:self];
+}
+
+- (NSRect)screenRectForCharAt:(unsigned int)idx
+{
+    NSLayoutManager *lm = [textView layoutManager];
+    NSPoint o = [textView textContainerOrigin];
+    NSRect r;
+    unsigned int g = [lm numberOfGlyphs];
+
+    if (g == 0) idx = 0;
+    else if (idx >= g) idx = g - 1;
+    if ([lm respondsToSelector:@selector(boundingRectForGlyphRange:inTextContainer:)])
+        r = [lm boundingRectForGlyphRange:NSMakeRange(idx, g == 0 ? 0 : 1) inTextContainer:[textView textContainer]];
+    else
+        r = [lm lineFragmentRectForGlyphAtIndex:idx effectiveRange:NULL];
+    r.origin.x += o.x;
+    r.origin.y += o.y;
+    r = [textView convertRect:r toView:nil];
+    r.origin = [window convertBaseToScreen:r.origin];
+    return r;
+}
+
+/* Selects a definition: the line whose text is `pattern` (a ctags search pattern), else line number `line`; `name` is selected in it. */
+- (void)revealLine:(int)line pattern:(NSString *)pattern name:(NSString *)name
+{
+    NSString *s;
+    unsigned int n, pos = 0;
+    NSRange found = NSMakeRange(NSNotFound, 0), lr;
+
+    [self expandAllFolds];
+    s = [textView string];
+    n = [s length];
+    if (pattern != nil && [pattern length] > 0) {
+        while (pos < n) {
+            NSRange r = [s rangeOfString:pattern options:0 range:NSMakeRange(pos, n - pos)];
+            unsigned int e;
+
+            if (r.length == 0) break;
+            e = NSMaxRange(r);
+            while (e < n && ([s characterAtIndex:e] == ' ' || [s characterAtIndex:e] == '\t' || [s characterAtIndex:e] == '\r')) e++;
+            if ((r.location == 0 || [s characterAtIndex:r.location - 1] == '\n') && (e >= n || [s characterAtIndex:e] == '\n')) {
+                found = [s lineRangeForRange:NSMakeRange(r.location, 0)];
+                break;
+            }
+            pos = r.location + 1;
+        }
+    }
+    if (found.location == NSNotFound && line > 0) {
+        int l = 1;
+
+        pos = 0;
+        while (l < line && pos < n) {
+            lr = [s lineRangeForRange:NSMakeRange(pos, 0)];
+            if (NSMaxRange(lr) <= pos) break;
+            pos = NSMaxRange(lr);
+            l++;
+        }
+        found = [s lineRangeForRange:NSMakeRange(pos < n ? pos : n, 0)];
+    }
+    if (found.location == NSNotFound) { NSBeep(); return; }
+    if (found.length > 0 && [s characterAtIndex:NSMaxRange(found) - 1] == '\n') found.length--;
+    {
+        NSRange hit = name != nil ? [s rangeOfString:name options:0 range:found] : NSMakeRange(NSNotFound, 0);
+        NSRange sel = hit.length > 0 ? hit : NSMakeRange(found.location, 0);
+
+        [textView setSelectedRange:sel];
+        [textView scrollRangeToVisible:sel];
+    }
+    [self showWindow];
+    [window makeFirstResponder:textView];
+}
+
 - (NSString *)lineAtCaret
 {
     NSString *s = [textView string];
@@ -530,6 +638,7 @@ static void line_col(NSString *s, unsigned int loc, unsigned int *line, unsigned
 
     if (sel.length > 0 || sel.location != expectedCaret) undo_break(undo);
     [textView rectSelectionMoved];
+    if ([owner respondsToSelector:@selector(hideCallTip)]) [owner hideCallTip];
     [self checkFoldSelection];
     prevSel = [textView selectedRange];
     [self updateStatus];

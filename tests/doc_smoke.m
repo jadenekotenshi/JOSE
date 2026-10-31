@@ -330,6 +330,29 @@ int main(void)
         [ad applyAppearance];
         CHECK([[tv backgroundColor] isEqual:[NSColor whiteColor]] || [[tv backgroundColor] isEqual:[Appearance backgroundColor]]);
     }
+    {   /* tags: reveal a definition by its line text, else by line number; the word before a typed paren */
+        EditorDoc *td = [[[EditorDoc alloc] initWithOwner:nil] autorelease];
+        EditTextView *tv = [td textView];
+        NSString *src = @"int helper(int a)\n{\n  return a;\n}\n\nint main(void)\n{\n  return helper(1);\n}\n";
+        unsigned int at;
+        NSString *w;
+        [tv setString:src];
+        [td revealLine:0 pattern:@"int main(void)" name:@"main"];
+        CHECK([tv selectedRange].location == [src rangeOfString:@"main"].location && [tv selectedRange].length == 4);
+        [td revealLine:0 pattern:@"helper(1);" name:@"helper"];                        /* only whole lines count: not found */
+        CHECK(YES);
+        [td revealLine:1 pattern:nil name:@"helper"];
+        CHECK([tv selectedRange].location == [src rangeOfString:@"helper"].location);
+        [td revealLine:6 pattern:@"no such line" name:@"main"];                        /* the pattern fails: the line number is used */
+        CHECK([tv selectedRange].location == [src rangeOfString:@"main"].location && [tv selectedRange].length == 4);
+        [tv setSelectedRange:NSMakeRange([src rangeOfString:@"helper(1"].location + 3, 0)];
+        CHECK([[td wordAtCaret] isEqualToString:@"helper"]);
+        [tv setSelectedRange:NSMakeRange([src rangeOfString:@"(1);"].location + 1, 0)];       /* just after the paren */
+        w = [td wordBeforeParenAt:&at];
+        CHECK([w isEqualToString:@"helper"] && at == [src rangeOfString:@"(1);"].location);
+        [tv setSelectedRange:NSMakeRange(2, 0)];
+        CHECK([td wordBeforeParenAt:&at] == nil && at == 2);
+    }
     {   /* Shell > Filter Selection: the selection goes through a command and comes back, as one undo step */
         EditorDoc *sd = [[[EditorDoc alloc] initWithOwner:nil] autorelease];
         NSTextView *tv = [sd textView];

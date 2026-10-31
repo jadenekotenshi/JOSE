@@ -3,6 +3,7 @@
 #import "FindController.h"
 #import "ShellController.h"
 #import "PrefsController.h"
+#import "TagsController.h"
 #import "Appearance.h"
 #import "UIHelpers.h"
 #import "HKSyntaxDefinition.h"
@@ -263,6 +264,10 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
     [self addItem:@"Go to Matching Bracket" action:@selector(gotoBracket:) key:@"b" target:self toMenu:m];
     [self addItem:@"Select to Matching Bracket" action:@selector(selectBracket:) key:@"B" target:self toMenu:m];
     [self addItem:@"Go to Line..." action:@selector(gotoLine:) key:@"l" target:self toMenu:m];
+    [self addItem:@"Find Definition" action:@selector(findDefinition:) key:@"t" target:self toMenu:m];
+    [self addItem:@"Return from Definition" action:@selector(returnFromDefinition:) key:@"T" target:self toMenu:m];
+    [self addItem:@"Show Call Tip" action:@selector(showCallTip:) key:@"9" target:self toMenu:m];
+    [self addItem:@"Load Tags File..." action:@selector(loadTags:) key:@"" target:self toMenu:m];
 
     m = [self submenuNamed:@"Preferences" inMenu:main];
     [self addItem:@"Preferences Panel..." action:@selector(showPrefs:) key:@"," target:self toMenu:m];
@@ -340,7 +345,7 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
     SEL a = [item action];
     int tag = [item tag];
 
-    if (a == @selector(saveDoc:) || a == @selector(openIncluded:) || a == @selector(saveDocAs:) || a == @selector(closeDoc:) || a == @selector(gotoLine:) || a == @selector(showFind:) || a == @selector(findAgain:)
+    if (a == @selector(saveDoc:) || a == @selector(openIncluded:) || a == @selector(findDefinition:) || a == @selector(returnFromDefinition:) || a == @selector(showCallTip:) || a == @selector(saveDocAs:) || a == @selector(closeDoc:) || a == @selector(gotoLine:) || a == @selector(showFind:) || a == @selector(findAgain:)
         || a == @selector(findPrevious:) || a == @selector(findSelection:)
         || a == @selector(toggleWrap:) || a == @selector(setMode:)
         || a == @selector(gotoBracket:) || a == @selector(selectBracket:) || a == @selector(shiftLeft:) || a == @selector(shiftRight:) || a == @selector(commentLines:) || a == @selector(uncommentLines:)
@@ -401,6 +406,7 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
 - (void)documentDidClose:(EditorDoc *)doc
 {
     [[doc retain] autorelease];                                  /* the window is still telling us it is closing */
+    [self hideCallTip];
     [docs removeObject:doc];
 }
 
@@ -597,6 +603,21 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
     }
     [self openPath:found];
 }
+
+/* ---- tags ---- */
+
+- (TagsController *)tagsController
+{
+    if (tags == nil) tags = [[TagsController alloc] initWithOwner:self];
+    return tags;
+}
+
+- (void)findDefinition:(id)sender { [[self tagsController] findDefinition]; }
+- (void)returnFromDefinition:(id)sender { [[self tagsController] returnFromDefinition]; }
+- (void)showCallTip:(id)sender { [[self tagsController] showCallTip]; }
+- (void)loadTags:(id)sender { [[self tagsController] loadTagsFile]; }
+- (void)hideCallTip { if (tags != nil) [tags hideCallTip]; }
+- (void)showCallTipAfterParenIn:(EditorDoc *)doc { [[self tagsController] showCallTipAfterParenIn:doc]; }
 
 - (void)showPrefs:(id)sender
 {
