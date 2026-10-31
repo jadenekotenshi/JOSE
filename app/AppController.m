@@ -11,6 +11,27 @@
 - (void)savePreferences;
 - (void)applyIndentPrefsTo:(EditorDoc *)d;
 - (void)applyIndentPrefs;
+- (id)addItem:(NSString *)title action:(SEL)action key:(NSString *)key target:(id)target toMenu:(NSMenu *)menu;
+- (NSMenu *)keepMenu:(NSMenu *)menu;
+- (NSMenu *)submenuNamed:(NSString *)title inMenu:(NSMenu *)parent;
+@end
+
+@implementation AppController
+
+- (id)init
+{
+    self = [super init];
+    if (self) {
+        docs = [[NSMutableArray alloc] init];
+        [self loadPreferences];
+        menuKeepers = [[NSMutableArray alloc] init];
+        syntaxDir = [[[NSBundle mainBundle] bundlePath] stringByAppendingPathComponent:@"syntax"];
+        [syntaxDir retain];
+        [HKSyntaxDefinition setSyntaxDirectory:syntaxDir];
+    }
+    return self;
+}
+
 /* ---- saved preferences (NSUserDefaults, as strings: the one form every release of it reads back alike) ---- */
 
 static BOOL pref_bool(NSUserDefaults *ud, NSString *key, BOOL def)
@@ -48,27 +69,6 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
     set_pref_bool(ud, @"WrapLines", prefWrap);
     set_pref_bool(ud, @"LineNumbers", prefLineNumbers);
     [ud synchronize];
-}
-
-- (id)addItem:(NSString *)title action:(SEL)action key:(NSString *)key target:(id)target toMenu:(NSMenu *)menu;
-- (NSMenu *)keepMenu:(NSMenu *)menu;
-- (NSMenu *)submenuNamed:(NSString *)title inMenu:(NSMenu *)parent;
-@end
-
-@implementation AppController
-
-- (id)init
-{
-    self = [super init];
-    if (self) {
-        docs = [[NSMutableArray alloc] init];
-        [self loadPreferences];
-        menuKeepers = [[NSMutableArray alloc] init];
-        syntaxDir = [[[NSBundle mainBundle] bundlePath] stringByAppendingPathComponent:@"syntax"];
-        [syntaxDir retain];
-        [HKSyntaxDefinition setSyntaxDirectory:syntaxDir];
-    }
-    return self;
 }
 
 - (id)addItem:(NSString *)title action:(SEL)action key:(NSString *)key
