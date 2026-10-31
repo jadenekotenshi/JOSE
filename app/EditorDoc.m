@@ -896,6 +896,7 @@ static BOOL ident_char(unichar c)
     firstLine = [text substringWithRange:r];
     m = lang_mode_for(UI_CPATH(path), UI_CPATH(firstLine));
     [self setMode:m != NULL ? [NSString stringWithCString:m] : nil];
+    if ([owner respondsToSelector:@selector(applyModePrefsTo:)]) [owner applyModePrefsTo:self];
     [self updateTitle];
     [self updateStatus];
     return YES;
@@ -946,7 +947,10 @@ static BOOL ident_char(unichar c)
     dirty = NO;
     if (mode == nil) {
         const char *m = lang_mode_for(UI_CPATH(path), NULL);
-        if (m != NULL) [self setMode:[NSString stringWithCString:m]];
+        if (m != NULL) {
+            [self setMode:[NSString stringWithCString:m]];
+            if ([owner respondsToSelector:@selector(applyModePrefsTo:)]) [owner applyModePrefsTo:self];
+        }
     }
     [self updateTitle];
     return YES;

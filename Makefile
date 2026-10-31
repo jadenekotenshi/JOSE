@@ -6,7 +6,7 @@ OBJCFLAGS = -x objective-c -fno-objc-arc -w -g -Ihk -Icore -Iapp
 CFLAGS  = -std=c89 -pedantic -Wall -Wextra -Wdeclaration-after-statement \
           -Wno-long-long -Wno-unused-parameter -O2 -g -Icore
 
-test: $(BUILD)/test_core $(BUILD)/test_search $(BUILD)/test_edit $(BUILD)/test_brace $(BUILD)/test_fill $(BUILD)/test_shell $(BUILD)/test_fold $(BUILD)/test_words $(BUILD)/test_includes $(BUILD)/test_tags $(BUILD)/test_foldlines $(BUILD)/test_macro
+test: $(BUILD)/test_core $(BUILD)/test_search $(BUILD)/test_edit $(BUILD)/test_brace $(BUILD)/test_fill $(BUILD)/test_shell $(BUILD)/test_fold $(BUILD)/test_words $(BUILD)/test_includes $(BUILD)/test_tags $(BUILD)/test_foldlines $(BUILD)/test_macro $(BUILD)/test_modeprefs
 	$(BUILD)/test_core
 	$(BUILD)/test_search
 	$(BUILD)/test_edit
@@ -17,6 +17,7 @@ test: $(BUILD)/test_core $(BUILD)/test_search $(BUILD)/test_edit $(BUILD)/test_b
 	$(BUILD)/test_words
 	$(BUILD)/test_includes
 	$(BUILD)/test_tags
+	$(BUILD)/test_modeprefs
 	$(BUILD)/test_foldlines
 	$(BUILD)/test_macro
 
@@ -35,6 +36,10 @@ $(BUILD)/test_words: tests/test_words.c tests/test.h core/words.c core/words.h c
 $(BUILD)/test_includes: tests/test_includes.c tests/test.h core/includes.c core/includes.h
 	mkdir -p $(BUILD)
 	$(CC) $(CFLAGS) tests/test_includes.c core/includes.c -o $@
+
+$(BUILD)/test_modeprefs: tests/test_modeprefs.c tests/test.h core/modeprefs.c core/modeprefs.h
+	mkdir -p $(BUILD)
+	$(CC) $(CFLAGS) tests/test_modeprefs.c core/modeprefs.c -o $@
 
 $(BUILD)/test_tags: tests/test_tags.c tests/test.h core/tags.c core/tags.h
 	mkdir -p $(BUILD)

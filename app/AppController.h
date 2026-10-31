@@ -1,4 +1,5 @@
 #import "Compat.h"
+#include "modeprefs.h"
 
 @class EditorDoc;
 @class FindController;
@@ -32,6 +33,7 @@
     int             prefIndentWidth;
     BOOL            prefWrap;           /* the setting new windows start with */
     BOOL            prefLineNumbers;
+    ModePrefs       modePrefs;          /* what each language mode overrides */
     BOOL            launched;
     NSMutableArray *startupFiles;      /* named on the command line; opened once the event loop runs */
 }
@@ -45,6 +47,10 @@
 - (void)documentDidClose:(EditorDoc *)doc;
 - (NSString *)syntaxDirectory;
 - (void)noteRecentFile:(NSString *)path;  /* a file was opened or saved: it goes to the top of Open Recent */
+- (NSArray *)modeNames;                 /* the syntax files' base names, sorted */
+- (int)modeSetting:(int)which forMode:(NSString *)name;   /* MP_UNSET if the mode leaves it to the Preferences menu */
+- (void)setModeSetting:(int)which value:(int)value forMode:(NSString *)name;   /* saved, and applied to the windows in that mode */
+- (void)applyModePrefsTo:(EditorDoc *)d;   /* a document's mode was chosen: its settings, else the general ones */
 - (FindController *)finder;
 - (ShellController *)shellController;
 - (BOOL)macroRecording;                 /* a macro is being learned */

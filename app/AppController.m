@@ -75,6 +75,8 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
     prefFillWidth = w != nil ? [w intValue] : 72;
     if (prefFillWidth < 20 || prefFillWidth > 200) prefFillWidth = 72;
     [Appearance loadSettings];
+    w = [ud stringForKey:@"ModePrefs"];
+    modeprefs_parse(&modePrefs, w != nil ? UI_CPATH(w) : "");
 }
 
 - (void)savePreferences
@@ -87,6 +89,12 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
     set_pref_bool(ud, @"WrapLines", prefWrap);
     set_pref_bool(ud, @"LineNumbers", prefLineNumbers);
     [ud setObject:[NSString stringWithFormat:@"%d", prefFillWidth] forKey:@"FillWidth"];
+    {
+        char buf[MP_MAX_MODES * 160];
+
+        modeprefs_format(&modePrefs, buf, sizeof buf);
+        [ud setObject:[NSString stringWithCString:buf] forKey:@"ModePrefs"];
+    }
     [ud synchronize];
 }
 
@@ -478,15 +486,55 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
 
     if (d == nil) return;
     [d setMode:(tag == TAG_MODE_BASE - 1) ? nil : [sender title]];
+    [self applyModePrefsTo:d];
+}
+
+/* The value of a setting for a document: what its language mode overrides, else the general preference. */
+- (int)effectiveSetting:(int)which for:(EditorDoc *)d
+{
+    int v = [d mode] != nil ? modeprefs_get(&modePrefs, UI_CPATH([d mode]), which) : MP_UNSET;
+
+    if (v != MP_UNSET) return v;
+    switch (which) {
+    case MP_INDENT: return prefIndentWidth;
+    case MP_SPACES: return prefUseSpaces;
+    case MP_AUTO:   return prefAutoIndent;
+    default:        return prefWrap;
+    }
 }
 
 /* Pushes the indentation settings to a document. */
 - (void)applyIndentPrefsTo:(EditorDoc *)d
 {
     if ([d lineNumbers] != prefLineNumbers) [d setLineNumbers:prefLineNumbers];
-    [d setAutoIndent:prefAutoIndent];
-    [d setUseSpaces:prefUseSpaces];
-    [d setIndentWidth:prefIndentWidth];
+    [d setAutoIndent:[self effectiveSetting:MP_AUTO for:d]];
+    [d setUseSpaces:[self effectiveSetting:MP_SPACES for:d]];
+    [d setIndentWidth:[self effectiveSetting:MP_INDENT for:d]];
+}
+
+/* The document's language mode was chosen (a file was opened or saved with a name, or Language Mode was used). */
+- (void)applyModePrefsTo:(EditorDoc *)d
+{
+    [self applyIndentPrefsTo:d];
+    if ([d wrap] != (BOOL)[self effectiveSetting:MP_WRAP for:d]) [d setWrap:[self effectiveSetting:MP_WRAP for:d]];
+}
+
+- (int)modeSetting:(int)which forMode:(NSString *)name
+{
+    return modeprefs_get(&modePrefs, UI_CPATH(name), which);
+}
+
+- (void)setModeSetting:(int)which value:(int)value forMode:(NSString *)name
+{
+    unsigned int i;
+
+    if (modeprefs_set(&modePrefs, UI_CPATH(name), which, value) != 0) return;
+    [self savePreferences];
+    for (i = 0; i < [docs count]; i++) {
+        EditorDoc *d = [docs objectAtIndex:i];
+
+        if ([d mode] != nil && [[d mode] isEqualToString:name]) [self applyModePrefsTo:d];
+    }
 }
 
 - (void)applyIndentPrefs

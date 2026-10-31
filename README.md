@@ -48,6 +48,10 @@ Status: **prototype (0.0.1)** -- nothing here has been run on OPENSTEP yet.
 * **Preferences panel** (Preferences > Preferences Panel..., cmd-,): Light or Dark colours (light text on a dark background, with the
   syntax colours lightened to match), the background and text colours, the font and size (any fixed-pitch font installed), the
   include path, call tips and the fold margin.  Changes show in every window at once and are saved.
+* **Per-mode preferences** (Preferences > Preferences Panel > Language Modes...): each language mode may override the indent width,
+  spaces for indentation, auto indent and line wrapping; a setting left at "Same as general" follows the Preferences menu.  The
+  overrides apply when a file is opened or saved under a name, or the mode is chosen by hand, and at once to windows already in
+  that mode.  (They win over the menu: the menu items change the general setting.)  Saved as `ModePrefs`, one line per mode.
 * **Fold margin**: a `-` beside every line where a block begins and a `+` beside every folded one, next to the line numbers (or
   alone, if they are off).  Click it to fold or unfold.  It is rescanned shortly after you stop typing, and left empty for files of
   more than three million characters.

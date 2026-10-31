@@ -14,8 +14,15 @@
     NSTextField     *pathField;
     NSButton        *tipsSwitch;
     NSButton        *marginSwitch;
+    NSPanel         *modePanel;           /* Language Modes...: what each mode overrides */
+    NSPopUpButton   *modePopup;
+    NSPopUpButton   *modeIndentPopup;
+    NSPopUpButton   *modeSpacesPopup;
+    NSPopUpButton   *modeAutoPopup;
+    NSPopUpButton   *modeWrapPopup;
     NSArray         *fixedFonts;          /* the names of the fixed-pitch fonts, found the first time the panel opens */
 }
 - (id)initWithOwner:(id)anOwner;
 - (void)showPanel;
+- (void)showModePanel;                 /* the settings each language mode overrides */
 @end

@@ -1,4 +1,6 @@
 #import "PrefsController.h"
+#import "AppController.h"
+#include "modeprefs.h"
 #import "Appearance.h"
 #import "UIHelpers.h"
 
@@ -19,6 +21,12 @@ static const int font_sizes[] = { 8, 9, 10, 11, 12, 13, 14, 16, 18, 20, 24 };
 - (void)tipsChanged:(id)sender;
 - (void)marginChanged:(id)sender;
 - (void)closePanel:(id)sender;
+- (void)showModes:(id)sender;
+- (void)buildModePanel;
+- (void)syncModeControls;
+- (void)modeSelected:(id)sender;
+- (void)modeSettingChanged:(id)sender;
+- (void)closeModePanel:(id)sender;
 @end
 
 @implementation PrefsController
@@ -119,6 +127,7 @@ static const int font_sizes[] = { 8, 9, 10, 11, 12, 13, 14, 16, 18, 20, 24 };
     [marginSwitch setAction:@selector(marginChanged:)];
     [cv addSubview:marginSwitch];
 
+    [cv addSubview:ui_button(@"Language Modes...", NSMakeRect(16, 8, 140, 28), self, @selector(showModes:))];
     [cv addSubview:ui_button(@"Close", NSMakeRect(354, 8, 70, 28), self, @selector(closePanel:))];
     [panel center];
 }
@@ -212,6 +221,123 @@ static const int font_sizes[] = { 8, 9, 10, 11, 12, 13, 14, 16, 18, 20, 24 };
 {
     [self pathChanged:nil];                 /* a path typed without pressing Return still counts */
     [panel orderOut:nil];
+}
+
+/* ---- the Language Modes panel ---- */
+
+#define SAME_ITEM @"Same as general"
+static const int mode_widths[] = { 2, 3, 4, 5, 6, 8 };
+#define N_MODE_WIDTHS 6
+
+static NSPopUpButton *tri_popup(NSRect r, id target, SEL action, BOOL widths)
+{
+    NSPopUpButton *p = [[[NSPopUpButton alloc] initWithFrame:r pullsDown:NO] autorelease];
+    int i;
+
+    [p addItemWithTitle:SAME_ITEM];
+    if (widths) {
+        for (i = 0; i < N_MODE_WIDTHS; i++) [p addItemWithTitle:[NSString stringWithFormat:@"%d", mode_widths[i]]];
+    } else {
+        [p addItemWithTitle:@"On"];
+        [p addItemWithTitle:@"Off"];
+    }
+    [p setTarget:target];
+    [p setAction:action];
+    return p;
+}
+
+- (void)buildModePanel
+{
+    NSView *cv;
+    NSArray *names = [owner modeNames];
+    unsigned int i;
+
+    modePanel = [[NSPanel alloc] initWithContentRect:NSMakeRect(0, 0, 360, 248)
+                                           styleMask:(NSTitledWindowMask | NSClosableWindowMask)
+                                             backing:NSBackingStoreBuffered defer:NO];
+    [modePanel setTitle:@"Language Modes"];
+    [modePanel setReleasedWhenClosed:NO];
+    cv = [modePanel contentView];
+    [cv addSubview:ui_label(@"Mode:", NSMakeRect(16, 212, 90, 18))];
+    modePopup = [[[NSPopUpButton alloc] initWithFrame:NSMakeRect(140, 208, 204, 24) pullsDown:NO] autorelease];
+    for (i = 0; i < [names count]; i++) [modePopup addItemWithTitle:[names objectAtIndex:i]];
+    [modePopup setTarget:self];
+    [modePopup setAction:@selector(modeSelected:)];
+    [cv addSubview:modePopup];
+    [cv addSubview:ui_label(@"Indent width:", NSMakeRect(16, 176, 110, 18))];
+    modeIndentPopup = tri_popup(NSMakeRect(140, 172, 204, 24), self, @selector(modeSettingChanged:), YES);
+    [cv addSubview:modeIndentPopup];
+    [cv addSubview:ui_label(@"Use spaces:", NSMakeRect(16, 142, 110, 18))];
+    modeSpacesPopup = tri_popup(NSMakeRect(140, 138, 204, 24), self, @selector(modeSettingChanged:), NO);
+    [cv addSubview:modeSpacesPopup];
+    [cv addSubview:ui_label(@"Auto indent:", NSMakeRect(16, 108, 110, 18))];
+    modeAutoPopup = tri_popup(NSMakeRect(140, 104, 204, 24), self, @selector(modeSettingChanged:), NO);
+    [cv addSubview:modeAutoPopup];
+    [cv addSubview:ui_label(@"Wrap lines:", NSMakeRect(16, 74, 110, 18))];
+    modeWrapPopup = tri_popup(NSMakeRect(140, 70, 204, 24), self, @selector(modeSettingChanged:), NO);
+    [cv addSubview:modeWrapPopup];
+    [cv addSubview:ui_wrapping_label(@"A setting left at \"Same as general\" follows the Preferences menu. Windows in the mode change at once.",
+                                     NSMakeRect(16, 36, 328, 30), NO)];
+    [cv addSubview:ui_button(@"Close", NSMakeRect(274, 4, 70, 28), self, @selector(closeModePanel:))];
+    [modePanel center];
+}
+
+/* Shows what the chosen mode overrides. */
+- (void)syncModeControls
+{
+    NSString *m = [modePopup titleOfSelectedItem];
+    int w = [owner modeSetting:MP_INDENT forMode:m], v;
+
+    if (w == MP_UNSET) [modeIndentPopup selectItemWithTitle:SAME_ITEM];
+    else [modeIndentPopup selectItemWithTitle:[NSString stringWithFormat:@"%d", w]];
+    v = [owner modeSetting:MP_SPACES forMode:m];
+    [modeSpacesPopup selectItemWithTitle:v == MP_UNSET ? SAME_ITEM : (v ? @"On" : @"Off")];
+    v = [owner modeSetting:MP_AUTO forMode:m];
+    [modeAutoPopup selectItemWithTitle:v == MP_UNSET ? SAME_ITEM : (v ? @"On" : @"Off")];
+    v = [owner modeSetting:MP_WRAP forMode:m];
+    [modeWrapPopup selectItemWithTitle:v == MP_UNSET ? SAME_ITEM : (v ? @"On" : @"Off")];
+}
+
+- (void)showModePanel
+{
+    if (modePanel == nil) [self buildModePanel];
+    [self syncModeControls];
+    [modePanel makeKeyAndOrderFront:nil];
+}
+
+- (void)showModes:(id)sender
+{
+    [self showModePanel];
+}
+
+- (void)modeSelected:(id)sender
+{
+    [self syncModeControls];
+}
+
+static int popup_flag(NSPopUpButton *p)
+{
+    NSString *t = [p titleOfSelectedItem];
+
+    if ([t isEqualToString:@"On"]) return 1;
+    if ([t isEqualToString:@"Off"]) return 0;
+    return MP_UNSET;
+}
+
+- (void)modeSettingChanged:(id)sender
+{
+    NSString *m = [modePopup titleOfSelectedItem];
+    NSString *w = [modeIndentPopup titleOfSelectedItem];
+
+    [owner setModeSetting:MP_INDENT value:[w isEqualToString:SAME_ITEM] ? MP_UNSET : [w intValue] forMode:m];
+    [owner setModeSetting:MP_SPACES value:popup_flag(modeSpacesPopup) forMode:m];
+    [owner setModeSetting:MP_AUTO value:popup_flag(modeAutoPopup) forMode:m];
+    [owner setModeSetting:MP_WRAP value:popup_flag(modeWrapPopup) forMode:m];
+}
+
+- (void)closeModePanel:(id)sender
+{
+    [modePanel orderOut:nil];
 }
 
 @end
