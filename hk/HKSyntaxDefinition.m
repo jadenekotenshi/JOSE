@@ -26,6 +26,20 @@
 
 #import "HKSyntaxDefinition.h"
 
+/* A plist says "YES" as a string, and NSString has no -boolValue on OPENSTEP 4.2 (NSNumber does). */
+static BOOL
+HKPlistBool (id value)
+{
+  if ([value isKindOfClass: [NSString class]])
+    {
+      NSString * s = [value lowercaseString];
+
+      return [s isEqualToString: @"yes"] || [s isEqualToString: @"true"] || [s intValue] != 0;
+    }
+  return [value boolValue];
+}
+
+
 
 
 static NSDictionary *
@@ -97,14 +111,14 @@ ParseSyntaxGraphics (NSDictionary * specification)
   value = [specification objectForKey: @"Bold"];
   if (value != nil)
     {
-      [dict setObject: [NSNumber numberWithBool: [value boolValue]]
+      [dict setObject: [NSNumber numberWithBool: HKPlistBool (value)]
                forKey: @"Bold"];
     }
 
   value = [specification objectForKey: @"Italic"];
   if (value != nil)
     {
-      [dict setObject: [NSNumber numberWithBool: [value boolValue]]
+      [dict setObject: [NSNumber numberWithBool: HKPlistBool (value)]
                forKey: @"Italic"];
     }
 
