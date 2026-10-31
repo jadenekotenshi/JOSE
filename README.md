@@ -48,6 +48,13 @@ Status: **prototype (0.0.1)** -- nothing here has been run on OPENSTEP yet.
 * **Preferences panel** (Preferences > Preferences Panel..., cmd-,): Light or Dark colours (light text on a dark background, with the
   syntax colours lightened to match), the background and text colours, the font and size (any fixed-pitch font installed), the
   include path, call tips and the fold margin.  Changes show in every window at once and are saved.
+* **Find in Files** (Search > Find in Files..., shift-cmd-F): looks for text in the files of a folder, with the same case, regular
+  expression and whole-word options as Find, a list of file-name patterns (`*.c *.h`; `*` and `?`), and subfolders on or off
+  (`.`-folders and `CVS` are skipped).  The matching lines are listed as `file:line: text`; double-click one to open the file
+  there.  *Replace All...* replaces in every file with a match, after asking.  A file open in a window is searched as it stands
+  there and changed there (one undo step, not saved); the others are rewritten on disk, each kept as `name.bak` if that is ticked.
+  Files that are not UTF-8 text (or are over 4 MB) are never searched, and a file that mixes line endings is never rewritten; the
+  message line says how many were left out.  The search is not interruptible.
 * **Per-mode preferences** (Preferences > Preferences Panel > Language Modes...): each language mode may override the indent width,
   spaces for indentation, auto indent and line wrapping; a setting left at "Same as general" follows the Preferences menu.  The
   overrides apply when a file is opened or saved under a name, or the mode is chosen by hand, and at once to windows already in
@@ -118,14 +125,13 @@ for a literal one).
 
 Roughly in this order; the list is not a promise.
 
-1. Search: Find, Replace, Find Again/Previous, Find Selection, regular expressions, case/word options, Replace All and In Selection (one undo step) -- done, awaiting a check on 4.2; multi-file replace still to do.
+1. Search: Find, Replace, Find Again/Previous, Find Selection, regular expressions, case/word options, Replace All and In Selection (one undo step) -- done, awaiting a check on 4.2; multi-file search and replace (Find in Files) -- done, awaiting a check on 4.2.
 2. Editing: undo/redo, auto-indent, smart indent (brace languages, Python), shift left/right, comment/uncomment, spaces-for-tabs
    and indent width -- done and checked on 4.2; match brace, line numbers and saved settings -- done and checked;
    fill paragraph, rectangular selection, shell commands -- done and checked; code folding -- done and checked.
 3. Highlighting: nested contexts -- done and checked; the Preferences panel (colours, dark mode, font), recent files, Open Included
    File, tags with call tips and the fold margin -- done, awaiting a check on 4.2; more language modes.
-4. Shell commands (filter, execute, sort) -- done and checked; still to do: split panes,
-   per-mode preferences.
+4. Shell commands (filter, execute, sort) -- done and checked; per-mode preferences -- done, awaiting a check on 4.2; still to do: split panes.
 
 ## Building
 

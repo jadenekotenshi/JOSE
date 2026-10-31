@@ -5,12 +5,19 @@
 #import "Appearance.h"
 #import "FindController.h"
 #import "MacroController.h"
+#import "FilesController.h"
 #import "AppController.h"
+#import "UIHelpers.h"
 #import "HKSyntaxDefinition.h"
 #include <stdio.h>
 
 @interface EditorDoc (SmokeTest)
 - (void)refreshFoldInfo;
+@end
+
+@interface FilesController (SmokeTest)
+- (void)collectFilesIn:(NSString *)d recursive:(BOOL)rec patterns:(const char *)pats into:(NSMutableArray *)found;
+- (NSString *)replaceInFiles:(NSArray *)hitFiles search:(Search *)s with:(NSString *)replacement literal:(BOOL)literal backups:(BOOL)backups;
 @end
 
 @interface ShellController (SmokeTest)
@@ -24,13 +31,17 @@
     FindController *finder;
     ShellController *shell;
     MacroController *mc;
+    EditorDoc *openDoc;
 }
 - (void)setDoc:(EditorDoc *)d;
+- (void)setOpenDoc:(EditorDoc *)d;
 - (MacroController *)mc;
 @end
 
 @implementation MacroOwner
 - (void)setDoc:(EditorDoc *)d { doc = d; }
+- (void)setOpenDoc:(EditorDoc *)d { openDoc = d; }
+- (EditorDoc *)documentForPath:(NSString *)p { return (openDoc != nil && [[openDoc path] isEqualToString:p]) ? openDoc : nil; }
 - (id)init
 {
     self = [super init];
@@ -555,6 +566,62 @@ int main(void)
         CHECK([rd rectPaste]);
         CHECK([[tv string] isEqualToString:@"aXYZdef\ngXbcYZjkl\nmXhiYZpqr\n  no\n"]);
         CHECK([tv rectActive]);                                                 /* the pasted block is the rectangle now */
+    }
+    {   /* multi-file replace: LF, CRLF, mixed endings, binary, Latin-1, a subfolder, an open document, backups */
+        MacroOwner *own = [[[MacroOwner alloc] init] autorelease];
+        FilesController *fc = [[[FilesController alloc] initWithOwner:own] autorelease];
+        NSString *fdir = [dir stringByAppendingPathComponent:@"multi"], *sub = [fdir stringByAppendingPathComponent:@"sub"];
+        NSFileManager *fm = [NSFileManager defaultManager];
+        NSMutableArray *found = [NSMutableArray array];
+        EditorDoc *od = [[[EditorDoc alloc] initWithOwner:own] autorelease];
+        NSString *pa = [fdir stringByAppendingPathComponent:@"a.txt"], *pb = [fdir stringByAppendingPathComponent:@"b.txt"];
+        NSString *pc = [fdir stringByAppendingPathComponent:@"c.txt"], *pe = [fdir stringByAppendingPathComponent:@"e.txt"];
+        NSString *pf = [sub stringByAppendingPathComponent:@"f.txt"], *po = [fdir stringByAppendingPathComponent:@"open.txt"];
+        static const unsigned char binb[] = { 'f', 'o', 'o', 0, 'x' };
+        static const unsigned char latin[] = { 'c', 'a', 'f', 0xE9, ' ', 'f', 'o', 'o', '\n' };
+        NSData *pats = ui_utf8_cstring(@"*.txt *.bin");
+        u16 pat[3] = { 'f', 'o', 'o' };
+        char err[80];
+        Search *se = search_new(pat, 3, 0, err, sizeof err);
+        NSString *msg;
+
+        [fm createDirectoryAtPath:fdir attributes:nil];
+        [fm createDirectoryAtPath:sub attributes:nil];
+        [@"foo bar\nfoo\n" writeToFile:pa atomically:YES];
+        [[@"foo\r\nbar foo\r\n" dataUsingEncoding:NSASCIIStringEncoding] writeToFile:pb atomically:YES];
+        [[@"foo\nfoo\r\n" dataUsingEncoding:NSASCIIStringEncoding] writeToFile:pc atomically:YES];
+        [[NSData dataWithBytes:binb length:5] writeToFile:[fdir stringByAppendingPathComponent:@"d.bin"] atomically:YES];
+        [[NSData dataWithBytes:latin length:9] writeToFile:pe atomically:YES];
+        [@"foo\n" writeToFile:pf atomically:YES];
+        [@"x foo y\n" writeToFile:po atomically:YES];
+        [@"foo\n" writeToFile:[fdir stringByAppendingPathComponent:@"skip.c"] atomically:YES];
+        [od openFile:po];
+        [own setOpenDoc:od];
+
+        [fc collectFilesIn:fdir recursive:NO patterns:(const char *)[pats bytes] into:found];
+        CHECK([found count] == 6);                                               /* a b c d.bin e open: not skip.c, not sub/ */
+        [found removeAllObjects];
+        [fc collectFilesIn:fdir recursive:YES patterns:(const char *)[pats bytes] into:found];
+        CHECK([found count] == 7 && [found containsObject:pf]);
+
+        msg = [fc replaceInFiles:found search:se with:@"BAR" literal:YES backups:YES];
+        CHECK([msg isEqualToString:@"Replaced 6 matches in 4 files; 3 left alone (mixed line endings, or could not be written)."]);
+        CHECK([[NSString stringWithContentsOfFile:pa] isEqualToString:@"BAR bar\nBAR\n"]);
+        CHECK([[NSString stringWithContentsOfFile:[pa stringByAppendingString:@".bak"]] isEqualToString:@"foo bar\nfoo\n"]);
+        CHECK([[[NSString alloc] initWithData:[NSData dataWithContentsOfFile:pb] encoding:NSASCIIStringEncoding] autorelease] != nil);
+        CHECK([[[[NSString alloc] initWithData:[NSData dataWithContentsOfFile:pb] encoding:NSASCIIStringEncoding] autorelease]
+               isEqualToString:@"BAR\r\nbar BAR\r\n"]);                           /* CRLF kept */
+        CHECK([[[[NSString alloc] initWithData:[NSData dataWithContentsOfFile:pc] encoding:NSASCIIStringEncoding] autorelease]
+               isEqualToString:@"foo\nfoo\r\n"]);                                 /* mixed: untouched */
+        CHECK([[NSData dataWithContentsOfFile:pe] isEqualToData:[NSData dataWithBytes:latin length:9]]);   /* Latin-1: untouched */
+        CHECK([[NSData dataWithContentsOfFile:[fdir stringByAppendingPathComponent:@"d.bin"]] length] == 5);
+        CHECK([[NSString stringWithContentsOfFile:pf] isEqualToString:@"BAR\n"]);
+        CHECK([[NSString stringWithContentsOfFile:[fdir stringByAppendingPathComponent:@"skip.c"]] isEqualToString:@"foo\n"]);
+        CHECK([[[od textView] string] isEqualToString:@"x BAR y\n"] && [od isDirty]);                    /* the open window changed */
+        CHECK([[NSString stringWithContentsOfFile:po] isEqualToString:@"x foo y\n"]);                    /* not its file */
+        [od undo];
+        CHECK([[[od textView] string] isEqualToString:@"x foo y\n"]);                                    /* one undo step */
+        search_free(se);
     }
     [[NSFileManager defaultManager] removeItemAtPath:dir error:NULL];
     printf(failures ? "doc: FAILED\n" : "doc: ok\n");

@@ -5,6 +5,7 @@
 #import "PrefsController.h"
 #import "TagsController.h"
 #import "MacroController.h"
+#import "FilesController.h"
 #import "Appearance.h"
 #import "UIHelpers.h"
 #import "HKSyntaxDefinition.h"
@@ -279,6 +280,7 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
     [self addItem:@"Find Previous" action:@selector(findPrevious:) key:@"G" target:self toMenu:m];
     [self addItem:@"Find Selection" action:@selector(findSelection:) key:@"e" target:self toMenu:m];
     [self addItem:@"Replace..." action:@selector(showFind:) key:@"r" target:self toMenu:m];
+    [self addItem:@"Find in Files..." action:@selector(showFiles:) key:@"F" target:self toMenu:m];
     [self addItem:@"Go to Matching Bracket" action:@selector(gotoBracket:) key:@"b" target:self toMenu:m];
     [self addItem:@"Select to Matching Bracket" action:@selector(selectBracket:) key:@"B" target:self toMenu:m];
     [self addItem:@"Go to Line..." action:@selector(gotoLine:) key:@"l" target:self toMenu:m];
@@ -829,6 +831,25 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
 
     [[d textView] setString:[@"# JOSE macro\n" stringByAppendingString:[[self macroController] lastAsText]]];
     [d setMode:@"JOSEMacro"];
+}
+
+- (void)showFiles:(id)sender
+{
+    if (filesFinder == nil) filesFinder = [[FilesController alloc] initWithOwner:self];
+    [filesFinder showPanel];
+}
+
+- (EditorDoc *)documentForPath:(NSString *)path
+{
+    unsigned int i;
+
+    path = [path stringByStandardizingPath];
+    for (i = 0; i < [docs count]; i++) {
+        EditorDoc *d = [docs objectAtIndex:i];
+
+        if ([d path] != nil && [[d path] isEqualToString:path]) return d;
+    }
+    return nil;
 }
 
 - (void)showPrefs:(id)sender
