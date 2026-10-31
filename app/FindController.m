@@ -10,6 +10,7 @@
 - (EditorDoc *)document;
 - (Search *)compiledSearch;
 - (BOOL)doFind:(BOOL)forward;
+- (void)showDocument:(EditorDoc *)d;
 - (int)flags;
 - (BOOL)literalReplacement;
 - (void)replaceBetween:(unsigned int)lo and:(unsigned int)hi what:(NSString *)what;
@@ -53,6 +54,14 @@ static u16 *units_of(NSString *s, unsigned int *n)
 - (EditorDoc *)document
 {
     return [(AppController *)owner frontDocument];
+}
+
+/* Brings the document to the front.  From the panel the panel stays the key window, so that Return and the buttons keep
+ * working for the next search without a click; from the menu the document is the key window already. */
+- (void)showDocument:(EditorDoc *)d
+{
+    if (panel != nil && [panel isKeyWindow]) [[d window] orderFront:nil];
+    else [[d window] makeKeyAndOrderFront:nil];
 }
 
 - (void)say:(NSString *)text
@@ -194,7 +203,7 @@ static u16 *units_of(NSString *s, unsigned int *n)
     [[d textView] setSelectedRange:NSMakeRange(m.start[0], m.end[0] - m.start[0])];
     [[d textView] scrollRangeToVisible:NSMakeRange(m.start[0], m.end[0] - m.start[0])];
     [self say:@""];
-    [[d window] makeKeyAndOrderFront:nil];
+    [self showDocument:d];
     return YES;
 }
 
@@ -297,7 +306,7 @@ static u16 *units_of(NSString *s, unsigned int *n)
         NSString *str = nout > 0 ? [NSString stringWithCharacters:out length:nout] : @"";
         [d replaceRange:NSMakeRange(first, last - first) with:str select:NSMakeRange(first, nout)];
         [self say:[NSString stringWithFormat:@"Replaced %u %@.", count, count == 1 ? @"match" : @"matches"]];
-        [[d window] makeKeyAndOrderFront:nil];
+        [self showDocument:d];
     } else {
         [self say:[NSString stringWithFormat:@"Not found%@.", what]];
         NSBeep();
