@@ -155,7 +155,11 @@ int shell_run(const char *cmd, const char *dir, const char *in, size_t nin, unsi
     if (out_open) close(outp[0]);
     if (err_open) close(errp[0]);
     while (!reaped) {
-        int w = waitpid(pid, (void *)&status, 0);
+#ifdef OPENSTEP
+        int w = wait((void *)&status);          /* this libc has no waitpid; the only child that matters is the one just started */
+#else
+        int w = waitpid(pid, &status, 0);
+#endif
         if (w == pid) reaped = 1;
         else if (w < 0 && errno != EINTR) break;
     }
