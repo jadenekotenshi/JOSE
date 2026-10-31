@@ -207,7 +207,15 @@ static u16 *units_of(NSString *s, unsigned int *n)
     return YES;
 }
 
-- (void)findNext:(id)sender { [self doFind:YES]; }
+- (void)findNext:(id)sender
+{
+    [self doFind:YES];
+    if (sender == findField) {                    /* Return in the field: end editing took the focus; give it back */
+        [panel makeFirstResponder:findField];
+        [findField selectText:nil];
+    }
+}
+
 - (void)findPrev:(id)sender { [self doFind:NO]; }
 
 - (void)findAgain
