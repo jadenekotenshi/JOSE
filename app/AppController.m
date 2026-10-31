@@ -913,6 +913,8 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
                                          backing:NSBackingStoreBuffered defer:NO];
     [panel setTitle:@"Go to Line"];
     field = ui_field(NSMakeRect(80, 54, 160, 22));
+    [field setTarget:self];
+    [field setAction:@selector(gotoOK:)];                                   /* Return goes, like the button */
     [[panel contentView] addSubview:ui_label(@"Line:", NSMakeRect(16, 56, 60, 18))];
     [[panel contentView] addSubview:field];
     [[panel contentView] addSubview:ui_button(@"Go", NSMakeRect(170, 12, 70, 28), self, @selector(gotoOK:))];

@@ -1222,12 +1222,22 @@ static int unmatched_cmp(const void *a, const void *b)
             line_col(s, all[pick].other, &line, &col);
             what = [NSString stringWithFormat:@"'%s' does not fit the bracket opened on line %u", word, line];
             break;
+        case BRACE_INDENT:
+            line_col(s, all[pick].other, &line, &col);
+            what = [NSString stringWithFormat:@"'%s' is not indented like the line that opened its block (line %u): a brace may be extra or missing around here", word, line];
+            break;
         case BRACE_UNCLOSED: what = [NSString stringWithFormat:@"'%s' is never closed", word]; break;
         case UM_WORD_OPEN:   what = [NSString stringWithFormat:@"'%s' is never closed", word]; break;
         case UM_WORD_CLOSE:  what = [NSString stringWithFormat:@"'%s' closes nothing", word]; break;
         default:             what = [NSString stringWithFormat:@"'%s' is outside any block", word]; break;
         }
         what = [NSString stringWithFormat:@"Problem %u of %u: %@", pick + 1, total, what];
+    }
+    {
+        unsigned int tl, tc, nl = 0, q;
+        line_col(s, all[pick].pos, &tl, &tc);
+        for (q = 0; q < n; q++) if (t[q] == '\n') nl++;
+        SSTrace("unmatched: line_col says line %u, the text holds %u newlines, ruler says %u", tl, nl, ruler != nil ? [ruler lineNumberForChar:all[pick].pos] : 0);
     }
     SSTrace("unmatched: %u problems, showing #%u at %u+%u of %u", total, pick + 1, all[pick].pos, all[pick].len, n);
     [textView setSelectedRange:NSMakeRange(all[pick].pos, all[pick].len)];

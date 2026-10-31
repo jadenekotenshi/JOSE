@@ -55,7 +55,9 @@ Status: **prototype (0.0.1)** -- nothing here has been run on OPENSTEP yet.
   skipped over are the ones reported -- which is where a closing bracket is missing.  In the shell, csh, zsh, Ruby and C modes
   block keywords are checked too: `if` without `fi`, `case` without `esac`, a loop without `done` (a `fi` does not close a
   `while`), Ruby `def`/`if`/`do` without `end`, `#if` without `#endif`, and a stray `else`/`#elif`.  Strings, character constants
-  and comments are skipped in the C-like modes.  If everything is paired it says so.
+  and comments are skipped in the C-like modes.  When there are problems, the first `}` that starts its line but is not indented
+  like the line that opened its block is listed too, because an extra or missing brace shows up there long before the place where
+  the counts finally run out.  If everything is paired it says so.
 * **Split panes** (Windows > Split Pane, cmd-2; Close Pane, cmd-1): the window shows the same text in two panes, one above the
   other, each with its own scroll position, selection, line numbers and fold margin.  Edits, undo, folds and highlighting are
   shared; the commands act on the pane with the insertion point.  Close Pane closes that one and the other fills the window.

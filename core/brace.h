@@ -25,6 +25,7 @@ int brace_match(const u16 *t, unsigned len, unsigned pos, int c_aware, unsigned 
 #define BRACE_STRAY    1
 #define BRACE_MISMATCH 2
 #define BRACE_UNCLOSED 3
+#define BRACE_INDENT   4     /* a hint: the first `}` that starts its line but is indented differently from the line that opened its block (`other`); only given when there are other problems, since an extra or missing brace shows up there first */
 typedef struct { unsigned pos; int kind; unsigned other; } BraceProblem;
 unsigned brace_scan_problems(const u16 *t, unsigned len, int c_aware, BraceProblem **out);
 

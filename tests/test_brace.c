@@ -49,7 +49,7 @@ int main(void)
         BraceProblem *bp;
         unsigned k, n;
         const char *cases[] = { "int f() { return (1); }", "}", "a ( b ]", "void f() {\n if (x) {\n}\n", "s = \"{\"; /* ( */ // [\nx", "" };
-        unsigned count[] = { 0, 1, 1, 1, 0, 0 };
+        unsigned count[] = { 0, 1, 1, 2, 0, 0 };           /* the 4th: the open { and the hint that the } is not indented like the if */
         int kind[] = { 0, BRACE_STRAY, BRACE_MISMATCH, BRACE_UNCLOSED, 0, 0 };
         unsigned at[] = { 0, 0, 6, 9, 0, 0 };
         int i;
@@ -76,6 +76,24 @@ int main(void)
         CHECK(bp[1].pos == 9 && bp[1].kind == BRACE_STRAY);                        /* then ) and ] have nothing open */
         CHECK(bp[2].pos == 11 && bp[2].kind == BRACE_STRAY);
         free(bp);
+        /* an extra } in the middle: the file's last } is the stray one, but the hint points at the one that does not line up */
+        {
+            const char *src = "void f() {\n  a;\n  }\n  b;\n}\nint x;\n";
+            for (k = 0; src[k]; k++) u[k] = (u16)(unsigned char)src[k];
+            n = brace_scan_problems(u, k, 1, &bp);
+            CHECK(n == 2 && bp[0].kind == BRACE_INDENT && bp[0].pos == 18 && bp[0].other == 9);
+            CHECK(bp[1].kind == BRACE_STRAY && bp[1].pos == 25);
+            free(bp);
+            src = "void f() {\n  if (a) {\n    b;\n  }\n}\n";                          /* well formed: no hint */
+            for (k = 0; src[k]; k++) u[k] = (u16)(unsigned char)src[k];
+            CHECK(brace_scan_problems(u, k, 1, &bp) == 0);
+            free(bp);
+            src = "void f()\n  {\n  a;\n  }\n}\n";                                    /* GNU style lines up; the last } is stray with no hint */
+            for (k = 0; src[k]; k++) u[k] = (u16)(unsigned char)src[k];
+            n = brace_scan_problems(u, k, 1, &bp);
+            CHECK(n == 1 && bp[0].kind == BRACE_STRAY);
+            free(bp);
+        }
         /* several problems come back in order */
         for (k = 0; "} ( { ] )"[k]; k++) u[k] = (u16)(unsigned char)"} ( { ] )"[k];
         n = brace_scan_problems(u, k, 1, &bp);

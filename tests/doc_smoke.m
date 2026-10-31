@@ -755,6 +755,44 @@ int main(void)
         [xd undo];
         CHECK([[tv string] length] > 100000);
     }
+    {   /* the line-number ruler against the truth, through random edits, folds and undo */
+        EditorDoc *rd = [[[EditorDoc alloc] initWithOwner:nil] autorelease];
+        EditTextView *tv = [rd textView];
+        NSMutableString *src = [NSMutableString string];
+        LineNumberView *rl;
+        int i, bad = 0;
+
+        srand(7);
+        for (i = 0; i < 300; i++) [src appendFormat:@"void f%d() {\n  if (x) {\n    y;\n  }\n}\n\n", i];
+        [rd setMode:@"C"];
+        [tv setString:src];
+        [rd setLineNumbers:YES];
+        rl = [rd valueForKey:@"ruler"];
+        for (i = 0; i < 400 && bad == 0; i++) {
+            unsigned len = [[tv string] length], at = len ? (unsigned)rand() % len : 0;
+            NSString *full;
+            unsigned p, expect = 1, j;
+
+            switch (rand() % 9) {
+            case 0: [tv setSelectedRange:NSMakeRange(at, 0)]; [tv insertText:@"\n"]; break;
+            case 1: [tv setSelectedRange:NSMakeRange(at, 0)]; [tv insertText:@"}"]; break;
+            case 2: [tv setSelectedRange:NSMakeRange(at, 0)]; [tv deleteBackward:nil]; break;
+            case 3: [tv setSelectedRange:NSMakeRange(at, 0)]; [rd toggleFold]; break;
+            case 4: [rd foldAll]; break;
+            case 5: [rd expandAllFolds]; break;
+            case 6: [rd undo]; break;
+            case 7: [rd redo]; break;
+            default: [tv setSelectedRange:NSMakeRange(at, 0)]; [tv insertText:@"a\nb\n"]; break;
+            }
+            full = [rd expandedString:[tv string]];
+            len = [full length];
+            for (j = 0; j < len; j++) if ([full characterAtIndex:j] == '\n') expect++;
+            /* the ruler counts positions in the buffer (markers stand for their lines), so ask about the buffer's end */
+            p = [[tv string] length];
+            if ([rl lineNumberForChar:p] != expect) { printf("ruler drift after op %d: ruler %u, truth %u\n", i, [rl lineNumberForChar:p], expect); bad = 1; }
+        }
+        CHECK(bad == 0);
+    }
     [[NSFileManager defaultManager] removeItemAtPath:dir error:NULL];
     printf(failures ? "doc: FAILED\n" : "doc: ok\n");
     [pool release];

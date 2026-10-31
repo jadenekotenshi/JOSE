@@ -113,8 +113,23 @@ static int problem_cmp(const void *a, const void *b)
     return x < y ? -1 : (x > y ? 1 : 0);
 }
 
+/* The width of the indentation of the line that holds t[pos] (a tab goes to the next multiple of 8), and whether t[pos] is the first
+ * thing on the line other than blanks. */
+static unsigned line_indent(const u16 *t, unsigned pos, int *first)
+{
+    unsigned b = pos, w = 0, i;
+
+    while (b > 0 && t[b - 1] != '\n') b--;
+    for (i = b; i < pos && (t[i] == ' ' || t[i] == '\t'); i++) w = t[i] == '\t' ? (w / 8 + 1) * 8 : w + 1;
+    *first = (i == pos);
+    return w;
+}
+
 unsigned brace_scan_problems(const u16 *t, unsigned len, int c_aware, BraceProblem **out)
 {
+    int hint = 0;
+    unsigned hint_pos = 0, hint_open = 0;
+
     unsigned *stack = NULL, cap = 0, top = 0, i, c, np = 0, pcap = 0;
     int state = S_CODE, ok = 1;
 
@@ -152,11 +167,18 @@ unsigned brace_scan_problems(const u16 *t, unsigned len, int c_aware, BraceProbl
             } else {
                 while (ok && top > j) { ok = problem_add(out, &np, &pcap, stack[top - 1], BRACE_UNCLOSED, 0); top--; }
                 top--;                                                /* the pair itself */
+                if (c_aware && !hint && c == '}') {                   /* does it line up with the line that opened the block? */
+                    int first, ofirst;
+                    unsigned ci = line_indent(t, i, &first);
+
+                    if (first && ci != line_indent(t, stack[top], &ofirst)) { hint = 1; hint_pos = i; hint_open = stack[top]; }
+                }
             }
         }
     }
     while (ok && top > 0) { ok = problem_add(out, &np, &pcap, stack[top - 1], BRACE_UNCLOSED, 0); top--; }
     free(stack);
+    if (ok && hint && np > 0) ok = problem_add(out, &np, &pcap, hint_pos, BRACE_INDENT, hint_open);
     if (!ok) { free(*out); *out = NULL; return 0; }
     if (np > 1) qsort(*out, np, sizeof(BraceProblem), problem_cmp);
     return np;
