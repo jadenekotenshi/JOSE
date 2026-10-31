@@ -89,7 +89,7 @@
     id item;
 
     m = [self submenuNamed:@"Info" inMenu:main];
-    [self addItem:@"Info Panel..." action:@selector(orderFrontStandardInfoPanel:) key:@"" target:NSApp toMenu:m];
+    [self addItem:@"Info Panel..." action:@selector(showAbout:) key:@"" target:self toMenu:m];
 
     m = [self submenuNamed:@"File" inMenu:main];
     [self addItem:@"New" action:@selector(newDoc:) key:@"n" target:self toMenu:m];
@@ -284,6 +284,13 @@
 {
     if (startupFiles == nil) startupFiles = [[NSMutableArray alloc] init];
     [startupFiles addObject:path];
+}
+
+/* NSApp's standard info panel crashed on 4.2 (it wants an Info file the bundle lacks); a plain alert does not. */
+- (void)showAbout:(id)sender
+{
+    NSRunAlertPanel(@"JOSE", @"Jade's OPENSTEP Editor\n\nVersion 0.0.1\n\nA syntax-highlighting text editor.\nHighlighting by HighlighterKit (LGPL).",
+                    @"OK", nil, nil);
 }
 
 - (void)applicationDidFinishLaunching:(NSNotification *)notification
