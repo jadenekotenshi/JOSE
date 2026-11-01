@@ -1,0 +1,23 @@
+JOSE Unicode sample (UTF-8). Open this file and tell me which lines you can read.
+
+1 Latin-1:            café naïve über Ångström ñ ß æ ø £ © ® ± ½
+2 Latin Extended-A:   Łódź Český š ž ő ű Ş ı ğ œ
+3 Greek:              Αθήνα αβγδ Ω λόγος
+4 Cyrillic:           Москва привет Жызнь
+5 Hebrew:             שלום עולם
+6 Arabic:             مرحبا بالعالم
+7 Thai:               สวัสดี
+8 Japanese kana:      こんにちは テスト カタカナ
+9 Japanese kanji:     日本語 東京 漢字 編集
+10 Chinese (simpl.):  你好，世界 汉字 编辑器
+11 Chinese (trad.):   你好，世界 漢字 編輯器
+12 Korean:            안녕하세요 한글
+13 Symbols:           • → ← ↑ ↓ ≠ ≤ ≥ ∞ ∑ √ € ™
+14 Box drawing:       ┌──┬──┐ │  │  │ └──┴──┘
+15 Combining marks:   é (e + acute)  ä (a + diaeresis)
+16 Outside the BMP:   😀 (emoji)  𠀀 (CJK Ext. B)  𝄞 (musical G clef)
+
+The columns below are in a fixed-width font: how do these line up?
+ABCDEFGHIJ
+あいうえお
+1234567890
