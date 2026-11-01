@@ -140,8 +140,12 @@ static BOOL write_text(NSString *text, NSString *path)
 
 - (void)recordLast
 {
+    BOOL ok;
+
     if (quiet) return;
-    (void)[self writeSessionNamed:LAST_NAME];
+    SSTrace("session: recording the last session");
+    ok = [self writeSessionNamed:LAST_NAME];
+    SSTrace("session: %s", ok ? "recorded" : "nothing to record");
 }
 
 - (BOOL)hasLast

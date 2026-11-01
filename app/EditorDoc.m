@@ -472,6 +472,7 @@ static void line_col(NSString *s, unsigned int loc, unsigned int *line, unsigned
 
 - (void)dealloc
 {
+    SSTrace("close: the document is deallocated");
     [[NSNotificationCenter defaultCenter] removeObserver:self];
     [highlighter detach];
     [highlighter release];
@@ -1107,13 +1108,20 @@ static BOOL ident_char(unichar c)
 
 - (BOOL)windowShouldClose:(id)sender
 {
-    return [self confirmClose];
+    BOOL ok;
+
+    SSTrace("close: the window of %s is to close", SSCS(path != nil ? path : (remoteSpec != nil ? remoteSpec : @"an untitled document")));
+    ok = [self confirmClose];
+    SSTrace("close: %s", ok ? "allowed" : "refused");
+    return ok;
 }
 
 - (void)windowWillClose:(NSNotification *)notification
 {
+    SSTrace("close: windowWillClose");
     [window setDelegate:nil];
     [owner documentDidClose:self];
+    SSTrace("close: windowWillClose done");
 }
 
 - (BOOL)closeWindow

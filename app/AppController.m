@@ -484,11 +484,14 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
 
 - (void)documentDidClose:(EditorDoc *)doc
 {
+    SSTrace("close: documentDidClose begins (%u documents)", (unsigned)[docs count]);
     [[doc retain] autorelease];                                  /* the window is still telling us it is closing */
     [self hideCallTip];
     if (preview != nil) [preview documentClosed:doc];
     [docs removeObject:doc];
+    SSTrace("close: removed; recording the last session");
     [[self sessionController] recordLast];
+    SSTrace("close: documentDidClose ends");
 }
 
 - (void)newDoc:(id)sender { [self newDocument]; }
@@ -1020,6 +1023,7 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
 
 - (void)applicationDidBecomeActive:(NSNotification *)notification
 {
+    SSTrace("the program became active");
     if (launched) [self noteClipboard];                          /* something may have been copied in another program */
 }
 
