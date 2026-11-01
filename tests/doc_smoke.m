@@ -1149,6 +1149,38 @@ int main(void)
         [pc documentClosed:md];
         CHECK(![pc hasPreviewFor:md]);
     }
+    {   /* the browser for preview links: an .app's executable, arguments with %u or the address last, quoting */
+        NSFileManager *fm = [NSFileManager defaultManager];
+        NSString *app = [dir stringByAppendingPathComponent:@"fake.app"], *exe = [app stringByAppendingPathComponent:@"fake"];
+        NSString *out = [dir stringByAppendingPathComponent:@"browser.out"];
+        NSString *body = [NSString stringWithFormat:@"#!/bin/sh\nprintf '%%s|' \"$@\" > '%@'\n", out];
+        NSString *oldPath = [Appearance browserPath], *oldArgs = [Appearance browserArgs], *got = nil;
+        int tries;
+
+        [fm createDirectoryAtPath:app attributes:nil];
+        [body writeToFile:exe atomically:YES];
+        chmod([exe cString], 0755);
+        [Appearance setBrowserPath:app];
+        [Appearance setBrowserArgs:@"-new"];
+        [fm removeFileAtPath:out handler:nil];
+        CHECK([PreviewController openURLString:@"http://x.example/a b?q=1&r='2'"]);
+        for (tries = 0; tries < 60 && got == nil; tries++) {
+            got = [NSString stringWithContentsOfFile:out];
+            if (got == nil || [got length] == 0) { got = nil; [NSThread sleepUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.05]]; }
+        }
+        CHECK(got != nil && [got isEqualToString:@"-new|http://x.example/a b?q=1&r='2'|"]);
+        [Appearance setBrowserArgs:@"--url=%u --x"];
+        [fm removeFileAtPath:out handler:nil];
+        got = nil;
+        CHECK([PreviewController openURLString:@"http://y.example/"]);
+        for (tries = 0; tries < 60 && got == nil; tries++) {
+            got = [NSString stringWithContentsOfFile:out];
+            if (got == nil || [got length] == 0) { got = nil; [NSThread sleepUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.05]]; }
+        }
+        CHECK(got != nil && [got isEqualToString:@"--url=http://y.example/|--x|"]);
+        [Appearance setBrowserPath:oldPath];
+        [Appearance setBrowserArgs:oldArgs];
+    }
     [[NSFileManager defaultManager] removeItemAtPath:dir error:NULL];
     printf(failures ? "doc: FAILED\n" : "doc: ok\n");
     [pool release];

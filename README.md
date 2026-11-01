@@ -64,6 +64,9 @@ Status: **prototype (0.0.1)** -- nothing here has been run on OPENSTEP yet.
   converter and shown by the ordinary text view.  It follows the document half a second after each edit and keeps about the same
   place in the text as the document is scrolled to; closing the document closes it.  *Preferences > Markdown...* chooses how accents
   are written into the RTF (NeXTSTEP by default on OPENSTEP; try Windows-1252 if letters come out wrong) and how links show.
+  Web addresses in the preview show in blue, and a click on one runs the browser set in *Preferences > Markdown...* (default
+  `/LocalApps/OmniWeb.app`; any `.app`, such as NetSurf, or any program will do): its executable gets the arguments you give and then the
+  address (or `%u` in the arguments stands for it).  Addresses show only with *Links* set to *Text (address)* or *Show the address*.
   `.md`, `.markdown`, `.mkd` and `.mdown` files open in a Markdown mode that colours headings, quotes, fenced code and HTML comments.
 * **Remote editing** (File > Open Remote..., shift-cmd-O): opens `[user@]host:path` (`me@sparc:/home/me/x.c`, or `sparc:~/x.c` for the
   home folder) in a window titled with that name, by running `stepssh host 'cat path'` -- or OpenSSH's `ssh` instead; *Preferences >
@@ -86,6 +89,9 @@ Status: **prototype (0.0.1)** -- nothing here has been run on OPENSTEP yet.
   can paste, make current, delete or clear.  Something copied from a rectangle stays a rectangle.  Anything over 400,000 bytes is not kept,
   and the history lives in memory only.  (Several copies made one after another in another program, without JOSE becoming active
   between, are seen only as the last.)
+* **Files dropped on the icon**: a file dragged from Workspace onto JOSE's icon (or opened with it) opens in a window, whether JOSE is
+  running or is started by the drop; several files at once open together.  (JOSE does not claim any file type, so double-clicking a
+  file in Workspace still opens it with whatever Workspace has chosen for that type.)
 * **Sessions** (File > Sessions): *Save Session As...* keeps the windows that show files -- with each caret, scroll position, window
   frame and wrap setting -- as a named set in `~/.JOSE.sessions`; *Save Session* writes it again under the current name.  *Open
   Session* adds a saved set to what is open; *Switch to Session* first closes the windows that are not in it (asking about unsaved

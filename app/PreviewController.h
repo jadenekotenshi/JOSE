@@ -19,4 +19,5 @@
 - (void)settingsChanged;                 /* the accent or link settings changed: every preview is made again */
 - (NSString *)previewStringFor:(EditorDoc *)d;   /* the text the preview shows (for tests); nil if none */
 - (void)refreshNowFor:(EditorDoc *)d;            /* make it again without waiting */
++ (BOOL)openURLString:(NSString *)url;   /* run the browser from Preferences > Markdown on this address (YES if it started); alerts if it cannot */
 @end

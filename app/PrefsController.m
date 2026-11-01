@@ -450,31 +450,41 @@ static int popup_flag(NSPopUpButton *p)
 {
     NSView *cv;
 
-    mdPanel = [[NSPanel alloc] initWithContentRect:NSMakeRect(0, 0, 380, 190)
+    mdPanel = [[NSPanel alloc] initWithContentRect:NSMakeRect(0, 0, 420, 270)
                                          styleMask:(NSTitledWindowMask | NSClosableWindowMask)
                                            backing:NSBackingStoreBuffered defer:NO];
     [mdPanel setTitle:@"Markdown Preview"];
     [mdPanel setReleasedWhenClosed:NO];
     cv = [mdPanel contentView];
-    [cv addSubview:ui_label(@"Accents:", NSMakeRect(16, 154, 90, 18))];
-    mdCharsetPopup = [[[NSPopUpButton alloc] initWithFrame:NSMakeRect(110, 150, 250, 24) pullsDown:NO] autorelease];
+    [cv addSubview:ui_label(@"Accents:", NSMakeRect(16, 234, 90, 18))];
+    mdCharsetPopup = [[[NSPopUpButton alloc] initWithFrame:NSMakeRect(110, 230, 290, 24) pullsDown:NO] autorelease];
     [mdCharsetPopup addItemWithTitle:@"Windows-1252"];
     [mdCharsetPopup addItemWithTitle:@"NeXTSTEP"];
     [mdCharsetPopup addItemWithTitle:@"ASCII only (\\u escapes)"];
     [mdCharsetPopup setTarget:self];
     [mdCharsetPopup setAction:@selector(markdownChanged:)];
     [cv addSubview:mdCharsetPopup];
-    [cv addSubview:ui_label(@"Links:", NSMakeRect(16, 120, 90, 18))];
-    mdLinksPopup = [[[NSPopUpButton alloc] initWithFrame:NSMakeRect(110, 116, 250, 24) pullsDown:NO] autorelease];
+    [cv addSubview:ui_label(@"Links:", NSMakeRect(16, 200, 90, 18))];
+    mdLinksPopup = [[[NSPopUpButton alloc] initWithFrame:NSMakeRect(110, 196, 290, 24) pullsDown:NO] autorelease];
     [mdLinksPopup addItemWithTitle:@"Show the text"];
     [mdLinksPopup addItemWithTitle:@"Show the address"];
     [mdLinksPopup addItemWithTitle:@"Text (address)"];
     [mdLinksPopup setTarget:self];
     [mdLinksPopup setAction:@selector(markdownChanged:)];
     [cv addSubview:mdLinksPopup];
-    [cv addSubview:ui_wrapping_label(@"If accented letters come out wrong in the preview, try the other encoding. The preview opens from Windows > Markdown Preview.",
-                                     NSMakeRect(16, 44, 348, 62), NO)];
-    [cv addSubview:ui_button(@"Close", NSMakeRect(294, 8, 70, 28), self, @selector(closeMarkdownPanel:))];
+    [cv addSubview:ui_label(@"Browser:", NSMakeRect(16, 166, 90, 18))];
+    mdBrowserField = ui_field(NSMakeRect(110, 164, 290, 22));
+    [mdBrowserField setTarget:self];
+    [mdBrowserField setAction:@selector(markdownChanged:)];
+    [cv addSubview:mdBrowserField];
+    [cv addSubview:ui_label(@"Arguments:", NSMakeRect(16, 136, 90, 18))];
+    mdArgsField = ui_field(NSMakeRect(110, 134, 290, 22));
+    [mdArgsField setTarget:self];
+    [mdArgsField setAction:@selector(markdownChanged:)];
+    [cv addSubview:mdArgsField];
+    [cv addSubview:ui_wrapping_label(@"A click on a web address in the preview runs the browser: an .app (such as /LocalApps/OmniWeb.app or a NetSurf .app) or any program, with the arguments (if any) and then the address; %u in the arguments stands for the address. Addresses show only with Links set to Text (address) or Show the address. If accented letters come out wrong, try the other encoding.",
+                                     NSMakeRect(16, 44, 388, 84), NO)];
+    [cv addSubview:ui_button(@"Close", NSMakeRect(334, 8, 70, 28), self, @selector(closeMarkdownPanel:))];
     [mdPanel center];
 }
 
@@ -488,6 +498,8 @@ static int popup_flag(NSPopUpButton *p)
     if (mdPanel == nil) [self buildMarkdownPanel];
     [mdCharsetPopup selectItemAtIndex:[Appearance previewCharset]];
     [mdLinksPopup selectItemAtIndex:[Appearance previewLinks]];
+    [mdBrowserField setStringValue:[Appearance browserPath]];
+    [mdArgsField setStringValue:[Appearance browserArgs]];
     [mdPanel makeKeyAndOrderFront:nil];
 }
 
@@ -495,12 +507,15 @@ static int popup_flag(NSPopUpButton *p)
 {
     [Appearance setPreviewCharset:[mdCharsetPopup indexOfSelectedItem]];
     [Appearance setPreviewLinks:[mdLinksPopup indexOfSelectedItem]];
+    [Appearance setBrowserPath:ui_trim([mdBrowserField stringValue])];
+    [Appearance setBrowserArgs:ui_trim([mdArgsField stringValue])];
     [Appearance saveSettings];
     if ([owner respondsToSelector:@selector(previewSettingsChanged)]) [owner previewSettingsChanged];
 }
 
 - (void)closeMarkdownPanel:(id)sender
 {
+    [self markdownChanged:nil];                       /* a path typed without pressing Return still counts */
     [mdPanel orderOut:nil];
 }
 

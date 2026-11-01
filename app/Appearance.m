@@ -16,6 +16,9 @@ static int previewCharset = 1;                  /* NeXT's own RTF reader takes \
 static int previewCharset = 0;
 #endif
 static int previewLinks = 2;
+static NSString *browserPath = nil;
+static NSString *browserArgs = nil;
+#define DEFAULT_BROWSER_PATH @"/LocalApps/OmniWeb.app"
 static int remoteProgram = 0;
 static NSString *remotePaths[2];
 static NSString *remoteExtra = nil;
@@ -78,6 +81,10 @@ static BOOL get_bool(NSUserDefaults *ud, NSString *key, BOOL def)
     includePath = [[ud stringForKey:@"IncludePath"] copy];
     callTips = get_bool(ud, @"CallTips", YES);
     reopenLast = get_bool(ud, @"ReopenLastSession", NO);
+    [browserPath release];
+    browserPath = [[ud stringForKey:@"BrowserPath"] copy];
+    [browserArgs release];
+    browserArgs = [[ud stringForKey:@"BrowserArgs"] copy];
     v = [ud stringForKey:@"PreviewCharset"];
     if (v != nil && [v intValue] >= 0 && [v intValue] <= 2) previewCharset = [v intValue];
     v = [ud stringForKey:@"PreviewLinks"];
@@ -110,6 +117,8 @@ static BOOL get_bool(NSUserDefaults *ud, NSString *key, BOOL def)
     else [ud removeObjectForKey:@"IncludePath"];
     [ud setObject:callTips ? @"YES" : @"NO" forKey:@"CallTips"];
     [ud setObject:reopenLast ? @"YES" : @"NO" forKey:@"ReopenLastSession"];
+    if (browserPath != nil) [ud setObject:browserPath forKey:@"BrowserPath"]; else [ud removeObjectForKey:@"BrowserPath"];
+    if (browserArgs != nil) [ud setObject:browserArgs forKey:@"BrowserArgs"]; else [ud removeObjectForKey:@"BrowserArgs"];
     [ud setObject:[NSString stringWithFormat:@"%d", previewCharset] forKey:@"PreviewCharset"];
     [ud setObject:[NSString stringWithFormat:@"%d", previewLinks] forKey:@"PreviewLinks"];
     [ud setObject:[NSString stringWithFormat:@"%d", remoteProgram] forKey:@"RemoteProgram"];
@@ -198,6 +207,10 @@ static BOOL get_bool(NSUserDefaults *ud, NSString *key, BOOL def)
 
 + (BOOL)callTips { return callTips; }
 + (void)setCallTips:(BOOL)flag { callTips = flag; }
++ (NSString *)browserPath { return browserPath != nil ? browserPath : DEFAULT_BROWSER_PATH; }
++ (void)setBrowserPath:(NSString *)path { [browserPath release]; browserPath = [path length] > 0 ? [path copy] : nil; }
++ (NSString *)browserArgs { return browserArgs != nil ? browserArgs : @""; }
++ (void)setBrowserArgs:(NSString *)args { [browserArgs release]; browserArgs = [args length] > 0 ? [args copy] : nil; }
 + (int)previewCharset { return previewCharset; }
 + (void)setPreviewCharset:(int)which { previewCharset = (which >= 0 && which <= 2) ? which : 0; }
 + (int)previewLinks { return previewLinks; }

@@ -29,6 +29,10 @@
 + (void)setRemotePath:(NSString *)path for:(int)which;
 + (NSString *)remoteExtra;                /* extra arguments for it (such as -p 2222), put before the host name */
 + (void)setRemoteExtra:(NSString *)extra;
++ (NSString *)browserPath;                /* what a click on a link in the Markdown preview runs: an .app (its executable is used) or a program */
++ (void)setBrowserPath:(NSString *)path;
++ (NSString *)browserArgs;                /* arguments before the address; "%u" in them stands for the address (else it is added last) */
++ (void)setBrowserArgs:(NSString *)args;
 + (int)previewCharset;                    /* how the Markdown preview writes accents: 0 Windows-1252, 1 NeXTSTEP, 2 \\u escapes only */
 + (void)setPreviewCharset:(int)which;
 + (int)previewLinks;                      /* what a link shows in the preview: 0 its text, 1 its address, 2 "text (address)" */

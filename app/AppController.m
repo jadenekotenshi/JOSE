@@ -1257,9 +1257,28 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
     if ([docs count] == 0) [self newDocument];
 }
 
+/* Workspace sends a file dragged onto the application's icon (or opened with it) here, one call per file -- possibly before the
+ * program has finished starting, when the file waits with those named on the command line. */
 - (BOOL)application:(NSApplication *)app openFile:(NSString *)filename
 {
+    SSTrace("openFile: %s%s", SSCS(filename), launched ? "" : " (before launch has finished)");
+    if (filename == nil || [filename length] == 0) return NO;
+    if (!launched) {
+        if (![[NSFileManager defaultManager] isReadableFileAtPath:filename]) return NO;
+        [self openAtLaunch:filename];
+        return YES;
+    }
     return [self openPath:filename] != nil;
+}
+
+- (BOOL)application:(NSApplication *)app openTempFile:(NSString *)filename
+{
+    return [self application:app openFile:filename];
+}
+
+- (BOOL)application:(NSApplication *)app openFileWithoutUI:(NSString *)filename
+{
+    return [self application:app openFile:filename];
 }
 
 - (BOOL)applicationShouldTerminate:(id)sender

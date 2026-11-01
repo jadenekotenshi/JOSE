@@ -28,6 +28,8 @@
     NSPanel         *mdPanel;             /* Markdown...: how the preview is made */
     NSPopUpButton   *mdCharsetPopup;
     NSPopUpButton   *mdLinksPopup;
+    NSTextField     *mdBrowserField;
+    NSTextField     *mdArgsField;
     NSArray         *fixedFonts;          /* the names of the fixed-pitch fonts, found the first time the panel opens */
 }
 - (id)initWithOwner:(id)anOwner;

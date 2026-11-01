@@ -3,11 +3,51 @@
 #import "Appearance.h"
 #import "UIHelpers.h"
 #include "md.h"
+#include "url.h"
+#include "remote.h"
+#include "shellrun.h"
 #include <stdlib.h>
 #include <string.h>
 
 #define PREVIEW_MAX_CHARS 3000000U            /* beyond this the preview says so instead */
 #define PREVIEW_DELAY 0.5
+
+/* The text view of a preview: a click on a web address in it runs the browser. */
+@interface PreviewTextView : NSTextView
+@end
+
+@implementation PreviewTextView
+
+- (void)mouseDown:(NSEvent *)event
+{
+    NSPoint p = [self convertPoint:[event locationInWindow] fromView:nil];
+    NSPoint o = [self textContainerOrigin];
+    NSLayoutManager *lm = [self layoutManager];
+    NSString *s = [self string];
+    unsigned int n = [s length], ci, start, len;
+    NSRange g;
+    u16 *t;
+
+    if (n > 0 && n < 2000000U && [event clickCount] == 1 && [lm respondsToSelector:@selector(characterIndexForGlyphAtIndex:)]) {
+        g = [lm glyphRangeForBoundingRect:NSMakeRect(p.x - o.x, p.y - o.y, 1.0, 1.0) inTextContainer:[self textContainer]];
+        if (g.length > 0) {
+            ci = [lm characterIndexForGlyphAtIndex:g.location];
+            t = (u16 *)malloc((n + 1) * sizeof(u16));
+            if (t != NULL) {
+                [s getCharacters:t];
+                len = ci < n ? url_at(t, n, ci, &start) : 0;
+                free(t);
+                if (len > 0) {
+                    [PreviewController openURLString:[s substringWithRange:NSMakeRange(start, len)]];
+                    return;
+                }
+            }
+        }
+    }
+    [super mouseDown:event];
+}
+
+@end
 
 /* One preview: the document, its window, and the text view in it. */
 @interface PreviewItem : NSObject
@@ -115,6 +155,20 @@ static NSData *rtf_of(NSString *markdown)
     rtf = rtf_of(text);
     if (rtf == nil) return;
     [it->tv replaceCharactersInRange:NSMakeRange(0, [[it->tv string] length]) withRTF:rtf];
+    {   /* web addresses show in blue: they can be clicked */
+        NSString *shown = [it->tv string];
+        unsigned int sn = [shown length], from = 0, st, ln;
+        u16 *st16 = sn > 0 && sn < 2000000U ? (u16 *)malloc((sn + 1) * sizeof(u16)) : NULL;
+
+        if (st16 != NULL) {
+            [shown getCharacters:st16];
+            while ((ln = url_next(st16, sn, from, &st)) > 0) {
+                [[it->tv textStorage] addAttribute:NSForegroundColorAttributeName value:[NSColor blueColor] range:NSMakeRange(st, ln)];
+                from = st + ln;
+            }
+            free(st16);
+        }
+    }
     if ([it->tv respondsToSelector:@selector(sizeToFit)]) [it->tv sizeToFit];
     {
         NSScrollView *psv = [it->tv enclosingScrollView];
@@ -185,7 +239,7 @@ static NSData *rtf_of(NSString *markdown)
     [sv setHasHorizontalScroller:NO];
     [sv setBorderType:NSNoBorder];
     [sv setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
-    it->tv = [[[NSTextView alloc] initWithFrame:NSMakeRect(0, 0, [sv contentSize].width, [sv contentSize].height)] autorelease];
+    it->tv = [[[PreviewTextView alloc] initWithFrame:NSMakeRect(0, 0, [sv contentSize].width, [sv contentSize].height)] autorelease];
     [it->tv setMinSize:NSMakeSize(0.0, [sv contentSize].height)];
     [it->tv setMaxSize:NSMakeSize(1.0e7, 1.0e7)];
     [it->tv setVerticallyResizable:YES];
@@ -230,6 +284,48 @@ static NSData *rtf_of(NSString *markdown)
         [[it retain] autorelease];
         [it->window close];
     }
+}
+
+/* ---- the browser ---- */
+
++ (BOOL)openURLString:(NSString *)url
+{
+    NSString *path = [Appearance browserPath], *args = [Appearance browserArgs], *exe = path;
+    NSData *ed, *ud, *ad;
+    char eq[2200], uq[4200], *cmd;
+    size_t need;
+    ShellResult r;
+    NSString *spec;
+
+    if ([[path pathExtension] isEqualToString:@"app"]) exe = [path stringByAppendingPathComponent:[[path lastPathComponent] stringByDeletingPathExtension]];
+    if (![[NSFileManager defaultManager] isExecutableFileAtPath:exe]) {
+        NSRunAlertPanel(@"Open Link", @"The browser %@ was not found. Set it in Preferences > Markdown.", @"OK", nil, nil, path);
+        return NO;
+    }
+    ed = ui_utf8_cstring(exe);
+    ud = ui_utf8_cstring(url);
+    ad = ui_utf8_cstring(args);
+    if ([ed length] > 2000 || [ud length] > 4000) return NO;
+    remote_shq((const char *)[ed bytes], eq, sizeof eq);
+    remote_shq((const char *)[ud bytes], uq, sizeof uq);
+    if ([args rangeOfString:@"%u"].length > 0) {
+        NSMutableString *a = [NSMutableString stringWithString:args];
+
+        [a replaceOccurrencesOfString:@"%u" withString:ui_string_from_utf8(uq) options:0 range:NSMakeRange(0, [a length])];
+        spec = [NSString stringWithFormat:@"( %s %@ ) >/dev/null 2>&1 &", eq, a];
+    } else {
+        spec = [NSString stringWithFormat:@"( %s %@ %s ) >/dev/null 2>&1 &", eq, args, uq];
+    }
+    (void)ad;
+    need = [ui_utf8_cstring(spec) length];
+    cmd = (char *)malloc(need + 1);
+    if (cmd == NULL) return NO;
+    memcpy(cmd, [ui_utf8_cstring(spec) bytes], need);
+    SSTrace("browser: %s", cmd);
+    if (!shell_run(cmd, NULL, NULL, 0, 5000, 0, &r)) { free(cmd); shell_result_free(&r); return NO; }
+    free(cmd);
+    shell_result_free(&r);
+    return YES;
 }
 
 @end
