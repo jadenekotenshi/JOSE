@@ -384,6 +384,23 @@ static int scan_cpp(const u16 *t, unsigned n, TokList *l)
 
 /* ---- pairing ---- */
 
+/* Is this in-between word allowed in the block that the opener `open` begins?  Shell and csh: then/elif/else belong to an if, do to
+ * a loop; Ruby: elsif to an if or unless, when to a case.  Anything else is let through (`else` and `in` and the like have too many
+ * homes in Ruby to judge). */
+static int mid_fits(const u16 *t, const Tok *mid, const Tok *open, int kind)
+{
+    if (kind == WORDS_SH || kind == WORDS_CSH) {
+        int fam = word_is(t, open->s, open->e, "if") ? 1 : (word_is(t, open->s, open->e, kind == WORDS_CSH ? "switch" : "case") ? 2 : 3);
+        if (word_is(t, mid->s, mid->e, "do")) return fam == 3;
+        return fam == 1;                                  /* then, elif, else */
+    }
+    if (kind == WORDS_RUBY) {
+        if (word_is(t, mid->s, mid->e, "elsif")) return word_is(t, open->s, open->e, "if") || word_is(t, open->s, open->e, "unless");
+        if (word_is(t, mid->s, mid->e, "when")) return word_is(t, open->s, open->e, "case");
+    }
+    return 1;
+}
+
 /* Which closing word a shell or csh block word goes with: 1 if/fi (endif), 2 case/esac (switch/endsw), 3 loops/done (end). */
 static int family(const u16 *t, const Tok *k, int csh)
 {
@@ -451,6 +468,8 @@ int words_scan(const u16 *t, unsigned n, int kind, WordBlocks *out)
                     out->npairs++;
                 } else add_lone(out, l.v[i].s, l.v[i].e, WORD_LONE_CLOSE);
             } else if (top == 0) {
+                add_lone(out, l.v[i].s, l.v[i].e, WORD_LONE_MID);
+            } else if (!mid_fits(t, &l.v[i], &l.v[stack[top - 1]], kind)) {
                 add_lone(out, l.v[i].s, l.v[i].e, WORD_LONE_MID);
             } else {
                 out->mids[nmid].s = l.v[i].s;

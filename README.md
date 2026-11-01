@@ -55,7 +55,7 @@ Status: **prototype (0.0.1)** -- nothing here has been run on OPENSTEP yet.
   before it, and an opener that is never closed are all found; where a closer matches an opener further out, the brackets it
   skipped over are the ones reported -- which is where a closing bracket is missing.  In the shell, csh, zsh, Ruby and C modes
   block keywords are checked too: `if` without `fi`, `case` without `esac`, a loop without `done` (a `fi` does not close a
-  `while`), Ruby `def`/`if`/`do` without `end`, `#if` without `#endif`, and a stray `else`/`#elif`.  Strings, character constants
+  `while`; nor does an `else` belong in a loop, a `do` in an `if`, a Ruby `when` in an `if` or an `elsif` in a `case`), Ruby `def`/`if`/`do` without `end`, `#if` without `#endif`, and a stray `else`/`#elif`.  Strings, character constants
   and comments are skipped in the C-like modes.  When there are problems, the first `}` that starts its line but is not indented
   like the line that opened its block is listed too, because an extra or missing brace shows up there long before the place where
   the counts finally run out.  If everything is paired it says so.

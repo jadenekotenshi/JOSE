@@ -164,7 +164,16 @@ int main(void)
             { "x = a / 2\nif b / 3 > 1\n y\nend\n", WORDS_RUBY, 1, 0 },                          /* division is not a regexp */
             { "s.split(/[\\/]end/)\nif x\n y\nend\n", WORDS_RUBY, 1, 0 },                        /* a slash in a class */
             { "w = %w[end if def]\nr = %r{end/if}\nif x\n y\nend\n", WORDS_RUBY, 1, 0 },
-            { "if x\n y\n", WORDS_RUBY, 0, 1 }
+            { "if x\n y\n", WORDS_RUBY, 0, 1 },
+            { "while x; do\n a\nelse\n b\ndone\n", WORDS_SH, 1, 1 },                             /* an else in a loop */
+            { "if a; then\n b\ndo\n c\nfi\n", WORDS_SH, 1, 1 },                                   /* a do in an if */
+            { "if a; then\n b\nelif c; then\n d\nelse\n e\nfi\nfor i in a; do\n f\ndone\n", WORDS_SH, 2, 0 },
+            { "case x in\n a) b;;\nesac\nif a; then\n b\nfi\n", WORDS_SH, 2, 0 },
+            { "if (1) then\n a\nelse\n b\nendif\nforeach x (a)\n c\nend\n", WORDS_CSH, 2, 0 },
+            { "foreach x (a)\n c\nelse\nend\n", WORDS_CSH, 1, 1 },
+            { "case x\nwhen 1\n y\nelse\n z\nend\nif a\n b\nelsif c\n d\nelse\n e\nend\n", WORDS_RUBY, 2, 0 },
+            { "if a\n b\nwhen 1\n c\nend\n", WORDS_RUBY, 1, 1 },                                  /* a when in an if */
+            { "case a\nelsif b\n c\nend\n", WORDS_RUBY, 1, 1 }                                      /* an elsif in a case */
         };
         unsigned ci;
 

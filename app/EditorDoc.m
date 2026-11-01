@@ -1248,7 +1248,7 @@ static int unmatched_cmp(const void *a, const void *b)
         case BRACE_UNCLOSED: what = [NSString stringWithFormat:@"'%s' is never closed", word]; break;
         case UM_WORD_OPEN:   what = [NSString stringWithFormat:@"'%s' is never closed", word]; break;
         case UM_WORD_CLOSE:  what = [NSString stringWithFormat:@"'%s' closes nothing", word]; break;
-        default:             what = [NSString stringWithFormat:@"'%s' is outside any block", word]; break;
+        default:             what = [NSString stringWithFormat:@"'%s' does not belong in the block it is in", word]; break;
         }
         what = [NSString stringWithFormat:@"Problem %u of %u: %@", pick + 1, total, what];
     }
