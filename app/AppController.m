@@ -10,6 +10,9 @@
 #import "ClipboardController.h"
 #import "RemoteController.h"
 #import "PreviewController.h"
+#ifdef PILCROW_FT
+#import "UnicodeController.h"
+#endif
 #include "complete.h"
 #include "enc.h"
 #include "includes.h"
@@ -405,6 +408,10 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
     [self addItem:@"Arrange in Front" action:@selector(arrangeInFront:) key:@"" target:nil toMenu:m];
     [self addItem:@"Miniaturize Window" action:@selector(performMiniaturize:) key:@"m" target:nil toMenu:m];
     [self addItem:@"Markdown Preview" action:@selector(togglePreview:) key:@"P" target:self toMenu:m];
+#ifdef PILCROW_FT
+    [self addItem:@"Unicode View" action:@selector(toggleUnicodeView:) key:@"" target:self toMenu:m];
+    [self addItem:@"Unicode View Fonts..." action:@selector(chooseUnicodeFonts:) key:@"" target:self toMenu:m];
+#endif
     [self addItem:@"Split Pane" action:@selector(splitPane:) key:@"2" target:self toMenu:m];
     [self addItem:@"Close Pane" action:@selector(closePane:) key:@"1" target:self toMenu:m];
     [NSApp setWindowsMenu:m];
@@ -460,6 +467,13 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
         [item setTitle:(d != nil && preview != nil && [preview hasPreviewFor:d]) ? @"Close Markdown Preview" : @"Markdown Preview"];
         return d != nil;
     }
+#ifdef PILCROW_FT
+    if (a == @selector(toggleUnicodeView:)) {
+        [item setTitle:(d != nil && unicodeView != nil && [unicodeView hasViewFor:d]) ? @"Close Unicode View" : @"Unicode View"];
+        return d != nil;
+    }
+    if (a == @selector(chooseUnicodeFonts:)) return YES;
+#endif
     if (a == @selector(pasteFromHistory:)) return d != nil;
     if (a == @selector(saveSession:)) return [[self sessionController] currentName] != nil;
     if (a == @selector(reopenLastSession:)) return [[self sessionController] hasLast];
@@ -534,6 +548,9 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
     [[doc retain] autorelease];                                  /* the window is still telling us it is closing */
     [self hideCallTip];
     if (preview != nil) [preview documentClosed:doc];
+#ifdef PILCROW_FT
+    if (unicodeView != nil) [unicodeView documentClosed:doc];
+#endif
     [docs removeObject:doc];
     SSTrace("close: removed; recording the last session");
     [[self sessionController] recordLast];
@@ -975,9 +992,28 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
     if (d != nil) [[self previewController] toggleFor:d];
 }
 
+#ifdef PILCROW_FT
+- (void)toggleUnicodeView:(id)sender
+{
+    EditorDoc *d = [self frontDocument];
+
+    if (unicodeView == nil) unicodeView = [[UnicodeController alloc] initWithOwner:self];
+    if (d != nil) [unicodeView toggleFor:d];
+}
+
+- (void)chooseUnicodeFonts:(id)sender
+{
+    if (unicodeView == nil) unicodeView = [[UnicodeController alloc] initWithOwner:self];
+    [unicodeView chooseFonts];
+}
+#endif
+
 - (void)documentTextChanged:(EditorDoc *)d
 {
     if (preview != nil) [preview documentChanged:d];
+#ifdef PILCROW_FT
+    if (unicodeView != nil) [unicodeView documentChanged:d];
+#endif
 }
 
 - (void)previewSettingsChanged

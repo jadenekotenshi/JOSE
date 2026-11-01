@@ -18,10 +18,19 @@ CC       = cc
 OPT      = -O
 DEFS     = -DOPENSTEP
 ARCHS    =                        # e.g. -arch i386 -arch m68k -arch sparc; see `fat` below
-CFLAGS   = $(OPT) -Wall $(DEFS) $(ARCHS) -Ihk -Icore -Iapp
+CFLAGS   = $(OPT) -Wall $(DEFS) $(FT_DEFS) $(ARCHS) -Ihk -Icore -Iapp
 LIBS     = -framework AppKit -framework Foundation
 APP      = Pilcrow.app
 VERSION  = 0.1.1
+
+# The Unicode view (Windows > Unicode View) draws text with FreeType; it is built only on request, with  make -f Makefile.openstep ft
+# (also  ft-fat ), which needs FreeType from openstep-pkg: headers in /usr/local/include/freetype2 and /usr/local/lib/libfreetype.a
+# (linked in, so the installed program needs no library; FreeType is not available for m68k, so the fat build leaves it out).  The FT_*
+# variables are empty in a normal build.  Run  make clean  when changing between the two kinds of build.
+FT_DEFS  =
+FT_OBJS  =
+FT_LIBS  =
+FT_ON    = FT_DEFS="-DPILCROW_FT -I/usr/local/include/freetype2" FT_OBJS="core/uview.o core/uglyph.o app/UnicodeController.o" FT_LIBS="/usr/local/lib/libfreetype.a -lz"
 
 # Workspace takes an application's icon (and its file-type table) from a read-only __ICON segment
 # linked into the executable, not from a file in the .app folder (compare /NextApps/Edit.app, whose
@@ -40,13 +49,13 @@ SYNTAXFILES = syntax/C.syntax
 ICONFLAGS = -sectcreate __ICON __header $(ICONHDR) -segprot __ICON r r -sectcreate __ICON app $(ICONTIFF) -sectcreate __ICON doc $(DOCTIFF)
 
 HK_OBJS   = hk/HKTextPattern.o hk/HKSyntaxDefinition.o hk/HKSyntaxHighlighter.o
-CORE_OBJS = core/langmodes.o core/eol.o core/undo.o core/search.o core/edit.o core/brace.o core/fill.o core/rect.o core/shellrun.o core/fold.o core/words.o core/includes.o core/tags.o core/foldlines.o core/macro.o core/modeprefs.o core/grep.o core/session.o core/cliphist.o core/complete.o core/remote.o core/md.o core/md_block.o core/md_inline.o core/md_rtf.o core/md_util.o core/nsenc.o core/url.o core/enc.o core/enc_tables.o core/wide.o
+CORE_OBJS = core/langmodes.o core/eol.o core/undo.o core/search.o core/edit.o core/brace.o core/fill.o core/rect.o core/shellrun.o core/fold.o core/words.o core/includes.o core/tags.o core/foldlines.o core/macro.o core/modeprefs.o core/grep.o core/session.o core/cliphist.o core/complete.o core/remote.o core/md.o core/md_block.o core/md_inline.o core/md_rtf.o core/md_util.o core/nsenc.o core/url.o core/enc.o core/enc_tables.o core/wide.o core/fbuf.o
 APP_OBJS  = app/AppController.o app/EditorDoc.o app/FindController.o app/FilesController.o app/SessionController.o app/ClipboardController.o app/RemoteController.o app/PreviewController.o app/LineNumberView.o app/ShellController.o app/MacroController.o app/TagsController.o app/Appearance.o app/PrefsController.o app/UIHelpers.o app/main.o
 
 # Every header, so that a changed one rebuilds what includes it.  tools/lint_openstep.sh checks the list is complete.
 HEADERS   = hk/HKCompat.h hk/HKSyntaxDefinition.h hk/HKSyntaxHighlighter.h hk/HKTextPattern.h \
-            core/eol.h core/langmodes.h core/undo.h core/search.h core/edit.h core/brace.h core/fill.h core/rect.h core/shellrun.h core/fold.h core/words.h core/includes.h core/tags.h core/foldlines.h core/macro.h core/modeprefs.h core/grep.h core/session.h core/cliphist.h core/complete.h core/remote.h core/md.h core/md_int.h core/nsenc.h core/nsenc_tab.h core/url.h core/enc.h core/enc_tables.h core/wide.h \
-            app/AppController.h app/Compat.h app/EditorDoc.h app/FindController.h app/FilesController.h app/SessionController.h app/ClipboardController.h app/RemoteController.h app/PreviewController.h app/LineNumberView.h app/ShellController.h app/MacroController.h app/TagsController.h app/Appearance.h app/PrefsController.h app/UIHelpers.h
+            core/eol.h core/langmodes.h core/undo.h core/search.h core/edit.h core/brace.h core/fill.h core/rect.h core/shellrun.h core/fold.h core/words.h core/includes.h core/tags.h core/foldlines.h core/macro.h core/modeprefs.h core/grep.h core/session.h core/cliphist.h core/complete.h core/remote.h core/md.h core/md_int.h core/nsenc.h core/nsenc_tab.h core/url.h core/enc.h core/enc_tables.h core/wide.h core/fbuf.h core/uglyph.h core/uview.h \
+            app/AppController.h app/Compat.h app/EditorDoc.h app/FindController.h app/FilesController.h app/SessionController.h app/ClipboardController.h app/RemoteController.h app/PreviewController.h app/LineNumberView.h app/ShellController.h app/MacroController.h app/TagsController.h app/Appearance.h app/PrefsController.h app/UIHelpers.h app/UnicodeController.h
 .SUFFIXES: .c .m .o
 
 .c.o:
@@ -57,16 +66,30 @@ HEADERS   = hk/HKCompat.h hk/HKSyntaxDefinition.h hk/HKSyntaxHighlighter.h hk/HK
 
 all: $(APP)/Pilcrow
 
-# (After "all", which has to be the first rule so that a plain "make" builds the application.)
-$(HK_OBJS) $(CORE_OBJS) $(APP_OBJS): $(HEADERS)
+# The application with the Unicode view.  (A changed FT_DEFS does not rebuild by itself: the objects that depend on it go first.)
+ft:
+	rm -f app/AppController.o $(APP)/Pilcrow
+	$(MAKE) -f Makefile.openstep $(FT_ON) all
 
-$(APP)/Pilcrow: $(HK_OBJS) $(CORE_OBJS) $(APP_OBJS) $(ICONHDR) $(ICONTIFF) $(DOCTIFF) $(SYNTAXFILES)
+# Its unit test: needs a TrueType or OpenType font file, in $$PILCROW_TEST_FONT or one of the places the test knows.
+test-ft:
+	$(MAKE) -f Makefile.openstep $(FT_ON) build/test_uview
+	build/test_uview
+
+build/test_uview: tests/test_uview.c core/fbuf.o core/uview.o core/uglyph.o core/wide.o
+	-mkdir build
+	$(CC) $(CFLAGS) -o build/test_uview tests/test_uview.c core/uview.o core/uglyph.o core/fbuf.o core/wide.o $(FT_LIBS)
+
+# (After "all", which has to be the first rule so that a plain "make" builds the application.)
+$(HK_OBJS) $(CORE_OBJS) $(APP_OBJS) $(FT_OBJS): $(HEADERS)
+
+$(APP)/Pilcrow: $(HK_OBJS) $(CORE_OBJS) $(APP_OBJS) $(FT_OBJS) $(ICONHDR) $(ICONTIFF) $(DOCTIFF) $(SYNTAXFILES)
 	-mkdir $(APP)
 	cp $(DOCTIFF) $(APP)/doc.tiff
 	-mkdir $(APP)/syntax
 	cp syntax/*.syntax $(APP)/syntax
 	@( cd $(APP) ) >/dev/null 2>&1 || { echo "make: $(APP) is missing or is not a directory:"; ls -ld $(APP); echo "remove it and run make again"; exit 1; }
-	$(CC) $(ARCHS) -o $(APP)/Pilcrow $(HK_OBJS) $(CORE_OBJS) $(APP_OBJS) $(ICONFLAGS) $(LIBS) || { echo "make: linking with the __ICON segment failed; retrying without an icon"; $(CC) $(ARCHS) -o $(APP)/Pilcrow $(HK_OBJS) $(CORE_OBJS) $(APP_OBJS) $(LIBS); }
+	$(CC) $(ARCHS) -o $(APP)/Pilcrow $(HK_OBJS) $(CORE_OBJS) $(APP_OBJS) $(FT_OBJS) $(ICONFLAGS) $(LIBS) $(FT_LIBS) || { echo "make: linking with the __ICON segment failed; retrying without an icon"; $(CC) $(ARCHS) -o $(APP)/Pilcrow $(HK_OBJS) $(CORE_OBJS) $(APP_OBJS) $(FT_OBJS) $(LIBS) $(FT_LIBS); }
 
 # Show what was linked in: expect a segment __ICON with sections __header, app and doc.
 iconcheck:

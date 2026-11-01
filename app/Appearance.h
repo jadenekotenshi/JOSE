@@ -42,6 +42,10 @@
 + (void)setShowAllFonts:(BOOL)flag;
 + (BOOL)reopenLastSession;                /* open the previous session's files at launch */
 + (void)setReopenLastSession:(BOOL)flag;
++ (NSString *)unicodeFonts;              /* the Unicode view's font files, colon separated: the first is the main font, the others fill in what it lacks (nil: none yet) */
++ (void)setUnicodeFonts:(NSString *)paths;
++ (int)unicodeFontSize;                   /* pixels (default 14) */
++ (void)setUnicodeFontSize:(int)px;
 + (BOOL)foldMargin;
 + (void)setFoldMargin:(BOOL)flag;
 @end

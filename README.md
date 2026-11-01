@@ -76,6 +76,13 @@ on the development host, and `tests/encodings` has sample files for trying them.
   `~/.Pilcrow.trace` present, startup writes two lines saying whether an input manager is active, which parts of the `NSTextInput`
   protocol the system's text view implements, and which installed fonts have CJK-looking names.  (Whether Pilcrow's editor works with a
   Japanese or Korean input method is not known yet.)
+* **Unicode view (experimental, built with FreeType)**: *Windows > Unicode View* shows the document, read-only, in a window that Pilcrow
+  draws itself with FreeType from font files you pick (*Unicode View Fonts...*: TrueType/OpenType files, the first is the main font and
+  the others fill in what it lacks; `file.ttc#2` picks face 2 of a collection), instead of the system text system, which cannot show
+  Japanese, Korean, Chinese and the like on stock 4.2.  Text is laid out on a grid of character cells (East Asian wide characters take two,
+  combining marks none, no wrapping).  It follows the document as it is edited.  Build it with `make -f Makefile.openstep ft` (needs the
+  `freetype` package from openstep-pkg; run `make clean` when switching between this and the normal build; `test-ft` runs its test with
+  `PILCROW_TEST_FONT` set to a font file).  FreeType is linked in statically.  Not in the fat build: FreeType is not available for m68k.
 * **Text encodings** (File > Encoding > Reopen with / Save with): a file is read as UTF-8 if it is (or is plain ASCII), as UTF-16 or
   UTF-8 with a byte order mark if it has one, and otherwise as ISO-8859-1 -- which carries every byte -- and it is written back in the
   encoding it was read in, so an Latin-1 file stays Latin-1 and a Shift_JIS file stays Shift_JIS.  The status line shows the encoding.

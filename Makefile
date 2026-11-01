@@ -3,10 +3,15 @@ CC      ?= cc
 BUILD   = build
 OBJCFLAGS = -x objective-c -fno-objc-arc -w -g -Ihk -Icore -Iapp
 
+FT_OK   := $(shell pkg-config --exists freetype2 2>/dev/null && echo 1)
+FT_CFLAGS := $(shell pkg-config --cflags freetype2 2>/dev/null)
+FT_LIBS := $(shell pkg-config --libs freetype2 2>/dev/null)
+TEST_UVIEW := $(if $(FT_OK),$(BUILD)/test_uview)
+
 CFLAGS  = -std=c89 -pedantic -Wall -Wextra -Wdeclaration-after-statement \
           -Wno-long-long -Wno-unused-parameter -O2 -g -Icore
 
-test: $(BUILD)/test_core $(BUILD)/test_search $(BUILD)/test_edit $(BUILD)/test_brace $(BUILD)/test_fill $(BUILD)/test_shell $(BUILD)/test_fold $(BUILD)/test_words $(BUILD)/test_includes $(BUILD)/test_tags $(BUILD)/test_foldlines $(BUILD)/test_macro $(BUILD)/test_modeprefs $(BUILD)/test_grep $(BUILD)/test_session $(BUILD)/test_cliphist $(BUILD)/test_complete $(BUILD)/test_remote $(BUILD)/test_markdown $(BUILD)/test_url $(BUILD)/test_enc
+test: $(BUILD)/test_core $(BUILD)/test_search $(BUILD)/test_edit $(BUILD)/test_brace $(BUILD)/test_fill $(BUILD)/test_shell $(BUILD)/test_fold $(BUILD)/test_words $(BUILD)/test_includes $(BUILD)/test_tags $(BUILD)/test_foldlines $(BUILD)/test_macro $(BUILD)/test_modeprefs $(BUILD)/test_grep $(BUILD)/test_session $(BUILD)/test_cliphist $(BUILD)/test_complete $(BUILD)/test_remote $(BUILD)/test_markdown $(BUILD)/test_url $(BUILD)/test_enc $(TEST_UVIEW)
 	$(BUILD)/test_core
 	$(BUILD)/test_search
 	$(BUILD)/test_edit
@@ -26,6 +31,7 @@ test: $(BUILD)/test_core $(BUILD)/test_search $(BUILD)/test_edit $(BUILD)/test_b
 	$(BUILD)/test_markdown
 	$(BUILD)/test_url
 	$(BUILD)/test_enc
+	$(if $(FT_OK),$(BUILD)/test_uview)
 	$(BUILD)/test_foldlines
 	$(BUILD)/test_macro
 
@@ -72,6 +78,10 @@ $(BUILD)/test_remote: tests/test_remote.c tests/test.h core/remote.c core/remote
 $(BUILD)/test_markdown: tests/test_markdown.c tests/test.h core/md.c core/md.h core/md_block.c core/md_inline.c core/md_rtf.c core/md_util.c core/md_int.h core/nsenc.c core/nsenc.h
 	mkdir -p $(BUILD)
 	$(CC) $(CFLAGS) tests/test_markdown.c core/md.c core/md_block.c core/md_inline.c core/md_rtf.c core/md_util.c core/nsenc.c -o $@
+
+$(BUILD)/test_uview: tests/test_uview.c tests/test.h core/uview.c core/uview.h core/uglyph.c core/uglyph.h core/fbuf.c core/fbuf.h core/wide.c
+	mkdir -p $(BUILD)
+	$(CC) $(CFLAGS) $(FT_CFLAGS) tests/test_uview.c core/uview.c core/uglyph.c core/fbuf.c core/wide.c $(FT_LIBS) -o $@
 
 $(BUILD)/test_url: tests/test_url.c tests/test.h core/url.c core/url.h
 	mkdir -p $(BUILD)
@@ -120,7 +130,7 @@ lint:
 check-objc:
 	for f in app/*.m hk/*.m; do \
 	  echo "check $$f"; \
-	  $(CC) -fsyntax-only -x objective-c -fno-objc-arc -Wall -Wno-deprecated-declarations \
+	  $(CC) -fsyntax-only -DPILCROW_FT -x objective-c -fno-objc-arc -Wall -Wno-deprecated-declarations \
 	    -Werror=declaration-after-statement -Wno-unused-parameter -Wno-unused-function -Ihk -Icore -Iapp $$f || exit 1; \
 	done
 
@@ -137,7 +147,7 @@ doc-smoke:
 	for f in tests/doc_smoke.m app/EditorDoc.m app/UIHelpers.m app/LineNumberView.m app/ShellController.m app/FindController.m app/FilesController.m app/SessionController.m app/ClipboardController.m app/RemoteController.m app/PreviewController.m app/MacroController.m app/AppController.m app/TagsController.m app/PrefsController.m app/Appearance.m hk/*.m; do \
 	  $(CC) -c $(OBJCFLAGS) -fsanitize=address,undefined $$f -o $(BUILD)/dc_$$(basename $$f .m).o || exit 1; \
 	done
-	for f in core/*.c; do $(CC) -c -w -g -Icore -fsanitize=address,undefined $$f -o $(BUILD)/dc_c_$$(basename $$f .c).o || exit 1; done
+	for f in $(filter-out core/uglyph.c core/uview.c,$(wildcard core/*.c)); do $(CC) -c -w -g -Icore -fsanitize=address,undefined $$f -o $(BUILD)/dc_c_$$(basename $$f .c).o || exit 1; done
 	$(CC) -fsanitize=address,undefined $(BUILD)/dc_*.o -framework Foundation -framework AppKit -o $(BUILD)/doc_smoke
 	$(BUILD)/doc_smoke
 

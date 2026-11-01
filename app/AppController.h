@@ -34,6 +34,7 @@
     RemoteController *remote;
     NSMutableDictionary *headerCache;   /* Complete Word: the identifiers of the headers a document includes (per document) */
     PreviewController *preview;
+    id              unicodeView;        /* the UnicodeController (only in builds with FreeType) */
     NSMenu         *clipMenu;           /* Edit > Paste from History */
     NSMenu         *sessionOpenMenu;    /* File > Sessions > Open / Switch to / Delete */
     NSMenu         *sessionSwitchMenu;

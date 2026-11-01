@@ -7,6 +7,8 @@ static BOOL dark = NO;
 static NSColor *customBackground = nil;
 static NSColor *customText = nil;
 static NSString *fontName = nil;
+static NSString *unicodeFonts = nil;
+static int unicodeFontSize = 14;
 static float fontSize = 0.0;
 static NSString *includePath = nil;
 static BOOL callTips = YES;
@@ -150,6 +152,10 @@ static BOOL get_bool(NSUserDefaults *ud, NSString *key, BOOL def)
     callTips = get_bool(ud, @"CallTips", YES);
     reopenLast = get_bool(ud, @"ReopenLastSession", NO);
     showAllFonts = get_bool(ud, @"ShowAllFonts", NO);
+    [unicodeFonts release];
+    unicodeFonts = [[ud stringForKey:@"UnicodeFonts"] copy];
+    v = [ud stringForKey:@"UnicodeFontSize"];
+    unicodeFontSize = (v != nil && [v intValue] >= 6 && [v intValue] <= 72) ? [v intValue] : 14;
     [browserPath release];
     browserPath = [[ud stringForKey:@"BrowserPath"] copy];
     [browserArgs release];
@@ -187,6 +193,9 @@ static BOOL get_bool(NSUserDefaults *ud, NSString *key, BOOL def)
     [ud setObject:callTips ? @"YES" : @"NO" forKey:@"CallTips"];
     [ud setObject:reopenLast ? @"YES" : @"NO" forKey:@"ReopenLastSession"];
     [ud setObject:showAllFonts ? @"YES" : @"NO" forKey:@"ShowAllFonts"];
+    if (unicodeFonts != nil) [ud setObject:unicodeFonts forKey:@"UnicodeFonts"];
+    else [ud removeObjectForKey:@"UnicodeFonts"];
+    [ud setObject:[NSString stringWithFormat:@"%d", unicodeFontSize] forKey:@"UnicodeFontSize"];
     if (browserPath != nil) [ud setObject:browserPath forKey:@"BrowserPath"]; else [ud removeObjectForKey:@"BrowserPath"];
     if (browserArgs != nil) [ud setObject:browserArgs forKey:@"BrowserArgs"]; else [ud removeObjectForKey:@"BrowserArgs"];
     [ud setObject:[NSString stringWithFormat:@"%d", previewCharset] forKey:@"PreviewCharset"];
@@ -306,6 +315,10 @@ static BOOL get_bool(NSUserDefaults *ud, NSString *key, BOOL def)
 }
 + (BOOL)showAllFonts { return showAllFonts; }
 + (void)setShowAllFonts:(BOOL)flag { showAllFonts = flag; }
++ (NSString *)unicodeFonts { return unicodeFonts; }
++ (void)setUnicodeFonts:(NSString *)paths { [unicodeFonts release]; unicodeFonts = [paths length] > 0 ? [paths copy] : nil; }
++ (int)unicodeFontSize { return unicodeFontSize; }
++ (void)setUnicodeFontSize:(int)px { unicodeFontSize = (px >= 6 && px <= 72) ? px : 14; }
 + (BOOL)reopenLastSession { return reopenLast; }
 + (void)setReopenLastSession:(BOOL)flag { reopenLast = flag; }
 + (BOOL)foldMargin { return foldMargin; }
