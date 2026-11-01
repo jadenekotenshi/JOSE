@@ -45,6 +45,13 @@ size_t remote_path_arg(const char *path, char *out, size_t cap)
 {
     size_t n = 0, m;
 
+    if (path[0] == '~' && path[1] == '\0') {
+        static const char home1[] = "\"$HOME\"";
+
+        n = sizeof home1 - 1;
+        if (cap > n) memcpy(out, home1, n + 1);
+        return n;
+    }
     if (path[0] == '~' && path[1] == '/') {
         static const char home[] = "\"$HOME\"/";
 

@@ -261,6 +261,7 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
     [self addItem:@"New" action:@selector(newDoc:) key:@"n" target:self toMenu:m];
     [self addItem:@"Open..." action:@selector(openDoc:) key:@"o" target:self toMenu:m];
     [self addItem:@"Open Remote..." action:@selector(openRemote:) key:@"O" target:self toMenu:m];
+    [self addItem:@"Browse Remote..." action:@selector(browseRemote:) key:@"" target:self toMenu:m];
     recentMenu = [self submenuNamed:@"Open Recent" inMenu:m];
     [self rebuildRecentMenu];
     {
@@ -932,6 +933,7 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
 }
 
 - (void)openRemote:(id)sender { [[self remoteController] openDialog]; }
+- (void)browseRemote:(id)sender { [[self remoteController] browse]; }
 - (BOOL)remoteSaveDocument:(EditorDoc *)d { return [[self remoteController] saveDocument:d]; }
 - (BOOL)remoteReloadDocument:(EditorDoc *)d { return [[self remoteController] reloadDocument:d]; }
 

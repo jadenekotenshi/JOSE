@@ -12,6 +12,14 @@
     id          owner;                /* the AppController: -newDocument, -frontDocument */
     NSPanel    *dialogPanel;
     NSTextField *specField;
+    NSPanel      *browsePanel;        /* Browse Remote: a directory listing to open files from */
+    NSTextField  *browseHost;
+    NSTextField  *browseDir;
+    NSButton     *browseHidden;
+    NSTableView  *browseTable;
+    NSTextField  *browseMessage;
+    NSMutableArray *browseNames;      /* the entries shown, folders first with a trailing slash */
+    NSString     *browseCurrent;      /* the folder listed now, as the far side wrote it (absolute) */
     NSMutableArray *recent;           /* the specs opened lately, newest first */
 }
 - (id)initWithOwner:(id)anOwner;
@@ -19,5 +27,7 @@
 - (EditorDoc *)openSpec:(NSString *)spec;    /* nil (after telling the user why) if it could not be opened */
 - (BOOL)saveDocument:(EditorDoc *)d;  /* YES if the text was written */
 - (BOOL)reloadDocument:(EditorDoc *)d;
+- (void)browse;                       /* Browse Remote...: list a folder on another machine and open files from it */
+- (NSArray *)listDirectory:(NSString *)dir userhost:(NSString *)uh hidden:(BOOL)hidden resolved:(NSString **)abs;   /* names (folders end in /), or nil with the reason in *abs */
 - (BOOL)remoteChanged:(EditorDoc *)d; /* the file on the other side is not what was read (NO if it cannot tell) */
 @end

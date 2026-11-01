@@ -1120,6 +1120,26 @@ int main(void)
         CHECK([rc saveDocument:rd]);
         CHECK([[NSData dataWithContentsOfFile:crlf] isEqualToData:[@"Za\r\nb\r\n" dataUsingEncoding:NSASCIIStringEncoding]]);
 
+        {   /* the folder listing: folders first (with a slash), then files; hidden ones only when asked for */
+            NSString *abs = nil, *bdir = [rdir stringByAppendingPathComponent:@"list dir"];
+            NSArray *names, *want;
+
+            [fm createDirectoryAtPath:bdir attributes:nil];
+            [fm createDirectoryAtPath:[bdir stringByAppendingPathComponent:@"zsub"] attributes:nil];
+            [fm createDirectoryAtPath:[bdir stringByAppendingPathComponent:@".hid dir"] attributes:nil];
+            [@"x" writeToFile:[bdir stringByAppendingPathComponent:@"b file"] atomically:YES];
+            [@"x" writeToFile:[bdir stringByAppendingPathComponent:@"a.txt"] atomically:YES];
+            [@"x" writeToFile:[bdir stringByAppendingPathComponent:@".dot"] atomically:YES];
+            names = [rc listDirectory:bdir userhost:@"me@h" hidden:NO resolved:&abs];
+            CHECK([abs isEqualToString:bdir]);
+            want = [NSArray arrayWithObjects:@"zsub/", @"a.txt", @"b file", nil];
+            CHECK([names isEqualToArray:want]);
+            names = [rc listDirectory:bdir userhost:@"me@h" hidden:YES resolved:&abs];
+            CHECK([names count] == 5 && [names containsObject:@".dot"] && [names containsObject:@".hid dir/"] && [names containsObject:@"zsub/"]);
+            CHECK([[names objectAtIndex:0] characterAtIndex:[[names objectAtIndex:0] length] - 1] == '/');        /* folders first */
+            names = [rc listDirectory:[bdir stringByAppendingPathComponent:@"zsub"] userhost:@"me@h" hidden:NO resolved:&abs];
+            CHECK([names count] == 0 && names != nil);                              /* an empty folder lists as nothing */
+        }
         setenv("HOME", [rdir cString], 1);                                       /* ~/ is the remote home */
         [@"in home\n" writeToFile:[rdir stringByAppendingPathComponent:@"tilde.txt"] atomically:YES];
         rd = [rc openSpec:@"h:~/tilde.txt"];

@@ -76,7 +76,9 @@ Status: **prototype (0.0.1)** -- nothing here has been run on OPENSTEP yet.
   whether the file changed since it was read -- if it did, you are asked before it is overwritten.  Line endings are kept; only UTF-8
   text is opened; a path that does not exist can be created.  Revert to Saved fetches it again.  The program must log in without
   asking anything (a key; with OpenSSH an agent), and the host key must be known already (connect once from a terminal).  Save As
-  makes a local copy.  Remote windows are not part of sessions, and Open Included File, tags and the like see no local file.
+  makes a local copy.  *File > Browse Remote...* lists a folder on the other machine (machine and folder fields; folders first, an option for
+  hidden files; double-click a folder to enter it or a file to open it; *Up* goes to the parent): the listing is made by a few lines of `sh` run
+  there, so it needs nothing but a Bourne shell.  Remote windows are not part of sessions, and Open Included File, tags and the like see no local file.
 * **Word completion** (Edit > Complete Word, cmd-I; Complete Word, Previous, shift-cmd-I): finishes the word before the insertion point
   and, pressed again, goes on to the next candidate -- then back to the word as typed, and round again; shift-cmd-I goes the other way.
   Candidates, in this order: words of this text, nearest first (before the word, then after it); words of the other open windows

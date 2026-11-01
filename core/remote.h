@@ -16,7 +16,7 @@ int remote_parse(const char *spec, char *userhost, size_t uhcap, char *path, siz
  * string if cap is big enough. */
 size_t remote_shq(const char *s, char *out, size_t cap);
 
-/* The remote shell's form of a path: quoted, except that a leading ~/ becomes "$HOME"/ so that it still means the home folder. */
+/* The remote shell's form of a path: quoted, except that a leading ~/ becomes "$HOME"/ (and a lone ~ "$HOME") so that it still means the home folder. */
 size_t remote_path_arg(const char *path, char *out, size_t cap);
 
 /* The local command line:  'prog' [-o BatchMode=yes] [extra] 'userhost' 'remote command'.  `batch` adds the BatchMode option (OpenSSH

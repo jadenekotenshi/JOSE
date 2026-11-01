@@ -22,6 +22,12 @@
 - (void)dialogOK:(id)sender;
 - (void)dialogCancel:(id)sender;
 - (void)recentChosen:(id)sender;
+- (void)buildBrowser;
+- (void)browseGo:(id)sender;
+- (void)browseUp:(id)sender;
+- (void)browseOpen:(id)sender;
+- (void)browseClose:(id)sender;
+- (void)browseList:(NSString *)dir;
 @end
 
 static BOOL split_spec(NSString *spec, NSString **userhost, NSString **rpath)
@@ -286,6 +292,191 @@ static NSString *qpath(NSString *rpath)
     [dialogPanel release];
     dialogPanel = nil;
     if (spec != nil && [ui_trim(spec) length] > 0) [self openSpec:spec];
+}
+
+/* ---- the browser ---- */
+
+- (NSArray *)listDirectory:(NSString *)dir userhost:(NSString *)uh hidden:(BOOL)hidden resolved:(NSString **)abs
+{
+    ShellResult r;
+    NSString *cmd, *text;
+    NSMutableArray *lines, *dirs = [NSMutableArray array], *files = [NSMutableArray array];
+    unsigned int i;
+
+    cmd = [NSString stringWithFormat:@"cd %@ && pwd && for f in %@; do if [ -d \"$f\" ]; then echo \"$f/\"; elif [ -e \"$f\" ] || [ -L \"$f\" ]; then echo \"$f\"; fi; done",
+           qpath(dir), hidden ? @"* .[!.]* ..?*" : @"*"];
+    if (![self run:cmd userhost:uh input:nil result:&r]) { shell_result_free(&r); *abs = @"Could not run the program."; return nil; }
+    if (r.status != 0 || r.timed_out) {
+        *abs = [self errorText:&r];
+        shell_result_free(&r);
+        return nil;
+    }
+    text = ui_string_from_utf8(r.out);
+    shell_result_free(&r);
+    lines = [NSMutableArray arrayWithArray:[text componentsSeparatedByString:@"\n"]];
+    if ([lines count] == 0 || [[lines objectAtIndex:0] length] == 0) { *abs = @"The far side did not say where it is."; return nil; }
+    *abs = [[[lines objectAtIndex:0] copy] autorelease];
+    for (i = 1; i < [lines count]; i++) {
+        NSString *n = [lines objectAtIndex:i];
+
+        if ([n length] == 0 || [n isEqualToString:@"*/"] || [n isEqualToString:@"*"]) continue;                /* a glob that matched nothing */
+        if ([n characterAtIndex:[n length] - 1] == '/') [dirs addObject:n]; else [files addObject:n];
+    }
+    [dirs addObjectsFromArray:files];
+    return dirs;
+}
+
+- (int)numberOfRowsInTableView:(NSTableView *)tv { return (int)[browseNames count]; }
+
+- (id)tableView:(NSTableView *)tv objectValueForTableColumn:(NSTableColumn *)col row:(int)row
+{
+    return (row >= 0 && row < (int)[browseNames count]) ? [browseNames objectAtIndex:row] : @"";
+}
+
+- (void)browseList:(NSString *)dir
+{
+    NSString *uh = ui_trim([browseHost stringValue]), *abs = nil;
+    NSArray *names;
+
+    if ([uh length] == 0) { [browseMessage setStringValue:@"Type the machine as [user@]host."]; return; }
+    [browseMessage setStringValue:@"Listing..."];
+    [browseMessage display];
+    names = [self listDirectory:dir userhost:uh hidden:[browseHidden state] == NSOnState resolved:&abs];
+    if (names == nil) {
+        [browseMessage setStringValue:abs];
+        return;
+    }
+    [browseCurrent release];
+    browseCurrent = [abs copy];
+    [browseDir setStringValue:abs];
+    [browseNames removeAllObjects];
+    [browseNames addObjectsFromArray:names];
+    [browseTable reloadData];
+    [browseMessage setStringValue:[NSString stringWithFormat:@"%u entries in %@", (unsigned)[names count], abs]];
+    {
+        NSUserDefaults *ud = [NSUserDefaults standardUserDefaults];
+
+        [ud setObject:uh forKey:@"RemoteBrowseHost"];
+        [ud setObject:abs forKey:@"RemoteBrowseDir"];
+    }
+}
+
+- (void)browseGo:(id)sender
+{
+    NSString *d = ui_trim([browseDir stringValue]);
+
+    [self browseList:[d length] > 0 ? d : @"~"];
+}
+
+- (void)browseUp:(id)sender
+{
+    NSString *cur = browseCurrent != nil ? browseCurrent : ui_trim([browseDir stringValue]);
+
+    if ([cur length] == 0 || [cur isEqualToString:@"/"]) return;
+    [self browseList:[cur stringByDeletingLastPathComponent]];
+}
+
+- (void)browseOpen:(id)sender
+{
+    int row = [browseTable clickedRow];
+    NSString *name, *full;
+
+    if (row < 0) row = [browseTable selectedRow];
+    if (row < 0 || row >= (int)[browseNames count] || browseCurrent == nil) return;
+    name = [browseNames objectAtIndex:row];
+    if ([name characterAtIndex:[name length] - 1] == '/') {                         /* a folder: go into it */
+        [self browseList:[browseCurrent stringByAppendingPathComponent:[name substringToIndex:[name length] - 1]]];
+        return;
+    }
+    full = [NSString stringWithFormat:@"%@:%@", ui_trim([browseHost stringValue]), [browseCurrent stringByAppendingPathComponent:name]];
+    if ([self openSpec:full] == nil) [browseMessage setStringValue:@"That file could not be opened."];
+}
+
+- (void)browseClose:(id)sender
+{
+    [browsePanel orderOut:nil];
+}
+
+- (void)buildBrowser
+{
+    NSView *c;
+    NSTableColumn *col;
+    NSScrollView *sv;
+
+    browsePanel = [[NSPanel alloc] initWithContentRect:NSMakeRect(0, 0, 480, 400)
+                                             styleMask:(NSTitledWindowMask | NSClosableWindowMask | NSResizableWindowMask)
+                                               backing:NSBackingStoreBuffered defer:NO];
+    [browsePanel setTitle:@"Browse Remote"];
+    [browsePanel setReleasedWhenClosed:NO];
+    [browsePanel setMinSize:NSMakeSize(360, 280)];
+    c = [browsePanel contentView];
+    [c addSubview:ui_label(@"Machine:", NSMakeRect(14, 366, 60, 18))];
+    browseHost = ui_field(NSMakeRect(80, 364, 386, 22));
+    [browseHost setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
+    [c addSubview:browseHost];
+    [c addSubview:ui_label(@"Folder:", NSMakeRect(14, 336, 60, 18))];
+    browseDir = ui_field(NSMakeRect(80, 334, 306, 22));
+    [browseDir setTarget:self];
+    [browseDir setAction:@selector(browseGo:)];
+    [browseDir setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
+    [c addSubview:browseDir];
+    {
+        NSButton *b = ui_button(@"List", NSMakeRect(392, 330, 74, 28), self, @selector(browseGo:));
+        [b setAutoresizingMask:(NSViewMinXMargin | NSViewMinYMargin)];
+        [c addSubview:b];
+    }
+    browseHidden = ui_switch(@"Show hidden files", NSMakeRect(14, 306, 200, 20));
+    [browseHidden setAutoresizingMask:(NSViewMaxXMargin | NSViewMinYMargin)];
+    [c addSubview:browseHidden];
+    browseTable = [[[NSTableView alloc] initWithFrame:NSMakeRect(0, 0, 440, 200)] autorelease];
+    col = [[[NSTableColumn alloc] initWithIdentifier:@"name"] autorelease];
+    [[col headerCell] setStringValue:@"Double-click a folder to enter it, a file to open it"];
+    [col setWidth:1200];
+    [col setEditable:NO];
+    [browseTable addTableColumn:col];
+    [browseTable setDataSource:(id)self];
+    [browseTable setAllowsMultipleSelection:NO];
+    [browseTable setTarget:self];
+    [browseTable setDoubleAction:@selector(browseOpen:)];
+    sv = [[[NSScrollView alloc] initWithFrame:NSMakeRect(14, 70, 452, 228)] autorelease];
+    [sv setHasVerticalScroller:YES];
+    [sv setHasHorizontalScroller:YES];
+    [sv setBorderType:NSBezelBorder];
+    [sv setDocumentView:browseTable];
+    [sv setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
+    [c addSubview:sv];
+    browseMessage = ui_label(@"", NSMakeRect(14, 44, 452, 18));
+    [browseMessage setAutoresizingMask:(NSViewWidthSizable | NSViewMaxYMargin)];
+    [c addSubview:browseMessage];
+    {
+        NSButton *b;
+
+        b = ui_button(@"Up", NSMakeRect(14, 8, 60, 28), self, @selector(browseUp:));
+        [b setAutoresizingMask:(NSViewMaxXMargin | NSViewMaxYMargin)]; [c addSubview:b];
+        b = ui_button(@"Open", NSMakeRect(80, 8, 70, 28), self, @selector(browseOpen:));
+        [b setAutoresizingMask:(NSViewMaxXMargin | NSViewMaxYMargin)]; [c addSubview:b];
+        b = ui_button(@"Close", NSMakeRect(396, 8, 70, 28), self, @selector(browseClose:));
+        [b setAutoresizingMask:(NSViewMinXMargin | NSViewMaxYMargin)]; [c addSubview:b];
+    }
+    browseNames = [[NSMutableArray alloc] init];
+    [browsePanel center];
+}
+
+- (void)browse
+{
+    NSUserDefaults *ud = [NSUserDefaults standardUserDefaults];
+    NSString *h = [ud stringForKey:@"RemoteBrowseHost"], *d = [ud stringForKey:@"RemoteBrowseDir"];
+
+    if (browsePanel == nil) [self buildBrowser];
+    if (h == nil && [recent count] > 0) {                                  /* the machine of the file opened last */
+        NSString *uh, *rp;
+
+        if (split_spec([recent objectAtIndex:0], &uh, &rp)) { h = uh; d = [rp stringByDeletingLastPathComponent]; }
+    }
+    if ([[browseHost stringValue] length] == 0 && h != nil) [browseHost setStringValue:h];
+    if ([[browseDir stringValue] length] == 0) [browseDir setStringValue:d != nil ? d : @"~"];
+    [browsePanel makeKeyAndOrderFront:nil];
+    [browsePanel makeFirstResponder:[[browseHost stringValue] length] > 0 ? (NSResponder *)browseDir : (NSResponder *)browseHost];
 }
 
 @end

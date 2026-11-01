@@ -25,6 +25,8 @@ int main(void)
     CHECK(remote_shq("long string", buf, 4) == 13 && strlen(buf) == 3);              /* too small: reports the size, does not overrun */
     remote_path_arg("~/src/it's.c", buf, sizeof buf);
     CHECK(strcmp(buf, "\"$HOME\"/'src/it'\\''s.c'") == 0);
+    remote_path_arg("~", buf, sizeof buf);
+    CHECK(strcmp(buf, "\"$HOME\"") == 0);
     remote_path_arg("/abs/path", buf, sizeof buf);
     CHECK(strcmp(buf, "'/abs/path'") == 0);
     remote_path_arg("~user/x", buf, sizeof buf);
