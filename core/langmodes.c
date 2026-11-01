@@ -26,7 +26,7 @@ static const ExtMode EXTS[] = {
 
 static const NameMode NAMES[] = {
     { "ChangeLog", "ChangeLog" }, { "Changelog", "ChangeLog" },
-    { "Makefile", "GNUmakefile" }, { "makefile", "GNUmakefile" }, { "GNUmakefile", "GNUmakefile" },
+    { "Makefile", "BSDMakefile" }, { "makefile", "BSDMakefile" }, { "GNUmakefile", "GNUmakefile" },
     { ".profile", "Shell" }, { ".kshrc", "Shell" }, { ".bashrc", "Shell" }, { ".bash_profile", "Shell" }, { ".xinitrc", "Shell" },
     { ".cshrc", "Csh" }, { ".tcshrc", "Csh" }, { ".login", "Csh" }, { ".logout", "Csh" },
     { "Imakefile", "Imakefile" }, { "BSDmakefile", "BSDMakefile" },

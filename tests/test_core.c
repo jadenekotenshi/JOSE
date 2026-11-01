@@ -38,7 +38,8 @@ int main(void)
     CHECK(str_eq(lang_mode_for("config.mk", NULL), "GNUmakefile") && lang_mode_for("bsd.mk", NULL) != NULL);
     CHECK(str_eq(lang_mode_for("tool", "#!/usr/bin/env python"), "Python"));
     CHECK(str_eq(lang_mode_for("Thing.mm", NULL), "ObjC++"));
-    CHECK(str_eq(lang_mode_for("/usr/src/Makefile", NULL), "GNUmakefile"));
+    CHECK(str_eq(lang_mode_for("/usr/src/Makefile", NULL), "BSDMakefile") && str_eq(lang_mode_for("makefile", NULL), "BSDMakefile"));   /* OPENSTEP's make is BSD make */
+    CHECK(str_eq(lang_mode_for("GNUmakefile", NULL), "GNUmakefile"));
     CHECK(str_eq(lang_mode_for("Makefile.openstep", NULL), "GNUmakefile"));
     CHECK(str_eq(lang_mode_for("ChangeLog", NULL), "ChangeLog"));
     CHECK(str_eq(lang_mode_for("Info.plist", NULL), "Plist"));
