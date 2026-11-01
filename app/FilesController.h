@@ -22,6 +22,12 @@
     NSMutableArray  *rowText;             /* what each row of the list shows */
     NSMutableArray  *rowPath;             /* the file of each row */
     NSMutableArray  *rowLine;             /* NSNumber: the line of each row */
+    NSButton        *findButton;
+    NSButton        *replaceButton;
+    NSButton        *stopButton;
+    NSModalSession   modalSession;        /* while a search or replacement runs, so that the panel (Stop) stays alive */
+    BOOL             stopRequested;
+    NSTimeInterval   lastPump;
     unsigned int     skippedFiles;        /* files left out of the last run (binary, not UTF-8, too big) */
 }
 - (id)initWithOwner:(id)anOwner;

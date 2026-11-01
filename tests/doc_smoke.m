@@ -18,6 +18,7 @@
 @interface FilesController (SmokeTest)
 - (void)collectFilesIn:(NSString *)d recursive:(BOOL)rec patterns:(const char *)pats into:(NSMutableArray *)found;
 - (NSString *)replaceInFiles:(NSArray *)hitFiles search:(Search *)s with:(NSString *)replacement literal:(BOOL)literal backups:(BOOL)backups;
+- (void)stopRun:(id)sender;
 @end
 
 @interface ShellController (SmokeTest)
@@ -621,6 +622,10 @@ int main(void)
         CHECK([[NSString stringWithContentsOfFile:po] isEqualToString:@"x foo y\n"]);                    /* not its file */
         [od undo];
         CHECK([[[od textView] string] isEqualToString:@"x foo y\n"]);                                    /* one undo step */
+        [fc stopRun:nil];                                                        /* Stop: the walk and the replacement end at once */
+        [found removeAllObjects];
+        [fc collectFilesIn:fdir recursive:YES patterns:(const char *)[pats bytes] into:found];
+        CHECK([found count] == 0);
         search_free(se);
     }
     {   /* split panes: a second view of the same text; the active pane changes with the focus; closing either one */

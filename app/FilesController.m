@@ -25,6 +25,10 @@
 - (void)useFileFolder:(id)sender;
 - (void)openRow:(id)sender;
 - (void)closePanel:(id)sender;
+- (void)stopRun:(id)sender;
+- (void)beginRun;
+- (void)endRun;
+- (BOOL)pumpIfDue;
 - (NSString *)replaceInFiles:(NSArray *)hitFiles search:(Search *)s with:(NSString *)replacement literal:(BOOL)literal backups:(BOOL)backups;
 - (unsigned int)scanFiles:(NSArray *)files search:(Search *)s filesWithHits:(NSMutableArray *)hitFiles;
 @end
@@ -89,6 +93,7 @@ static u16 *units_of(NSString *s, unsigned int *n)
     [panel setTitle:@"Find in Files"];
     [panel setReleasedWhenClosed:NO];
     [panel setMinSize:NSMakeSize(560, 360)];
+    [panel setDelegate:self];
     c = [panel contentView];
 
     [c addSubview:ui_label(@"Find:", NSMakeRect(14, 438, 70, 18))];
@@ -157,9 +162,16 @@ static u16 *units_of(NSString *s, unsigned int *n)
         b = ui_button(@"Find All", NSMakeRect(14, 40, 100, 28), self, @selector(findAll:));
         [b setAutoresizingMask:(NSViewMaxXMargin | NSViewMaxYMargin)];
         [c addSubview:b];
+        findButton = b;
         b = ui_button(@"Replace All...", NSMakeRect(120, 40, 110, 28), self, @selector(replaceAll:));
         [b setAutoresizingMask:(NSViewMaxXMargin | NSViewMaxYMargin)];
         [c addSubview:b];
+        replaceButton = b;
+        b = ui_button(@"Stop", NSMakeRect(236, 40, 70, 28), self, @selector(stopRun:));
+        [b setAutoresizingMask:(NSViewMaxXMargin | NSViewMaxYMargin)];
+        [b setEnabled:NO];
+        [c addSubview:b];
+        stopButton = b;
         b = ui_button(@"Close", NSMakeRect(476, 40, 70, 28), self, @selector(closePanel:));
         [b setAutoresizingMask:(NSViewMinXMargin | NSViewMaxYMargin)];
         [c addSubview:b];
@@ -197,7 +209,57 @@ static u16 *units_of(NSString *s, unsigned int *n)
 
 - (void)closePanel:(id)sender
 {
+    if (modalSession != NULL) { stopRequested = YES; return; }       /* closing during a run stops it */
     [panel orderOut:nil];
+}
+
+- (BOOL)windowShouldClose:(id)sender
+{
+    if (modalSession != NULL) { stopRequested = YES; return NO; }
+    return YES;
+}
+
+/* ---- running a search without freezing the panel ---- */
+
+- (void)stopRun:(id)sender
+{
+    stopRequested = YES;
+}
+
+/* The panel becomes a modal session: its Stop button works, and nothing else in the program does until the run ends. */
+- (void)beginRun
+{
+    stopRequested = NO;
+    [findButton setEnabled:NO];
+    [replaceButton setEnabled:NO];
+    [stopButton setEnabled:YES];
+    modalSession = [NSApp beginModalSessionForWindow:panel];
+    lastPump = [NSDate timeIntervalSinceReferenceDate];
+}
+
+- (void)endRun
+{
+    if (modalSession != NULL) {
+        [NSApp endModalSession:modalSession];
+        modalSession = NULL;
+    }
+    [findButton setEnabled:YES];
+    [replaceButton setEnabled:YES];
+    [stopButton setEnabled:NO];
+}
+
+/* Lets the panel handle its events (about ten times a second at most).  NO if Stop was pressed. */
+- (BOOL)pumpIfDue
+{
+    NSTimeInterval now;
+
+    if (modalSession == NULL) return !stopRequested;
+    now = [NSDate timeIntervalSinceReferenceDate];
+    if (now - lastPump >= 0.1) {
+        lastPump = now;
+        [NSApp runModalSession:modalSession];
+    }
+    return !stopRequested;
 }
 
 - (void)useFileFolder:(id)sender
@@ -272,7 +334,7 @@ static u16 *units_of(NSString *s, unsigned int *n)
     NSArray *names = [[fm directoryContentsAtPath:dir] sortedArrayUsingSelector:@selector(compare:)];
     unsigned int i;
 
-    for (i = 0; i < [names count] && [found count] < MAX_FILES; i++) {
+    for (i = 0; i < [names count] && [found count] < MAX_FILES && [self pumpIfDue]; i++) {
         NSString *name = [names objectAtIndex:i];
         NSString *full = [dir stringByAppendingPathComponent:name];
         NSString *type = [[fm fileAttributesAtPath:full traverseLink:NO] fileType];
@@ -340,7 +402,7 @@ static NSString *clip_line(NSString *text, unsigned int a, unsigned int b)
     unsigned int i, total = 0;
 
     skippedFiles = 0;
-    for (i = 0; i < [files count] && total < MAX_ROWS; i++) {
+    for (i = 0; i < [files count] && total < MAX_ROWS && [self pumpIfDue]; i++) {
         NSString *file = [files objectAtIndex:i];
         NSString *text;
         EditorDoc *doc;
@@ -401,11 +463,13 @@ static NSString *plural(unsigned int n, NSString *one, NSString *many)
     [ud setObject:[folderField stringValue] forKey:@"FilesFolder"];
     [ud setObject:[patternField stringValue] forKey:@"FilesPattern"];
     [self say:@"Looking for files..."];
+    [self beginRun];
     [self collectFilesIn:folder recursive:[subSwitch state] == NSOnState patterns:(const char *)[pats bytes] into:files];
     total = [self scanFiles:files search:s filesWithHits:hitFiles];
+    [self endRun];
     search_free(s);
     [table reloadData];
-    [self say:[NSString stringWithFormat:@"%@ in %@ (of %@ searched%@%@)",
+    [self say:[NSString stringWithFormat:@"%@%@ in %@ (of %@ searched%@%@)", stopRequested ? @"Stopped: " : @"",
                plural(total, @"line", @"lines"), plural([hitFiles count], @"file", @"files"), plural([files count], @"file", @"files"),
                skippedFiles > 0 ? [NSString stringWithFormat:@"; %u not text or too big", skippedFiles] : @"",
                total >= MAX_ROWS ? @"; list is full, more may follow" : @""]];
@@ -429,9 +493,16 @@ static NSString *plural(unsigned int n, NSString *one, NSString *many)
     s = [self compiledSearch];
     if (s == NULL) return;
     [self say:@"Looking for files..."];
+    [self beginRun];
     [self collectFilesIn:folder recursive:[subSwitch state] == NSOnState patterns:(const char *)[pats bytes] into:files];
     total = [self scanFiles:files search:s filesWithHits:hitFiles];
+    [self endRun];
     [table reloadData];
+    if (stopRequested) {
+        search_free(s);
+        [self say:@"Stopped; nothing replaced."];
+        return;
+    }
     if (total == 0) {
         search_free(s);
         [self say:@"Nothing found, nothing replaced."];
@@ -450,7 +521,13 @@ static NSString *plural(unsigned int n, NSString *one, NSString *many)
         [self say:@"Cancelled."];
         return;
     }
-    [self say:[self replaceInFiles:hitFiles search:s with:[replaceField stringValue] literal:!regex backups:backups]];
+    [self beginRun];
+    {
+        NSString *summary = [self replaceInFiles:hitFiles search:s with:[replaceField stringValue] literal:!regex backups:backups];
+
+        [self endRun];
+        [self say:stopRequested ? [@"Stopped part way. " stringByAppendingString:summary] : summary];
+    }
     search_free(s);
 }
 
@@ -461,7 +538,7 @@ static NSString *plural(unsigned int n, NSString *one, NSString *many)
     u16 *repl = units_of(replacement, &nrepl);
 
     if (repl == NULL) return @"Out of memory.";
-    for (i = 0; i < [hitFiles count]; i++) {
+    for (i = 0; i < [hitFiles count] && [self pumpIfDue]; i++) {
         NSString *file = [hitFiles objectAtIndex:i], *text;
         EditorDoc *doc;
         int eol, mixed;

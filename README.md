@@ -68,7 +68,7 @@ Status: **prototype (0.0.1)** -- nothing here has been run on OPENSTEP yet.
   there.  *Replace All...* replaces in every file with a match, after asking.  A file open in a window is searched as it stands
   there and changed there (one undo step, not saved); the others are rewritten on disk, each kept as `name.bak` if that is ticked.
   Files that are not UTF-8 text (or are over 4 MB) are never searched, and a file that mixes line endings is never rewritten; the
-  message line says how many were left out.  The search is not interruptible.
+  message line says how many were left out.  While it runs the panel stays alive: *Stop* (or closing the panel) ends it, and nothing else in the program responds until it is over.
 * **Per-mode preferences** (Preferences > Preferences Panel > Language Modes...): each language mode may override the indent width,
   spaces for indentation, auto indent and line wrapping; a setting left at "Same as general" follows the Preferences menu.  The
   overrides apply when a file is opened or saved under a name, or the mode is chosen by hand, and at once to windows already in
