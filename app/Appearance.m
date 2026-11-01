@@ -59,6 +59,28 @@ static BOOL get_bool(NSUserDefaults *ud, NSString *key, BOOL def)
 
 @implementation Appearance
 
+/* Metrics are not enough: the PostScript server can refuse a font it lists ("typecheck; setfont" for the composite Heisei fonts).
+   So select it into a scratch image and wait for the server to answer; an error comes back as an exception here instead of in the editor. */
++ (BOOL)fontDraws:(NSFont *)f
+{
+    NSImage *img = [[NSImage alloc] initWithSize:NSMakeSize(32.0, 32.0)];
+    BOOL ok = YES;
+
+    [img lockFocus];
+    NS_DURING
+        [f set];
+        PSmoveto(2.0, 2.0);
+        PSshow("Mi");
+        PSWait();
+    NS_HANDLER
+        SSTrace("font %s cannot be selected: %s -- %s", SSCS([f fontName]), SSCS([localException name]), SSCS([localException reason]));
+        ok = NO;
+    NS_ENDHANDLER
+    [img unlockFocus];
+    [img release];
+    return ok;
+}
+
 /* A font the system lists can still be unusable (an incomplete install, a composite font), and laying text out in one has crashed the editor.
    So ask for the things drawing needs, and put the font in the editor only if they all make sense. */
 + (BOOL)fontUsable:(NSString *)name
@@ -72,7 +94,8 @@ static BOOL get_bool(NSUserDefaults *ud, NSString *key, BOOL def)
     asc = [f ascender];
     desc = [f descender];
     w = [f widthOfString:@"Mi"];
-    return asc - desc > 0.0 && asc - desc < 200.0 && w > 0.0 && w < 400.0;
+    if (!(asc - desc > 0.0 && asc - desc < 200.0 && w > 0.0 && w < 400.0)) return NO;
+    return [self fontDraws:f];
 }
 
 + (void)push

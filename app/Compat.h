@@ -18,6 +18,7 @@
 /* Development host only: stubs so `make check-objc` can syntax-check on macOS. Never linked. */
 extern void PSmoveto(float x, float y);
 extern void PSshow(const char *s);
+extern void PSWait(void);
 /* Exists in OpenStep's NSFont (removed from modern Cocoa); declared so the host syntax check passes. */
 @interface NSFont (OpenStepHostStub)
 - (float)widthOfString:(NSString *)string;

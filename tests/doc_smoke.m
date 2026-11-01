@@ -129,6 +129,7 @@ static int failures = 0;
 /* Compat.h declares the PostScript operators for the host; nothing here draws, so empty ones will do. */
 void PSmoveto(float x, float y) { }
 void PSshow(const char *s) { }
+void PSWait(void) { }
 #define CHECK(c) do { if (!(c)) { printf("FAIL line %d: %s\n", __LINE__, #c); failures++; } } while (0)
 
 int main(void)
