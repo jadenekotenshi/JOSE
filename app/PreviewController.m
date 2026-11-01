@@ -18,17 +18,25 @@
 
 @implementation PreviewTextView
 
+/* The first click on a window that is not the active one is delivered too (it would otherwise only bring the window forward). */
+- (BOOL)acceptsFirstMouse:(NSEvent *)event
+{
+    return YES;
+}
+
 - (void)mouseDown:(NSEvent *)event
 {
+    static NSString *lastURL = nil;
+    static NSTimeInterval lastTime = 0.0;
     NSPoint p = [self convertPoint:[event locationInWindow] fromView:nil];
     NSPoint o = [self textContainerOrigin];
     NSLayoutManager *lm = [self layoutManager];
     NSString *s = [self string];
-    unsigned int n = [s length], ci, start, len;
+    unsigned int n = [s length], ci = 0, start = 0, len = 0;
     NSRange g;
     u16 *t;
 
-    if (n > 0 && n < 2000000U && [event clickCount] == 1 && [lm respondsToSelector:@selector(characterIndexForGlyphAtIndex:)]) {
+    if (n > 0 && n < 2000000U && [lm respondsToSelector:@selector(characterIndexForGlyphAtIndex:)]) {
         g = [lm glyphRangeForBoundingRect:NSMakeRect(p.x - o.x, p.y - o.y, 1.0, 1.0) inTextContainer:[self textContainer]];
         if (g.length > 0) {
             ci = [lm characterIndexForGlyphAtIndex:g.location];
@@ -37,12 +45,20 @@
                 [s getCharacters:t];
                 len = ci < n ? url_at(t, n, ci, &start) : 0;
                 free(t);
-                if (len > 0) {
-                    [PreviewController openURLString:[s substringWithRange:NSMakeRange(start, len)]];
-                    return;
-                }
             }
         }
+    }
+    SSTrace("preview click: count %d at (%d,%d), character %u of %u, %s", (int)[event clickCount], (int)p.x, (int)p.y, ci, n, len > 0 ? "on an address" : "not on an address");
+    if (len > 0) {
+        NSString *url = [s substringWithRange:NSMakeRange(start, len)];
+        NSTimeInterval now = [NSDate timeIntervalSinceReferenceDate];
+
+        if (lastURL != nil && [lastURL isEqualToString:url] && now - lastTime < 1.0) return;     /* the second click of a double-click */
+        [lastURL release];
+        lastURL = [url copy];
+        lastTime = now;
+        [PreviewController openURLString:url];
+        return;
     }
     [super mouseDown:event];
 }
