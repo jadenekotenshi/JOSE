@@ -32,6 +32,7 @@
     SessionController *sessions;
     ClipboardController *clipboard;
     RemoteController *remote;
+    NSMutableDictionary *headerCache;   /* Complete Word: the identifiers of the headers a document includes (per document) */
     PreviewController *preview;
     NSMenu         *clipMenu;           /* Edit > Paste from History */
     NSMenu         *sessionOpenMenu;    /* File > Sessions > Open / Switch to / Delete */

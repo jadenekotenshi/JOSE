@@ -80,7 +80,10 @@ Status: **prototype (0.0.1)** -- nothing here has been run on OPENSTEP yet.
 * **Word completion** (Edit > Complete Word, cmd-I; Complete Word, Previous, shift-cmd-I): finishes the word before the insertion point
   and, pressed again, goes on to the next candidate -- then back to the word as typed, and round again; shift-cmd-I goes the other way.
   Candidates, in this order: words of this text, nearest first (before the word, then after it); words of the other open windows
-  (the first 400,000 characters of each); the keywords of the language mode; names from loaded tags files.  Case counts; if nothing
+  (the first 400,000 characters of each); the keywords of the language mode; names from loaded tags files; and, in the C family, the identifiers of the headers the file includes
+  (`#include`/`#import`, found next to the file and along the include path of Preferences, and the headers those include -- two levels, at
+  most 80 files and 3 MB; read once per document and remembered until its include lines change, so the first completion in a file can
+  pause on a slow machine).  Names of three letters or more are kept, which covers Objective-C method names and constants.  Case counts; if nothing
   matches, it is ignored.  Each press replaces the last candidate, so one Undo takes the whole completion out; any other edit or
   move of the insertion point ends the cycle.  The status line says which candidate it is on.
 * **Clipboard history** (Edit > Paste from History; Edit > Clipboard History..., shift-cmd-V): the last thirty things cut or copied in JOSE --

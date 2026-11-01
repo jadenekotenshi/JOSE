@@ -11,6 +11,7 @@
 #import "RemoteController.h"
 #import "PreviewController.h"
 #include "complete.h"
+#include "includes.h"
 #import "Appearance.h"
 #import "UIHelpers.h"
 #import "HKSyntaxDefinition.h"
@@ -26,6 +27,8 @@
 - (void)macroNote:(NSString *)name;
 - (void)rebuildMacroMenus;
 - (void)rebuildSessionMenus;
+- (NSString *)resolveInclude:(NSString *)name inDirectory:(NSString *)firstDir searched:(NSMutableArray *)searched;
+- (NSArray *)headerWordsForDocument:(EditorDoc *)d;
 - (void)rebuildClipboardMenu;
 - (NSString *)askName:(NSString *)title;
 - (void)loadRecent;
@@ -661,6 +664,11 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
  * Foo.framework/Headers/Bar.h).  nil if there is none. */
 - (NSString *)resolveInclude:(NSString *)name from:(EditorDoc *)d searched:(NSMutableArray *)searched
 {
+    return [self resolveInclude:name inDirectory:([d path] != nil ? [[d path] stringByDeletingLastPathComponent] : nil) searched:searched];
+}
+
+- (NSString *)resolveInclude:(NSString *)name inDirectory:(NSString *)firstDir searched:(NSMutableArray *)searched
+{
     NSFileManager *fm = [NSFileManager defaultManager];
     NSMutableArray *dirs = [NSMutableArray array];
     NSArray *path = [[Appearance includePath] componentsSeparatedByString:@":"];
@@ -672,7 +680,7 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
         [searched addObject:name];
         return ([fm fileExistsAtPath:name isDirectory:&isDir] && !isDir) ? name : nil;
     }
-    if ([d path] != nil) [dirs addObject:[[d path] stringByDeletingLastPathComponent]];
+    if (firstDir != nil) [dirs addObject:firstDir];
     for (i = 0; i < [path count]; i++)
         if ([[path objectAtIndex:i] length] > 0) [dirs addObject:[path objectAtIndex:i]];
     for (i = 0; i < [dirs count]; i++) {
@@ -929,6 +937,104 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
 
 /* ---- word completion ---- */
 
+#define HEADER_MAX_FILES 80
+#define HEADER_MAX_BYTES 3000000U
+#define HEADER_MAX_FILE 400000U
+#define HEADER_DEPTH 2
+
+/* The identifiers in the headers that a C-family file includes, and those they include (two levels), found along the include path of
+ * Preferences.  Remembered for the document until its #include lines change. */
+- (void)collectHeadersFrom:(NSString *)text directory:(NSString *)dir mode:(NSString *)mode depth:(int)depth
+                     paths:(NSMutableArray *)paths words:(NSMutableSet *)words bytes:(unsigned int *)bytes
+{
+    unsigned int n = [text length], pos = 0;
+    u16 *t;
+
+    if (n == 0) return;
+    t = (u16 *)malloc((n + 1) * sizeof(u16));
+    if (t == NULL) return;
+    [text getCharacters:t];
+    while (pos < n && [paths count] < HEADER_MAX_FILES && *bytes < HEADER_MAX_BYTES) {
+        unsigned int e = pos, k, count;
+        char names[INCLUDE_MAX_NAMES][INCLUDE_NAME_SIZE];
+        int sys = 0;
+
+        while (e < n && t[e] != '\n') e++;
+        count = include_parse(t + pos, e - pos, [mode cString], names, &sys);
+        for (k = 0; k < count && k < 1; k++) {                                  /* the best name for the line */
+            NSString *found = [self resolveInclude:[NSString stringWithCString:names[k]] inDirectory:dir searched:[NSMutableArray array]];
+            NSData *data;
+            NSString *htext;
+
+            if (found == nil || [paths containsObject:found]) continue;
+            [paths addObject:found];
+            data = [NSData dataWithContentsOfFile:found];
+            if (data == nil || [data length] > HEADER_MAX_FILE) continue;
+            *bytes += [data length];
+            {
+                char *b = (char *)malloc([data length] + 1);
+                unsigned int hn, i, st;
+                u16 *h;
+
+                if (b == NULL) continue;
+                [data getBytes:b];
+                b[[data length]] = '\0';
+                htext = ui_string_from_utf8(b);
+                free(b);
+                hn = [htext length];
+                h = (u16 *)malloc((hn + 1) * sizeof(u16));
+                if (h == NULL) continue;
+                [htext getCharacters:h];
+                for (i = 0; i < hn;) {                                         /* every identifier of three letters or more */
+                    while (i < hn && !comp_is_ident(h[i])) i++;
+                    st = i;
+                    while (i < hn && comp_is_ident(h[i])) i++;
+                    if (i - st >= 3 && !(h[st] >= '0' && h[st] <= '9')) [words addObject:[NSString stringWithCharacters:h + st length:i - st]];
+                }
+                free(h);
+            }
+            if (depth > 1) [self collectHeadersFrom:htext directory:[found stringByDeletingLastPathComponent] mode:mode depth:depth - 1 paths:paths words:words bytes:bytes];
+        }
+        pos = e + 1;
+    }
+    free(t);
+}
+
+- (NSArray *)headerWordsForDocument:(EditorDoc *)d
+{
+    NSString *text = [[d textView] string], *key = [NSString stringWithFormat:@"%p", d], *sig;
+    NSMutableString *lines = [NSMutableString string];
+    NSDictionary *cached;
+    unsigned int n = [text length], pos = 0, scanned = 0;
+
+    if (headerCache == nil) headerCache = [[NSMutableDictionary alloc] init];
+    while (pos < n && scanned < 400) {                                           /* the include lines of the file, at its top */
+        NSRange lr = [text lineRangeForRange:NSMakeRange(pos, 0)];
+        NSString *line = [text substringWithRange:lr];
+
+        if ([line length] > 0 && [line characterAtIndex:0] == '#') [lines appendString:line];
+        pos = NSMaxRange(lr);
+        scanned++;
+        if (lr.length == 0) break;
+    }
+    sig = [NSString stringWithFormat:@"%@|%@|%@", [d path] != nil ? [d path] : @"", [Appearance includePath], lines];
+    cached = [headerCache objectForKey:key];
+    if (cached != nil && [[cached objectForKey:@"sig"] isEqualToString:sig]) return [cached objectForKey:@"words"];
+    {
+        NSMutableSet *words = [NSMutableSet set];
+        NSMutableArray *paths = [NSMutableArray array];
+        unsigned int bytes = 0;
+        NSArray *sorted;
+
+        [self collectHeadersFrom:lines directory:([d path] != nil ? [[d path] stringByDeletingLastPathComponent] : nil) mode:[d mode]
+                           depth:HEADER_DEPTH paths:paths words:words bytes:&bytes];
+        sorted = [[words allObjects] sortedArrayUsingSelector:@selector(compare:)];
+        SSTrace("completion: read %u headers (%u bytes), %u words", (unsigned)[paths count], bytes, (unsigned)[sorted count]);
+        [headerCache setObject:[NSDictionary dictionaryWithObjectsAndKeys:sig, @"sig", sorted, @"words", nil] forKey:key];
+        return sorted;
+    }
+}
+
 #define COMPLETE_MAX 300
 #define COMPLETE_OTHER_CHARS 400000U           /* how much of each other window is read */
 
@@ -980,6 +1086,18 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
 
         for (k = 0; k < [names count]; k++)
             if (![out containsObject:[names objectAtIndex:k]]) [out addObject:[names objectAtIndex:k]];
+    }
+    if ([d mode] != nil && lang_c_like([[d mode] cString])) {                       /* names from the headers it includes */
+        NSArray *hw = [self headerWordsForDocument:d];
+        unsigned int added = 0;
+
+        for (k = 0; k < [hw count] && added < COMPLETE_MAX; k++) {
+            NSString *w = [hw objectAtIndex:k];
+
+            if ([w length] <= plen) continue;
+            if (icase ? [[w substringToIndex:plen] caseInsensitiveCompare:prefix] != NSOrderedSame : ![[w substringToIndex:plen] isEqualToString:prefix]) continue;
+            if (![out containsObject:w]) { [out addObject:w]; added++; }
+        }
     }
     return out;
 }

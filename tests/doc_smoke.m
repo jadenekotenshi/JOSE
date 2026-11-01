@@ -1181,6 +1181,29 @@ int main(void)
         [Appearance setBrowserPath:oldPath];
         [Appearance setBrowserArgs:oldArgs];
     }
+    {   /* completion from the headers a file includes, two levels deep */
+        AppController *ac = [[AppController alloc] init];
+        NSString *hd = [dir stringByAppendingPathComponent:@"hdr"];
+        NSString *h1 = [hd stringByAppendingPathComponent:@"jh.h"], *h2 = [hd stringByAppendingPathComponent:@"jh2.h"], *src = [hd stringByAppendingPathComponent:@"t.m"];
+        EditorDoc *hdoc = [[[EditorDoc alloc] initWithOwner:ac] autorelease];
+        NSArray *got;
+
+        [HKSyntaxDefinition setSyntaxDirectory:@"syntax"];                 /* AppController pointed it at its bundle */
+        [[NSFileManager defaultManager] createDirectoryAtPath:hd attributes:nil];
+        [@"#include \"jh2.h\"\n@interface Widget\n- (void)frobnicateWidgetWithName:(NSString *)n;\n@end\n" writeToFile:h1 atomically:YES];
+        [@"int deepFunctionName(void);\nextern int ab;\n" writeToFile:h2 atomically:YES];
+        [@"#import \"jh.h\"\n#include <missing/nothere.h>\nint main(void) { frob" writeToFile:src atomically:YES];
+        CHECK([hdoc openFile:src] && [[hdoc mode] isEqualToString:@"ObjC"]);
+        got = [ac extraCompletionsForPrefix:@"frob" document:hdoc icase:NO];
+        CHECK([got containsObject:@"frobnicateWidgetWithName"]);                 /* from the header itself */
+        got = [ac extraCompletionsForPrefix:@"deepF" document:hdoc icase:NO];
+        CHECK([got containsObject:@"deepFunctionName"]);                          /* from the header it includes */
+        CHECK(![[ac extraCompletionsForPrefix:@"ab" document:hdoc icase:NO] containsObject:@"ab"]);        /* under three letters is not kept */
+        CHECK([[ac extraCompletionsForPrefix:@"FROB" document:hdoc icase:YES] containsObject:@"frobnicateWidgetWithName"]);
+        [[hdoc textView] setSelectedRange:NSMakeRange([[[hdoc textView] string] length], 0)];
+        CHECK([hdoc completeWord:1] && [[[hdoc textView] string] hasSuffix:@"{ frobnicateWidgetWithName"]);
+        [ac release];
+    }
     [[NSFileManager defaultManager] removeItemAtPath:dir error:NULL];
     printf(failures ? "doc: FAILED\n" : "doc: ok\n");
     [pool release];
