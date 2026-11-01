@@ -154,19 +154,19 @@ int main(void)
     }
     {   /* more modes: INI, HTML, CSS, XML and three assemblers */
         const char *o, *c;
-        const char *x86 = "\t.globl _main\n_main:\n\tpushl %ebp\n\tmovl %esp, %ebp\n\tmovl $0, %eax\n\tleave\n\tret\n";
-        const char *sparc = "\t.global main\nmain:\n\tsave %sp, -96, %sp\n\tmov 0, %i0\n\tret\n\trestore\n";
-        const char *m68k = "_main:\n\tlink a6,#0\n\tmoveq #0,d0\n\tunlk a6\n\trts\n";
+        const char *x86_src = "\t.globl _main\n_main:\n\tpushl %ebp\n\tmovl %esp, %ebp\n\tmovl $0, %eax\n\tleave\n\tret\n";
+        const char *sparc_src = "\t.global main\nmain:\n\tsave %sp, -96, %sp\n\tmov 0, %i0\n\tret\n\trestore\n";
+        const char *m68k_src = "_main:\n\tlink a6,#0\n\tmoveq #0,d0\n\tunlk a6\n\trts\n";
 
         CHECK(str_eq(lang_mode_for("php.ini", NULL), "INI") && str_eq(lang_mode_for("setup.cfg", NULL), "INI") && str_eq(lang_mode_for(".gitconfig", NULL), "INI"));
         CHECK(str_eq(lang_mode_for("index.html", NULL), "HTML") && str_eq(lang_mode_for("a.HTM", NULL), "HTML") && str_eq(lang_mode_for("s.css", NULL), "CSS"));
         CHECK(str_eq(lang_mode_for("a.xml", NULL), "XML") && str_eq(lang_mode_for("logo.svg", NULL), "XML") && str_eq(lang_mode_for("t.xsl", NULL), "XML"));
         CHECK(str_eq(lang_mode_for("noext", "<?xml version=\"1.0\"?>\n"), "XML") && str_eq(lang_mode_for("noext", "<!DOCTYPE html>\n"), "HTML") && str_eq(lang_mode_for("noext", "<HTML>\n"), "HTML"));
         CHECK(str_eq(lang_mode_for("a.s", NULL), "AsmX86") && str_eq(lang_mode_for("a.S", NULL), "AsmX86") && str_eq(lang_mode_for("a.asm", NULL), "AsmX86"));
-        CHECK(str_eq(lang_sniff_asm(x86, strlen(x86)), "AsmX86") && str_eq(lang_sniff_asm(sparc, strlen(sparc)), "AsmSparc") && str_eq(lang_sniff_asm(m68k, strlen(m68k)), "AsmM68k"));
+        CHECK(str_eq(lang_sniff_asm(x86_src, strlen(x86_src)), "AsmX86") && str_eq(lang_sniff_asm(sparc_src, strlen(sparc_src)), "AsmSparc") && str_eq(lang_sniff_asm(m68k_src, strlen(m68k_src)), "AsmM68k"));
         CHECK(lang_sniff_asm(".data\nfoo: .long 1\n", 20) == NULL);
-        CHECK(str_eq(lang_refine_mode("AsmX86", sparc, strlen(sparc)), "AsmSparc") && str_eq(lang_refine_mode("AsmX86", m68k, strlen(m68k)), "AsmM68k"));
-        CHECK(str_eq(lang_refine_mode("AsmX86", ".data\n", 6), "AsmX86") && str_eq(lang_refine_mode("C", sparc, strlen(sparc)), "C") && lang_refine_mode(NULL, sparc, 4) == NULL);
+        CHECK(str_eq(lang_refine_mode("AsmX86", sparc_src, strlen(sparc_src)), "AsmSparc") && str_eq(lang_refine_mode("AsmX86", m68k_src, strlen(m68k_src)), "AsmM68k"));
+        CHECK(str_eq(lang_refine_mode("AsmX86", ".data\n", 6), "AsmX86") && str_eq(lang_refine_mode("C", sparc_src, strlen(sparc_src)), "C") && lang_refine_mode(NULL, sparc_src, 4) == NULL);
         CHECK(lang_comment_style("AsmX86", &o, &c) && o[0] == '#' && lang_comment_style("AsmM68k", &o, &c) && o[0] == '|' && lang_comment_style("AsmSparc", &o, &c) && o[0] == '!');
         CHECK(lang_comment_style("HTML", &o, &c) && strcmp(o, "<!--") == 0 && strcmp(c, "-->") == 0 && lang_comment_style("CSS", &o, &c) && strcmp(o, "/*") == 0);
         CHECK(lang_comment_style("INI", &o, &c) && o[0] == ';' && lang_c_like("CSS") && !lang_c_like("HTML") && lang_smart_indent("CSS") == 'b');

@@ -165,7 +165,9 @@ int lang_fold_brackets(const char *mode)
     return mode != NULL && (strcmp(mode, "JSON") == 0 || strcmp(mode, "JavaScript") == 0);
 }
 
-/* ---- which assembler? ---- */
+/* ---- which assembler? ----
+ * (Careful with names: NeXT's cc predefines `sparc`, `m68k` and `i386` as macros for the architecture it is building, so none of them
+ * can be a variable name.) */
 
 /* How often `word` occurs in t[0, n) with a non-identifier character on each side (or, with a leading '%' or '$', just after one). */
 static int count_word(const char *t, size_t n, const char *word)
@@ -184,17 +186,17 @@ static int count_word(const char *t, size_t n, const char *word)
 
 const char *lang_sniff_asm(const char *text, size_t n)
 {
-    static const char *const x86[] = { "%eax", "%ebx", "%ecx", "%edx", "%esp", "%ebp", "%esi", "%edi", "%rax", "%rsp", "%rbp", "%xmm0",
+    static const char *const x86_words[] = { "%eax", "%ebx", "%ecx", "%edx", "%esp", "%ebp", "%esi", "%edi", "%rax", "%rsp", "%rbp", "%xmm0",
                                        "movl", "pushl", "popl", "leal", "addl", "subl", "cmpl", "xorl", "movb", "movw", "testl", NULL };
-    static const char *const sparc[] = { "%o0", "%o1", "%o2", "%o3", "%l0", "%l1", "%l2", "%i0", "%i1", "%i2", "%g0", "%g1", "%sp", "%fp",
+    static const char *const sparc_words[] = { "%o0", "%o1", "%o2", "%o3", "%l0", "%l1", "%l2", "%i0", "%i1", "%i2", "%g0", "%g1", "%sp", "%fp",
                                          "%hi", "%lo", "sethi", "retl", "restore", "save", "ldd", "std", NULL };
-    static const char *const m68k[] = { "d0", "d1", "d2", "d3", "a0", "a1", "a2", "a6", "a7", "sp", "moveq", "movel", "move.l", "movem.l",
+    static const char *const m68k_words[] = { "d0", "d1", "d2", "d3", "a0", "a1", "a2", "a6", "a7", "sp", "moveq", "movel", "move.l", "movem.l",
                                         "movea.l", "link", "unlk", "rts", "jsr", "bsr", "dbra", "fp0", "fp1", NULL };
     int sx = 0, ss = 0, sm = 0, i;
 
-    for (i = 0; x86[i]; i++) sx += count_word(text, n, x86[i]);
-    for (i = 0; sparc[i]; i++) ss += count_word(text, n, sparc[i]);
-    for (i = 0; m68k[i]; i++) sm += count_word(text, n, m68k[i]);
+    for (i = 0; x86_words[i]; i++) sx += count_word(text, n, x86_words[i]);
+    for (i = 0; sparc_words[i]; i++) ss += count_word(text, n, sparc_words[i]);
+    for (i = 0; m68k_words[i]; i++) sm += count_word(text, n, m68k_words[i]);
     if (sx < 2 && ss < 2 && sm < 2) return NULL;
     if (ss > sx && ss >= sm) return "AsmSparc";
     if (sm > sx && sm > ss) return "AsmM68k";

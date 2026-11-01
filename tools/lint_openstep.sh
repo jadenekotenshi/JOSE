@@ -22,6 +22,7 @@ check "@ before a macro (@MACRO is not an Objective-C string for gcc 2.7.2: use 
 check "modern integer types (NSInteger/CGFloat/...)"        '\b(NSInteger|NSUInteger|CGFloat|CGRect|CGPoint|instancetype|nullable|__weak|__strong)\b' $OBJC
 check "stdint / stdbool / inline / restrict"                '#include[[:space:]]*<(stdint|stdbool|inttypes)\.h>|\binline\b|\brestrict\b' core/*.c core/*.h
 check "declaration in for-init (C99)"                       'for[[:space:]]*\((int|unsigned|size_t|u8|u32)[[:space:]]+[a-z_]+[[:space:]]*=' core/*.c
+check "identifier named like a macro that NeXT's cc predefines (sparc, m68k, i386, unix ...): it becomes 1 when building for that architecture" '[*[:space:](](sparc|m68k|i386|unix|vax|mips|hppa)[[:space:]]*(\[[^]]*\])?[[:space:]]*(=|;|,|\)|\[)' core/*.c core/*.h app/*.m app/*.h hk/*.m hk/*.h tests/*.c tests/*.m
 check "snprintf/vsnprintf (not guaranteed on 4.2)"          '\bv?snprintf\b'                      core/*.c app/*.m
 
 # --- APIs added after OpenStep 4.2 ---
