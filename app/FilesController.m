@@ -26,6 +26,10 @@
 - (void)openRow:(id)sender;
 - (void)closePanel:(id)sender;
 - (void)stopRun:(id)sender;
+- (void)collectOpenDocumentsWithPatterns:(const char *)pats into:(NSMutableArray *)found;
+- (void)gatherFilesWithPatterns:(const char *)pats into:(NSMutableArray *)found;
+- (void)scopeChanged:(id)sender;
+- (EditorDoc *)documentForKey:(NSString *)key;
 - (void)beginRun;
 - (void)endRun;
 - (BOOL)pumpIfDue;
@@ -59,6 +63,7 @@ static u16 *units_of(NSString *s, unsigned int *n)
         rowText = [[NSMutableArray alloc] init];
         rowPath = [[NSMutableArray alloc] init];
         rowLine = [[NSMutableArray alloc] init];
+        untitledDocs = [[NSMutableDictionary alloc] init];
     }
     return self;
 }
@@ -68,6 +73,7 @@ static u16 *units_of(NSString *s, unsigned int *n)
     [rowText release];
     [rowPath release];
     [rowLine release];
+    [untitledDocs release];
     [super dealloc];
 }
 
@@ -106,8 +112,15 @@ static u16 *units_of(NSString *s, unsigned int *n)
     replaceField = ui_field(NSMakeRect(100, 406, 446, 22));
     [replaceField setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
     [c addSubview:replaceField];
-    [c addSubview:ui_label(@"Folder:", NSMakeRect(14, 378, 70, 18))];
-    folderField = ui_field(NSMakeRect(100, 376, 326, 22));
+    [c addSubview:ui_label(@"Search in:", NSMakeRect(14, 378, 80, 18))];
+    scopePopup = [[[NSPopUpButton alloc] initWithFrame:NSMakeRect(100, 374, 110, 24) pullsDown:NO] autorelease];
+    [scopePopup addItemWithTitle:@"Folder"];
+    [scopePopup addItemWithTitle:@"Open files"];
+    [scopePopup setTarget:self];
+    [scopePopup setAction:@selector(scopeChanged:)];
+    [scopePopup setAutoresizingMask:(NSViewMaxXMargin | NSViewMinYMargin)];
+    [c addSubview:scopePopup];
+    folderField = ui_field(NSMakeRect(216, 376, 210, 22));
     [folderField setAutoresizingMask:(NSViewWidthSizable | NSViewMinYMargin)];
     [c addSubview:folderField];
     {
@@ -180,6 +193,9 @@ static u16 *units_of(NSString *s, unsigned int *n)
     [message setAutoresizingMask:(NSViewWidthSizable | NSViewMaxYMargin)];
     [c addSubview:message];
 
+    v = [ud stringForKey:@"FilesScope"];
+    if (v != nil && [v isEqualToString:@"Open files"]) [scopePopup selectItemWithTitle:@"Open files"];
+    [self scopeChanged:nil];
     v = [ud stringForKey:@"FilesFolder"];
     if (v != nil) [folderField setStringValue:v];
     v = [ud stringForKey:@"FilesPattern"];
@@ -217,6 +233,20 @@ static u16 *units_of(NSString *s, unsigned int *n)
 {
     if (modalSession != NULL) { stopRequested = YES; return NO; }
     return YES;
+}
+
+- (BOOL)openFilesScope
+{
+    return scopePopup != nil && [[scopePopup titleOfSelectedItem] isEqualToString:@"Open files"];
+}
+
+- (void)scopeChanged:(id)sender
+{
+    BOOL open = [self openFilesScope];
+
+    [folderField setEnabled:!open];
+    [subSwitch setEnabled:!open];
+    [[NSUserDefaults standardUserDefaults] setObject:[scopePopup titleOfSelectedItem] forKey:@"FilesScope"];
 }
 
 /* ---- running a search without freezing the panel ---- */
@@ -322,7 +352,9 @@ static u16 *units_of(NSString *s, unsigned int *n)
 
     if (row < 0) row = [table selectedRow];
     if (row < 0 || row >= (int)[rowPath count]) return;
-    d = [owner openPath:[rowPath objectAtIndex:row]];
+    d = [self documentForKey:[rowPath objectAtIndex:row]];
+    if (d != nil) [d showWindow];
+    else d = [owner openPath:[rowPath objectAtIndex:row]];
     if (d != nil) [d goToLine:[[rowLine objectAtIndex:row] intValue]];
 }
 
@@ -349,6 +381,48 @@ static u16 *units_of(NSString *s, unsigned int *n)
     }
 }
 
+/* The open windows as the list of things to search: a window with a file by its path, one without by a stand-in name ("Untitled", then
+ * "Untitled 2" ...).  Only the file's name is matched against the patterns. */
+- (void)collectOpenDocumentsWithPatterns:(const char *)pats into:(NSMutableArray *)found
+{
+    NSArray *ds = [owner documents];
+    unsigned int i;
+    int untitled = 0;
+
+    [untitledDocs removeAllObjects];
+    for (i = 0; i < [ds count]; i++) {
+        EditorDoc *d = [ds objectAtIndex:i];
+        NSString *key = [d path], *name;
+
+        if (key != nil) name = [key lastPathComponent];
+        else {
+            NSString *title = [[d window] title];
+
+            if (title == nil || [title length] == 0) title = @"Untitled";
+            untitled++;
+            key = untitled == 1 ? [NSString stringWithFormat:@"(%@)", title] : [NSString stringWithFormat:@"(%@ %d)", title, untitled];
+            [untitledDocs setObject:d forKey:key];
+            name = title;
+        }
+        if (glob_match_any(pats, UI_CPATH(name))) [found addObject:key];
+    }
+}
+
+/* What the panel is set to search: a folder's files, or the open windows. */
+- (void)gatherFilesWithPatterns:(const char *)pats into:(NSMutableArray *)found
+{
+    if ([self openFilesScope]) [self collectOpenDocumentsWithPatterns:pats into:found];
+    else [self collectFilesIn:[[folderField stringValue] stringByStandardizingPath] recursive:[subSwitch state] == NSOnState patterns:pats into:found];
+}
+
+/* The document a list key stands for: one without a file by its stand-in name, else the window showing that file (if any). */
+- (EditorDoc *)documentForKey:(NSString *)key
+{
+    EditorDoc *d = [untitledDocs objectForKey:key];
+
+    return d != nil ? d : [owner documentForPath:key];
+}
+
 /* The text of a file as the editor would see it (one LF per line): from its window if it is open there, else from disk.  nil
  * if it is not text we may touch (too big, a NUL, not UTF-8); *mixed is set if the line endings are mixed. */
 - (NSString *)textOfFile:(NSString *)file eol:(int *)eol mixed:(int *)mixed doc:(EditorDoc **)doc
@@ -360,7 +434,7 @@ static u16 *units_of(NSString *s, unsigned int *n)
 
     *eol = 0;
     *mixed = 0;
-    *doc = [owner documentForPath:file];
+    *doc = [self documentForKey:file];
     if (*doc != nil) return [*doc expandedString:[[*doc textView] string]];
     if ([[[NSFileManager defaultManager] fileAttributesAtPath:file traverseLink:YES] fileSize] > MAX_FILESIZE) return nil;
     data = [NSData dataWithContentsOfFile:file];
@@ -421,7 +495,8 @@ static NSString *clip_line(NSString *text, unsigned int a, unsigned int b)
         if (k > 0) {
             NSString *rel = file;
 
-            if (starts_with(file, root) && [file length] > [root length] + 1) rel = [file substringFromIndex:[root length] + 1];
+            if ([self openFilesScope]) rel = [file stringByAbbreviatingWithTildeInPath];
+            else if (starts_with(file, root) && [file length] > [root length] + 1) rel = [file substringFromIndex:[root length] + 1];
             [hitFiles addObject:file];
             for (h = 0; h < hits.n; h++) {
                 NSString *l = clip_line(text, hits.hit[h].lstart, hits.hit[h].lend);
@@ -454,7 +529,7 @@ static NSString *plural(unsigned int n, NSString *one, NSString *many)
     NSUserDefaults *ud = [NSUserDefaults standardUserDefaults];
 
     [self clearRows];
-    if (![[NSFileManager defaultManager] fileExistsAtPath:folder isDirectory:&isDir] || !isDir) {
+    if (![self openFilesScope] && (![[NSFileManager defaultManager] fileExistsAtPath:folder isDirectory:&isDir] || !isDir)) {
         [self say:@"That folder is not there."];
         return;
     }
@@ -464,7 +539,7 @@ static NSString *plural(unsigned int n, NSString *one, NSString *many)
     [ud setObject:[patternField stringValue] forKey:@"FilesPattern"];
     [self say:@"Looking for files..."];
     [self beginRun];
-    [self collectFilesIn:folder recursive:[subSwitch state] == NSOnState patterns:(const char *)[pats bytes] into:files];
+    [self gatherFilesWithPatterns:(const char *)[pats bytes] into:files];
     total = [self scanFiles:files search:s filesWithHits:hitFiles];
     [self endRun];
     search_free(s);
@@ -486,7 +561,7 @@ static NSString *plural(unsigned int n, NSString *one, NSString *many)
     int choice;
 
     [self clearRows];
-    if (![[NSFileManager defaultManager] fileExistsAtPath:folder isDirectory:&isDir] || !isDir) {
+    if (![self openFilesScope] && (![[NSFileManager defaultManager] fileExistsAtPath:folder isDirectory:&isDir] || !isDir)) {
         [self say:@"That folder is not there."];
         return;
     }
@@ -494,7 +569,7 @@ static NSString *plural(unsigned int n, NSString *one, NSString *many)
     if (s == NULL) return;
     [self say:@"Looking for files..."];
     [self beginRun];
-    [self collectFilesIn:folder recursive:[subSwitch state] == NSOnState patterns:(const char *)[pats bytes] into:files];
+    [self gatherFilesWithPatterns:(const char *)[pats bytes] into:files];
     total = [self scanFiles:files search:s filesWithHits:hitFiles];
     [self endRun];
     [table reloadData];
@@ -509,12 +584,13 @@ static NSString *plural(unsigned int n, NSString *one, NSString *many)
         return;
     }
     for (i = 0; i < [hitFiles count]; i++)
-        if ([owner documentForPath:[hitFiles objectAtIndex:i]] != nil) openDocs++;
+        if ([self documentForKey:[hitFiles objectAtIndex:i]] != nil) openDocs++;
     choice = NSRunAlertPanel(@"Replace in Files",
-                             @"Replace in %@ (%@ with a match)?%@  This cannot be undone for files that are not open.%@",
+                             @"Replace in %@ (%@ with a match)?%@%@%@",
                              @"Replace", @"Cancel", nil,
                              plural([hitFiles count], @"file", @"files"), plural(total, @"line", @"lines"),
-                             openDocs > 0 ? [NSString stringWithFormat:@" %u of them are open in windows and change there (not saved).", openDocs] : @"",
+                             openDocs > 0 ? [NSString stringWithFormat:@" %u of them are open in windows and change there (not saved; Undo works).", openDocs] : @"",
+                             openDocs < [hitFiles count] ? @"  This cannot be undone for the files that are not open." : @"",
                              backups ? @"  Each changed file is kept as name.bak." : @"");
     if (choice != NSAlertDefaultReturn) {
         search_free(s);

@@ -19,6 +19,7 @@
 - (void)collectFilesIn:(NSString *)d recursive:(BOOL)rec patterns:(const char *)pats into:(NSMutableArray *)found;
 - (NSString *)replaceInFiles:(NSArray *)hitFiles search:(Search *)s with:(NSString *)replacement literal:(BOOL)literal backups:(BOOL)backups;
 - (void)stopRun:(id)sender;
+- (void)collectOpenDocumentsWithPatterns:(const char *)pats into:(NSMutableArray *)found;
 @end
 
 @interface ShellController (SmokeTest)
@@ -33,7 +34,9 @@
     ShellController *shell;
     MacroController *mc;
     EditorDoc *openDoc;
+    NSArray *allDocs;
 }
+- (void)setDocuments:(NSArray *)a;
 - (void)setDoc:(EditorDoc *)d;
 - (void)setOpenDoc:(EditorDoc *)d;
 - (MacroController *)mc;
@@ -42,6 +45,8 @@
 @implementation MacroOwner
 - (void)setDoc:(EditorDoc *)d { doc = d; }
 - (void)setOpenDoc:(EditorDoc *)d { openDoc = d; }
+- (void)setDocuments:(NSArray *)a { allDocs = [a retain]; }
+- (NSArray *)documents { return allDocs != nil ? allDocs : [NSArray array]; }
 - (EditorDoc *)documentForPath:(NSString *)p { return (openDoc != nil && [[openDoc path] isEqualToString:p]) ? openDoc : nil; }
 - (id)init
 {
@@ -864,6 +869,36 @@ int main(void)
         CHECK([[tv string] isEqualToString:@"one\n"]);
         [ed undo];
         CHECK([[tv string] isEqualToString:@"one\n2\n"]);
+    }
+    {   /* Find in Files over the open windows: with a file and without, matched by name, replaced in the windows */
+        MacroOwner *own = [[[MacroOwner alloc] init] autorelease];
+        FilesController *fc = [[[FilesController alloc] initWithOwner:own] autorelease];
+        EditorDoc *a = [[[EditorDoc alloc] initWithOwner:own] autorelease], *b = [[[EditorDoc alloc] initWithOwner:own] autorelease];
+        NSString *pa = [dir stringByAppendingPathComponent:@"open-a.txt"];
+        NSMutableArray *found = [NSMutableArray array];
+        NSData *none = ui_utf8_cstring(@""), *txt = ui_utf8_cstring(@"*.txt");
+        u16 pat[3] = { 'f', 'o', 'o' };
+        char err[80];
+        Search *se = search_new(pat, 3, 0, err, sizeof err);
+
+        [@"foo in a\n" writeToFile:pa atomically:YES];
+        [a openFile:pa];
+        [[b textView] setString:@"a foo, another foo\n"];
+        [own setDocuments:[NSArray arrayWithObjects:a, b, nil]];
+        [own setOpenDoc:a];
+        [fc collectOpenDocumentsWithPatterns:(const char *)[none bytes] into:found];
+        CHECK([found count] == 2 && [found containsObject:pa]);
+        [found removeAllObjects];
+        [fc collectOpenDocumentsWithPatterns:(const char *)[txt bytes] into:found];
+        CHECK([found count] == 1 && [[found objectAtIndex:0] isEqualToString:pa]);          /* the untitled one has no .txt name */
+        [found removeAllObjects];
+        [fc collectOpenDocumentsWithPatterns:(const char *)[none bytes] into:found];
+        CHECK([[fc replaceInFiles:found search:se with:@"BAR" literal:YES backups:NO] isEqualToString:@"Replaced 3 matches in 2 files."]);
+        CHECK([[[a textView] string] isEqualToString:@"BAR in a\n"] && [[[b textView] string] isEqualToString:@"a BAR, another BAR\n"]);
+        CHECK([a isDirty] && [b isDirty]);
+        [b undo];
+        CHECK([[[b textView] string] isEqualToString:@"a foo, another foo\n"]);
+        search_free(se);
     }
     [[NSFileManager defaultManager] removeItemAtPath:dir error:NULL];
     printf(failures ? "doc: FAILED\n" : "doc: ok\n");

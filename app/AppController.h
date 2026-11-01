@@ -46,6 +46,7 @@
 - (void)openAtLaunch:(NSString *)path;
 - (EditorDoc *)openPath:(NSString *)path;
 - (EditorDoc *)frontDocument;
+- (NSArray *)documents;                 /* every open document, oldest first */
 - (EditorDoc *)documentForPath:(NSString *)path;   /* the window showing this file, or nil */
 - (void)documentDidClose:(EditorDoc *)doc;
 - (NSString *)syntaxDirectory;

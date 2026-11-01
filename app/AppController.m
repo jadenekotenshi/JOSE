@@ -855,6 +855,8 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
     [filesFinder showPanel];
 }
 
+- (NSArray *)documents { return [NSArray arrayWithArray:docs]; }
+
 - (EditorDoc *)documentForPath:(NSString *)path
 {
     unsigned int i;

@@ -1,6 +1,6 @@
 #import "Compat.h"
 
-/* Search > Find in Files...: looks for text in the files of a folder (and its subfolders), lists the lines that match, and
+/* Search > Find in Files...: looks for text in the files of a folder (and its subfolders), or in the windows that are open, lists the lines that match, and
  * replaces in all of them.  Double-clicking a line opens the file there.  A file that is open in a window is searched as it
  * stands in the window, and replaced there (an undoable step, not saved); the others are rewritten on disk, optionally keeping
  * the old file as name.bak.  Files that are not UTF-8 text, or that mix line endings, are never rewritten. */
@@ -10,6 +10,8 @@
     NSPanel         *panel;
     NSTextField     *findField;
     NSTextField     *replaceField;
+    NSPopUpButton   *scopePopup;           /* Folder, or Open files */
+    NSMutableDictionary *untitledDocs;     /* during an open-files run: the stand-in name of each document without a file -> the document */
     NSTextField     *folderField;
     NSTextField     *patternField;
     NSButton        *caseSwitch;
@@ -32,4 +34,5 @@
 }
 - (id)initWithOwner:(id)anOwner;
 - (void)showPanel;
+- (BOOL)openFilesScope;                  /* the panel is set to search the open windows */
 @end
