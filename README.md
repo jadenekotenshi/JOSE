@@ -4,7 +4,8 @@ A programmer's text editor for OPENSTEP 4.2 (Mach, i386 / m68k / SPARC), with sy
 The aim is approximate feature parity with NEdit.  Plain Objective-C and C for gcc 2.7.2; no libraries beyond the
 OpenStep Foundation and AppKit. 
 
-Status: **prototype (0.0.1)** -- nothing here has been run on OPENSTEP yet.
+Status: **0.1.0**.  Everything described below has been built and run on OPENSTEP 4.2 (an x86 VM and a SPARC VM), except the text-encoding work
+(*File > Encoding*, the most recent addition), which has so far been tested only on the development host.
 
 ## What works so far
 
@@ -198,17 +199,16 @@ where the ending of any context around it is found (which also ends everything i
 past the end of its parent.  Patterns use HighlighterKit's own pattern syntax (`<` and `>` mean word start/end: write `\\<`
 for a literal one).
 
-## Roadmap towards NEdit
+## Where it stands, and what is next
 
-Roughly in this order; the list is not a promise.
+Roughly NEdit's feature set is here: search and replace (also across files and open windows), editing helpers, highlighting with nested
+contexts, folding, tags, macros, shell commands, split panes, sessions, plus things NEdit never had on this OS (Markdown preview, remote
+editing, word completion, clipboard history, text encodings).  The sections above say what each does.
 
-1. Search: Find, Replace, Find Again/Previous, Find Selection, regular expressions, case/word options, Replace All and In Selection (one undo step) -- done, awaiting a check on 4.2; multi-file search and replace (Find in Files) -- done, awaiting a check on 4.2.
-2. Editing: undo/redo, auto-indent, smart indent (brace languages, Python), shift left/right, comment/uncomment, spaces-for-tabs
-   and indent width -- done and checked on 4.2; match brace, line numbers and saved settings -- done and checked;
-   fill paragraph, rectangular selection, shell commands -- done and checked; code folding -- done and checked.
-3. Highlighting: nested contexts -- done and checked; the Preferences panel (colours, dark mode, font), recent files, Open Included
-   File, tags with call tips and the fold margin -- done, awaiting a check on 4.2; more language modes.
-4. Shell commands (filter, execute, sort) -- done and checked; per-mode preferences -- done, awaiting a check on 4.2; split panes -- done, awaiting a check on 4.2.
+Parked for the next major iteration: **a text view of JOSE's own** in place of `NSTextView`, drawing the visible lines itself with FreeType
+(both FreeType and FriBidi are already ported in `openstep-pkg`).  It would give real Unicode display from fonts you supply (Greek,
+Cyrillic, CJK, Hebrew), an input method for them, and an end to the slowness and crashes that come from OPENSTEP's text system on very
+large files.  Not planned: complex-script shaping (Indic, Thai), which needs HarfBuzz.
 
 ## Building
 

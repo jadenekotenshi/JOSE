@@ -1396,7 +1396,7 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
 /* NSApp's standard info panel crashed on 4.2 (it wants an Info file the bundle lacks); a plain alert does not. */
 - (void)showAbout:(id)sender
 {
-    NSRunAlertPanel(@"JOSE", @"Jade's OPENSTEP Editor\n\nVersion 0.0.1\n\nA syntax-highlighting text editor.\nHighlighting by HighlighterKit (LGPL).",
+    NSRunAlertPanel(@"JOSE", @"Jade's OPENSTEP Editor\n\nVersion 0.1.0\n\nA syntax-highlighting text editor.\nHighlighting by HighlighterKit (LGPL).",
                     @"OK", nil, nil);
 }
 
