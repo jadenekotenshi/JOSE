@@ -976,7 +976,7 @@ int main(void)
         CHECK([sc1 hasLast] && ![[sc1 savedNames] containsObject:@".last"]);
         {
             NSString *txt = [NSString stringWithContentsOfFile:[sdir stringByAppendingPathComponent:@"work"]];
-            CHECK([txt hasPrefix:@"# JOSE session\n"] && [txt rangeOfString:@"path="].length > 0 && [txt rangeOfString:@"s one.txt"].length > 0);
+            CHECK([txt hasPrefix:@"# Pilcrow session\n"] && [txt rangeOfString:@"path="].length > 0 && [txt rangeOfString:@"s one.txt"].length > 0);
         }
 
         CHECK([sc2 open:@"work" replace:NO]);                                    /* "another run" of the program */
@@ -1108,7 +1108,7 @@ int main(void)
         CHECK([rd isDirty]);
         CHECK([rc saveDocument:rd] && [rd remoteLength] == 13);                  /* written through the "ssh" */
         CHECK([[NSString stringWithContentsOfFile:rfile] isEqualToString:@"Xhello\nworld\n"]);
-        CHECK(![fm fileExistsAtPath:[rfile stringByAppendingString:@".jose-tmp"]]);   /* the temporary file is gone */
+        CHECK(![fm fileExistsAtPath:[rfile stringByAppendingString:@".pilcrow-tmp"]]);   /* the temporary file is gone */
         CHECK(![rc remoteChanged:rd]);
         [@"changed elsewhere\n" writeToFile:rfile atomically:YES];
         CHECK([rc remoteChanged:rd]);                                            /* noticed (no save is tried: it would ask) */

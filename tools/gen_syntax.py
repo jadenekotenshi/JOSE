@@ -135,7 +135,7 @@ write("Imakefile", file_text("Imakefile and Imake templates (cpp lines, XCOMM co
 
 # ---- the macro language ----
 macro_verbs = "insert action command find replace replace-all replace-sel filter exec".split()
-write("JOSEMacro", file_text("JOSE macros", [keyword("^%s>" % w, KEYWORD) for w in macro_verbs],
+write("PilcrowMacro", file_text("Pilcrow macros", [keyword("^%s>" % w, KEYWORD) for w in macro_verbs],
       [context('"', '"', STRING, skips=ESC),
        context("#", "\n", COMMENT, italic=True)]))
 

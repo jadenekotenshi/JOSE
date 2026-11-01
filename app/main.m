@@ -2,6 +2,7 @@
 #import "AppController.h"
 #import "UIHelpers.h"
 #include <signal.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -9,12 +10,12 @@
 
 /*
  * Startup is narrated with NSLog so a launch that "does nothing" can be diagnosed:
- * run  ./JOSE.app/JOSE  from a Terminal and see how far it gets.
+ * run  ./Pilcrow.app/Pilcrow  from a Terminal and see how far it gets.
  * Workspace throws a launched application's stderr away, so the same narration is also written
- * to ~/.JOSE.trace when that file exists:   touch ~/.JOSE.trace
+ * to ~/.Pilcrow.trace when that file exists:   touch ~/.Pilcrow.trace
  * then launch from Workspace and read the file.
  */
-/* A crash must not be silent: while ~/.JOSE.trace exists a fatal signal writes one line to it (using only write(),
+/* A crash must not be silent: while ~/.Pilcrow.trace exists a fatal signal writes one line to it (using only write(),
  * which is safe in a signal handler) before the process dies as it would have. */
 static int traceFD = -1;
 
@@ -41,16 +42,16 @@ static void leaving(void)
 
 /* An exception raised while one event is handled is logged and the event is dropped, instead of ending the program (and the
  * unsaved work in every window with it).  The last step the program reported (SSCrumb) is written with it. */
-@interface JOSEApplication : NSApplication
+@interface PilcrowApplication : NSApplication
 @end
 
-@implementation JOSEApplication
+@implementation PilcrowApplication
 - (void)sendEvent:(NSEvent *)event
 {
     NS_DURING
         [super sendEvent:event];
     NS_HANDLER
-        NSLog(@"JOSE: exception in an event: %@ -- %@", [localException name], [localException reason]);
+        NSLog(@"Pilcrow: exception in an event: %@ -- %@", [localException name], [localException reason]);
         SSTrace("EXCEPTION in an event: %s -- %s; last step: %s", SSCS([localException name]), SSCS([localException reason]), (const char *)ss_crumb);
         NSBeep();
     NS_ENDHANDLER
@@ -73,7 +74,7 @@ int main(int argc, char *argv[])
     }
     pool = [[NSAutoreleasePool alloc] init];
     SSCrumb("starting up");
-    NSLog(@"JOSE: starting");
+    NSLog(@"Pilcrow: starting");
     SSTrace("---- starting, argc=%d", argc);
     for (i = 0; i < argc; i++) SSTrace("  argv[%d] = %s", i, argv[i]);
     SSTrace("  cwd  = %s", SSCS([[NSFileManager defaultManager] currentDirectoryPath]));
@@ -82,8 +83,20 @@ int main(int argc, char *argv[])
     SSTrace("  getenv(\"SHELL\")  = %s", getenv("SHELL") ? getenv("SHELL") : "(not set)");
     SSTrace("  NSUserName()      = %s", SSCS(NSUserName()));
     signal(SIGPIPE, SIG_IGN);
+    {   /* the program was called JOSE before it was Pilcrow: its dot files and folders in the home folder move to the new names, once */
+        static const char *const moves[][2] = { { ".JOSE.trace", ".Pilcrow.trace" }, { ".JOSE.macros", ".Pilcrow.macros" }, { ".JOSE.sessions", ".Pilcrow.sessions" } };
+        NSString *home = NSHomeDirectory();
+        unsigned int mi;
+
+        for (mi = 0; mi < sizeof moves / sizeof moves[0]; mi++) {
+            NSString *from = [home stringByAppendingPathComponent:[NSString stringWithCString:moves[mi][0]]];
+            NSString *to = [home stringByAppendingPathComponent:[NSString stringWithCString:moves[mi][1]]];
+
+            if (access(UI_CPATH(from), F_OK) == 0 && access(UI_CPATH(to), F_OK) != 0) rename(UI_CPATH(from), UI_CPATH(to));
+        }
+    }
     {
-        NSString *tp = [NSHomeDirectory() stringByAppendingPathComponent:@".JOSE.trace"];
+        NSString *tp = [NSHomeDirectory() stringByAppendingPathComponent:@".Pilcrow.trace"];
         traceFD = open(UI_CPATH(tp), O_WRONLY | O_APPEND);        /* only if the file exists: tracing is opt-in */
         if (traceFD >= 0) {
             signal(SIGSEGV, fatal_signal); signal(SIGBUS, fatal_signal); signal(SIGILL, fatal_signal);
@@ -94,11 +107,11 @@ int main(int argc, char *argv[])
     }
 
     NS_DURING
-        [JOSEApplication sharedApplication];
-        NSLog(@"JOSE: NSApplication created");
+        [PilcrowApplication sharedApplication];
+        NSLog(@"Pilcrow: NSApplication created");
         SSTrace("NSApplication created");
         controller = [[AppController alloc] init];
-        NSLog(@"JOSE: controller created");
+        NSLog(@"Pilcrow: controller created");
         SSTrace("controller created");
         [NSApp setDelegate:controller];
         [controller buildMenu];
@@ -110,13 +123,13 @@ int main(int argc, char *argv[])
                 if (access(argv[i], R_OK) == 0) [controller openAtLaunch:[NSString stringWithCString:argv[i]]];
             }
         }
-        NSLog(@"JOSE: menu built, entering the event loop");
+        NSLog(@"Pilcrow: menu built, entering the event loop");
         SSTrace("menu built, entering the event loop");
         [NSApp run];
-        NSLog(@"JOSE: event loop ended");
+        NSLog(@"Pilcrow: event loop ended");
         SSTrace("event loop ended");
     NS_HANDLER
-        NSLog(@"JOSE: uncaught exception: %@ -- %@", [localException name], [localException reason]);
+        NSLog(@"Pilcrow: uncaught exception: %@ -- %@", [localException name], [localException reason]);
         SSTrace("uncaught exception: %s -- %s", SSCS([localException name]), SSCS([localException reason]));
     NS_ENDHANDLER
 

@@ -1,13 +1,13 @@
 #import "Compat.h"
 
-/* Saved sets of open files ("sessions"): File > Sessions.  A session is a small text file in ~/.JOSE.sessions holding, for each open
+/* Saved sets of open files ("sessions"): File > Sessions.  A session is a small text file in ~/.Pilcrow.sessions holding, for each open
  * file, its caret, scroll position, window frame and wrap setting (see core/session.h).  The set of windows open now is also kept as
  * the "last session", so that it can be reopened -- by hand, or at launch if the preference says so.  Windows without a file are
  * not part of a session. */
 @interface SessionController : NSObject
 {
     id        owner;                  /* the AppController: -documents, -openPath: */
-    NSString *folder;                 /* ~/.JOSE.sessions */
+    NSString *folder;                 /* ~/.Pilcrow.sessions */
     NSString *current;                /* the name last saved or opened, which Save Session writes to */
     BOOL      quiet;                  /* while a session is being opened or the program is quitting: do not record the windows */
 }

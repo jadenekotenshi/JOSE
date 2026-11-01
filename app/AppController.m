@@ -28,6 +28,7 @@
 - (void)macroNote:(NSString *)name;
 - (void)rebuildMacroMenus;
 - (void)rebuildSessionMenus;
+- (void)takeOverOldPreferences;
 - (NSString *)resolveInclude:(NSString *)name inDirectory:(NSString *)firstDir searched:(NSMutableArray *)searched;
 - (NSArray *)headerWordsForDocument:(EditorDoc *)d;
 - (void)rebuildClipboardMenu;
@@ -44,11 +45,32 @@
 
 @implementation AppController
 
+/* Pilcrow was called JOSE until 0.1.0, and its saved preferences were kept under that name.  Once, the ones that are not set yet are
+ * taken over from the old file (~/Library/Defaults/JOSE). */
+- (void)takeOverOldPreferences
+{
+    NSUserDefaults *ud = [NSUserDefaults standardUserDefaults];
+    NSDictionary *old;
+    NSArray *keys;
+    unsigned int i;
+
+    if ([ud stringForKey:@"MigratedFromJOSE"] != nil) return;
+    old = [NSDictionary dictionaryWithContentsOfFile:[NSHomeDirectory() stringByAppendingPathComponent:@"Library/Defaults/JOSE"]];
+    if (old == nil) old = [ud persistentDomainForName:@"JOSE"];
+    keys = [old allKeys];
+    for (i = 0; i < [keys count]; i++)
+        if ([ud objectForKey:[keys objectAtIndex:i]] == nil) [ud setObject:[old objectForKey:[keys objectAtIndex:i]] forKey:[keys objectAtIndex:i]];
+    [ud setObject:@"YES" forKey:@"MigratedFromJOSE"];
+    [ud synchronize];
+    if ([keys count] > 0) SSTrace("preferences: took over %u setting(s) from JOSE", (unsigned)[keys count]);
+}
+
 - (id)init
 {
     self = [super init];
     if (self) {
         docs = [[NSMutableArray alloc] init];
+        [self takeOverOldPreferences];
         [self loadPreferences];
         [self loadRecent];
         menuKeepers = [[NSMutableArray alloc] init];
@@ -241,7 +263,7 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
     NSMenu *main;
     id item;
 
-    main = [self keepMenu:[[[NSMenu alloc] initWithTitle:@"JOSE"] autorelease]];
+    main = [self keepMenu:[[[NSMenu alloc] initWithTitle:@"Pilcrow"] autorelease]];
     item = [main addItemWithTitle:@"Quit" action:@selector(terminate:) keyEquivalent:@"q"];
     [item setTarget:NSApp];
     [NSApp setMainMenu:main];
@@ -249,7 +271,7 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
 
 - (void)buildFullMenu
 {
-    NSMenu *main = [self keepMenu:[[[NSMenu alloc] initWithTitle:@"JOSE"] autorelease]];
+    NSMenu *main = [self keepMenu:[[[NSMenu alloc] initWithTitle:@"Pilcrow"] autorelease]];
     NSMenu *m;
     NSArray *names;
     unsigned int i;
@@ -911,8 +933,8 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
 {
     EditorDoc *d = [self newDocument];
 
-    [[d textView] setString:[@"# JOSE macro\n" stringByAppendingString:[[self macroController] lastAsText]]];
-    [d setMode:@"JOSEMacro"];
+    [[d textView] setString:[@"# Pilcrow macro\n" stringByAppendingString:[[self macroController] lastAsText]]];
+    [d setMode:@"PilcrowMacro"];
 }
 
 - (void)splitPane:(id)sender { [[self frontDocument] splitPane]; }
@@ -1396,7 +1418,7 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
 /* NSApp's standard info panel crashed on 4.2 (it wants an Info file the bundle lacks); a plain alert does not. */
 - (void)showAbout:(id)sender
 {
-    NSRunAlertPanel(@"JOSE", @"Jade's OPENSTEP Editor\n\nVersion 0.1.0\n\nA syntax-highlighting text editor.\nHighlighting by HighlighterKit (LGPL).",
+    NSRunAlertPanel(@"Pilcrow", @"Pilcrow\n\nVersion 0.1.0\n\nA programmer's text editor for OPENSTEP.\nHighlighting by HighlighterKit (LGPL).",
                     @"OK", nil, nil);
 }
 

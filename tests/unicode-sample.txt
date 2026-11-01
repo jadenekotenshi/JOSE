@@ -1,4 +1,4 @@
-JOSE Unicode sample (UTF-8). Open this file and tell me which lines you can read.
+Pilcrow Unicode sample (UTF-8). Open this file and tell me which lines you can read.
 
 1 Latin-1:            café naïve über Ångström ñ ß æ ø £ © ® ± ½
 2 Latin Extended-A:   Łódź Český š ž ő ű Ş ı ğ œ

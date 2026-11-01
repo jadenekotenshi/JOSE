@@ -110,7 +110,7 @@ int main(int argc, char **argv)
             { "Zsh", @"autoload -U compinit\necho \"s\" # note\n", @"autoload", @"s\"", @"note" },
             { "BSDMakefile", @".include <bsd.prog.mk>\nFOO= \"s\" # note\n", @"include", @"s\"", @"note" },
             { "Imakefile", @"XCOMM note\nSRCS = a.c\n#define X \"s\"\n", @"SRCS", @"s\"", @"note" },
-            { "JOSEMacro", @"# note\ninsert \"s\"\n", @"insert", @"s\"", @"note" }
+            { "PilcrowMacro", @"# note\ninsert \"s\"\n", @"insert", @"s\"", @"note" }
         };
         int ti;
         for (ti = 0; ti < 7; ti++) {

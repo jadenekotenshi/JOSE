@@ -30,7 +30,7 @@ void SSTrace(const char *fmt, ...)
     va_list ap;
 
     va_start(ap, fmt);
-    SSTraceV([NSHomeDirectory() stringByAppendingPathComponent:@".JOSE.trace"], fmt, ap);
+    SSTraceV([NSHomeDirectory() stringByAppendingPathComponent:@".Pilcrow.trace"], fmt, ap);
     va_end(ap);
 }
 

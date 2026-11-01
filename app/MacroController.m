@@ -55,7 +55,7 @@ static BOOL write_text(NSString *text, NSString *path)
         owner = anOwner;
         lines = [[NSMutableArray alloc] init];
         pendingInsert = [[NSMutableString alloc] init];
-        folder = [[NSHomeDirectory() stringByAppendingPathComponent:@".JOSE.macros"] retain];
+        folder = [[NSHomeDirectory() stringByAppendingPathComponent:@".Pilcrow.macros"] retain];
         /* the macro learned last time, if any */
         {
             NSString *text = read_text([folder stringByAppendingPathComponent:@".last"]);
@@ -338,7 +338,7 @@ static BOOL write_text(NSString *text, NSString *path)
     name = ui_trim(name);
     if ([name length] == 0 || [name rangeOfString:@"/"].length > 0 || [name characterAtIndex:0] == '.' || ![self hasMacro]) return NO;
     if (![fm fileExistsAtPath:folder isDirectory:&isDir]) [fm createDirectoryAtPath:folder attributes:nil];
-    return write_text([@"# JOSE macro\n" stringByAppendingString:[self lastAsText]], [folder stringByAppendingPathComponent:name]);
+    return write_text([@"# Pilcrow macro\n" stringByAppendingString:[self lastAsText]], [folder stringByAppendingPathComponent:name]);
 }
 
 - (BOOL)runSaved:(NSString *)name

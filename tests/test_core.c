@@ -36,7 +36,8 @@ int main(void)
     CHECK(str_eq(lang_mode_for("notes.md", NULL), "Markdown") && str_eq(lang_mode_for("README.markdown", NULL), "Markdown"));
     CHECK(str_eq(lang_mode_for("Imakefile", NULL), "Imakefile") && str_eq(lang_mode_for("Motif.tmpl", NULL), "Imakefile"));
     CHECK(str_eq(lang_mode_for("BSDmakefile", NULL), "BSDMakefile") && str_eq(lang_mode_for("/usr/share/mk/bsd.prog.mk", NULL), "BSDMakefile"));
-    CHECK(str_eq(lang_mode_for("first", "# JOSE macro\n"), "JOSEMacro") && str_eq(lang_mode_for("a.jmacro", NULL), "JOSEMacro"));
+    CHECK(str_eq(lang_mode_for("first", "# Pilcrow macro\n"), "PilcrowMacro") && str_eq(lang_mode_for("a.pmacro", NULL), "PilcrowMacro"));
+    CHECK(str_eq(lang_mode_for("first", "# JOSE macro\n"), "PilcrowMacro") && str_eq(lang_mode_for("a.jmacro", NULL), "PilcrowMacro"));      /* from before the rename */
     CHECK(str_eq(lang_mode_for("config.mk", NULL), "GNUmakefile") && lang_mode_for("bsd.mk", NULL) != NULL);
     CHECK(str_eq(lang_mode_for("tool", "#!/usr/bin/env python"), "Python"));
     CHECK(str_eq(lang_mode_for("Thing.mm", NULL), "ObjC++"));

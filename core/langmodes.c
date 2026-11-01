@@ -19,7 +19,7 @@ static const ExtMode EXTS[] = {
     { "json", "JSON" }, { "js", "JavaScript" }, { "mjs", "JavaScript" }, { "cjs", "JavaScript" },
     { "rb", "Ruby" }, { "rake", "Ruby" }, { "gemspec", "Ruby" }, { "ru", "Ruby" },
     { "zsh", "Zsh" },
-    { "jmacro", "JOSEMacro" },
+    { "pmacro", "PilcrowMacro" }, { "jmacro", "PilcrowMacro" },
     { "md", "Markdown" }, { "markdown", "Markdown" }, { "mkd", "Markdown" }, { "mdown", "Markdown" },
     { "tmpl", "Imakefile" }, { "rules", "Imakefile" },
     { NULL, NULL }
@@ -71,7 +71,7 @@ const char *lang_mode_for(const char *path, const char *first_line)
     base = base != NULL ? base + 1 : path;
     mode = lang_mode_for_name(base);
     if (mode != NULL) return mode;
-    if (first_line != NULL && strncmp(first_line, "# JOSE macro", 12) == 0) return "JOSEMacro";
+    if (first_line != NULL && (strncmp(first_line, "# Pilcrow macro", 15) == 0 || strncmp(first_line, "# JOSE macro", 12) == 0)) return "PilcrowMacro";     /* JOSE was the name before Pilcrow */
     if (first_line != NULL && first_line[0] == '#' && first_line[1] == '!') {
         if (strstr(first_line, "python") != NULL) return "Python";
         if (strstr(first_line, "perl") != NULL) return "Perl";
@@ -90,7 +90,7 @@ int lang_comment_style(const char *mode, const char **open, const char **close)
     static const struct { const char *mode; const char *open; const char *close; } T[] = {
         { "C", "/*", "*/" }, { "C-Header", "/*", "*/" }, { "ObjC", "/*", "*/" },
         { "C++", "//", "" }, { "ObjC++", "//", "" },
-        { "JOSEMacro", "#", "" }, { "JavaScript", "//", "" }, { "Ruby", "#", "" }, { "Zsh", "#", "" }, { "BSDMakefile", "#", "" }, { "Markdown", "<!--", "-->" }, { "Imakefile", "XCOMM", "" },
+        { "PilcrowMacro", "#", "" }, { "JavaScript", "//", "" }, { "Ruby", "#", "" }, { "Zsh", "#", "" }, { "BSDMakefile", "#", "" }, { "Markdown", "<!--", "-->" }, { "Imakefile", "XCOMM", "" },
         { "Python", "#", "" }, { "Shell", "#", "" }, { "Csh", "#", "" }, { "Perl", "#", "" }, { "GNUmakefile", "#", "" },
         { "Plist", "/*", "*/" }, { "Strings", "/*", "*/" }, { "GSmarkup", "<!--", "-->" },
         { NULL, NULL, NULL }

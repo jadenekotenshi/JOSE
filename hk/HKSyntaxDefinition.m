@@ -203,7 +203,7 @@ static BOOL darkColors = NO;       /* hand out the lightened foregrounds and dar
  */
 static NSString *explicitSyntaxDirectory = nil;
 
-/* JOSE keeps its syntax files in one directory of its own and says where it is. */
+/* Pilcrow keeps its syntax files in one directory of its own and says where it is. */
 + (void) setSyntaxDirectory: (NSString *) directory
 {
   ASSIGNCOPY (explicitSyntaxDirectory, directory);

@@ -137,7 +137,7 @@ static const int font_sizes[] = { 8, 9, 10, 11, 12, 13, 14, 16, 18, 20, 24 };
     [marginSwitch setAction:@selector(marginChanged:)];
     [cv addSubview:marginSwitch];
 
-    sessionSwitch = ui_switch(@"Reopen the last session's files when JOSE starts", NSMakeRect(16, 46, 408, 20));
+    sessionSwitch = ui_switch(@"Reopen the last session's files when Pilcrow starts", NSMakeRect(16, 46, 408, 20));
     [sessionSwitch setTarget:self];
     [sessionSwitch setAction:@selector(sessionChanged:)];
     [cv addSubview:sessionSwitch];

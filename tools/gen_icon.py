@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Generate app/JOSE.tiff, the application icon, and app/JOSEdoc.tiff, the icon of the documents it opens, in the layout NeXT's own tools write.
+"""Generate app/Pilcrow.tiff, the application icon, and app/Pilcrowdoc.tiff, the icon of the documents it opens, in the layout NeXT's own tools write.
 
-    python3 tools/gen_icon.py                      # writes app/JOSE.tiff
+    python3 tools/gen_icon.py                      # writes app/Pilcrow.tiff
     python3 tools/gen_icon.py --preview out.png    # also writes an 8x preview of both images
     python3 tools/gen_icon.py --show FILE.tiff out.png   # decode any NeXT icon TIFF to a PNG
 
@@ -85,7 +85,7 @@ def draw():
 
 
 def draw_doc():
-    """The icon of a document that JOSE opens: a page with a turned-down corner and a few lines of coloured text."""
+    """The icon of a document that Pilcrow opens: a page with a turned-down corner and a few lines of coloured text."""
     cv = Canvas()
     cv.rect(8, 7, 41, 44, SHADOW)                  # drop shadow, down and to the right
     cv.rect(5, 4, 38, 41, BLACK)                   # page outline
@@ -273,13 +273,13 @@ def main(argv):
     if len(argv) == 4 and argv[1] == '--show':
         preview(decode(open(argv[2], 'rb').read()), argv[3])
         return 0
-    out = 'app/JOSE.tiff'
+    out = 'app/Pilcrow.tiff'
     data = build_tiff(draw())
     open(out, 'wb').write(data)
     print("wrote %s (%d bytes)" % (out, len(data)))
     ddata = build_tiff(draw_doc())
-    open('app/JOSEdoc.tiff', 'wb').write(ddata)
-    print("wrote app/JOSEdoc.tiff (%d bytes)" % len(ddata))
+    open('app/Pilcrowdoc.tiff', 'wb').write(ddata)
+    print("wrote app/Pilcrowdoc.tiff (%d bytes)" % len(ddata))
     if len(argv) == 3 and argv[1] == '--preview':
         preview(decode(data) + decode(ddata), argv[2])
         print("wrote", argv[2])

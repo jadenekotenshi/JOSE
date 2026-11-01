@@ -1,6 +1,7 @@
-# JOSE -- Jade's OPENSTEP Editor
+# Pilcrow
 
-A programmer's text editor for OPENSTEP 4.2 (Mach, i386 / m68k / SPARC), with syntax highlighting.
+*Pilcrow* (¶, the paragraph mark) -- a programmer's text editor for OPENSTEP 4.2 (Mach, i386 / m68k / SPARC), with syntax highlighting.
+It was called JOSE (Jade's OPENSTEP Editor) until version 0.1.0.
 The aim is approximate feature parity with NEdit.  Plain Objective-C and C for gcc 2.7.2; no libraries beyond the
 OpenStep Foundation and AppKit. 
 
@@ -12,7 +13,7 @@ Status: **0.1.0**.  Everything described below has been built and run on OPENSTE
 * One window per file: open, save, save as, revert, close (with the usual question about unsaved changes).
 * Syntax highlighting by [HighlighterKit](hk/) (LGPL; see `hk/COPYING.LGPL`), applied lazily to what is on screen.
   The mode is chosen from the file name and can be changed from *Preferences > Language Mode*.
-  Syntax files are in `syntax/` and are installed in `JOSE.app/syntax/`; add more there.
+  Syntax files are in `syntax/` and are installed in `Pilcrow.app/syntax/`; add more there.
 * Line endings (LF, CRLF, CR) are detected on load and kept on save; UTF-8 is read and written (invalid bytes read as Latin-1).
 * Status line (line, column, mode, line ending), Go to Line, optional line wrapping, optional line numbers, matching brackets
   (`( ) [ ] { }`, and in shell scripts and the C family also the keyword pairs below).
@@ -84,7 +85,7 @@ Status: **0.1.0**.  Everything described below has been built and run on OPENSTE
   home folder) in a window titled with that name, by running `stepssh host 'cat path'` -- or OpenSSH's `ssh` instead; *Preferences >
   Remote Editing...* picks which (default StepSSH at `/usr/local/bin/stepssh`; OpenSSH at `/usr/local/bin/ssh`, run with
   `BatchMode`), where it is, and extra arguments such as `-p 2222` or `-i keyfile`.  Save writes the text back the same way (into
-  `path.jose-tmp` first, then over the file, so a dropped connection leaves the original alone) after asking the far side's `cksum`
+  `path.pilcrow-tmp` first, then over the file, so a dropped connection leaves the original alone) after asking the far side's `cksum`
   whether the file changed since it was read -- if it did, you are asked before it is overwritten.  Line endings are kept; only UTF-8
   text is opened; a path that does not exist can be created.  Revert to Saved fetches it again.  The program must log in without
   asking anything (a key; with OpenSSH an agent), and the host key must be known already (connect once from a terminal).  Save As
@@ -100,26 +101,26 @@ Status: **0.1.0**.  Everything described below has been built and run on OPENSTE
   pause on a slow machine).  Names of three letters or more are kept, which covers Objective-C method names and constants.  Case counts; if nothing
   matches, it is ignored.  Each press replaces the last candidate, so one Undo takes the whole completion out; any other edit or
   move of the insertion point ends the cycle.  The status line says which candidate it is on.
-* **Clipboard history** (Edit > Paste from History; Edit > Clipboard History..., shift-cmd-V): the last thirty things cut or copied in JOSE --
-  and, whenever JOSE becomes the active program again, what was copied elsewhere -- newest first.  Choosing one from the submenu makes it
+* **Clipboard history** (Edit > Paste from History; Edit > Clipboard History..., shift-cmd-V): the last thirty things cut or copied in Pilcrow --
+  and, whenever Pilcrow becomes the active program again, what was copied elsewhere -- newest first.  Choosing one from the submenu makes it
   the current clipboard (so cmd-V pastes it too) and pastes it at once; the panel lists them with a longer look at the selected one and
   can paste, make current, delete or clear.  Something copied from a rectangle stays a rectangle.  Anything over 400,000 bytes is not kept,
-  and the history lives in memory only.  (Several copies made one after another in another program, without JOSE becoming active
+  and the history lives in memory only.  (Several copies made one after another in another program, without Pilcrow becoming active
   between, are seen only as the last.)
 * **Files dropped on a window**: a file dragged from Workspace onto an editor window (its text or its line-number margin) opens in a window
   of its own instead of pasting its name; several at once open together, folders are ignored.  (Dropping on the application icon or the
   Dock tile does not work with this Workspace -- none of the sibling programs gets it to either -- so that path was given up;
-  `application:openFile:` is still there for whatever Workspace does send.)  JOSE's icon header lists the file types it opens
-  (`app/JOSE.iconheader`, in Edit.app's format: `S<tab>ext<tab>JOSE<tab>doc`, about fifty extensions, with the page icon
-  `app/JOSEdoc.tiff`), so from `/LocalApps` Workspace offers JOSE for them and double-clicking one can open it here.  Workspace may then
-  show that icon for such files; if it picks JOSE where you want Edit, use the Inspector's *Open With* for that type, or delete the
+  `application:openFile:` is still there for whatever Workspace does send.)  Pilcrow's icon header lists the file types it opens
+  (`app/Pilcrow.iconheader`, in Edit.app's format: `S<tab>ext<tab>Pilcrow<tab>doc`, about fifty extensions, with the page icon
+  `app/Pilcrowdoc.tiff`), so from `/LocalApps` Workspace offers Pilcrow for them and double-clicking one can open it here.  Workspace may then
+  show that icon for such files; if it picks Pilcrow where you want Edit, use the Inspector's *Open With* for that type, or delete the
   type's `S` line and rebuild.
 * **Sessions** (File > Sessions): *Save Session As...* keeps the windows that show files -- with each caret, scroll position, window
-  frame and wrap setting -- as a named set in `~/.JOSE.sessions`; *Save Session* writes it again under the current name.  *Open
+  frame and wrap setting -- as a named set in `~/.Pilcrow.sessions`; *Save Session* writes it again under the current name.  *Open
   Session* adds a saved set to what is open; *Switch to Session* first closes the windows that are not in it (asking about unsaved
   work, and leaving the ones that are in it alone); *Delete Session* removes one.  The windows open now are also kept as the *last
   session* each time one opens or closes, and at quit, so *Reopen Last Session* brings them back; with *Preferences > Reopen the
-  last session's files when JOSE starts* (off by default) that happens at launch, unless files are named on the command line.
+  last session's files when Pilcrow starts* (off by default) that happens at launch, unless files are named on the command line.
   Windows without a file are not part of a session, and files that have gone are skipped (and counted).
 * **Split panes** (Windows > Split Pane, cmd-2; Close Pane, cmd-1): the window shows the same text in two panes, one above the
   other, each with its own scroll position, selection, line numbers and fold margin.  Edits, undo, folds and highlighting are
@@ -154,14 +155,14 @@ Status: **0.1.0**.  Everything described below has been built and run on OPENSTE
 *Macro > Learn Macro* (shift-cmd-L) starts learning; the status line says "Learning a macro"; *Stop Learning* ends it.  *Replay Macro*
 (cmd-Y) runs it again in the front window, and *Repeat Macro...* (shift-cmd-Y) runs it a number of times or until it fails (a
 search that finds nothing, say).  The last macro is kept between sessions; *Save Macro As...* names it, and *Run Macro* and
-*Edit Macro* list the saved ones (in `~/.JOSE.macros`).  *Macro as Text* shows the learned macro in a window.
+*Edit Macro* list the saved ones (in `~/.Pilcrow.macros`).  *Macro as Text* shows the learned macro in a window.
 
 What is learned is not keystrokes but *actions*: typed text (one insert for a run of keys), key actions such as the arrows, Return,
 Tab, Delete, word and line movement, selecting, Cut/Copy/Paste, menu commands (shift, comment, fill, fold, brackets, undo), searches
 and replacements with their settings, and filters and executed commands.  Nothing is learned from the mouse, so start a macro at a
 place that a key or a search can find again.  Because the result is a short text, macros can be read, edited and written by hand:
 
-    # JOSE macro
+    # Pilcrow macro
     # find: f or b (forward/backward), c case sensitive, r regular expression, w whole word, p wrap around
     find fcp "TODO"
     action moveToEndOfLine:
@@ -191,7 +192,7 @@ inside here-documents, Ruby regular expressions and `%w[]`-style literals.
 
 ## Syntax files
 
-HighlighterKit's `.syntax` files are property lists of contexts.  JOSE adds one key: a context may have a `Parent`
+HighlighterKit's `.syntax` files are property lists of contexts.  Pilcrow adds one key: a context may have a `Parent`
 (the index of another context in the list; 0, the default context, if it is left out), which makes it a context that begins
 *inside* its parent, so the contexts form a tree.  The C modes use this for `<header>`, `"header"` and comments inside a
 preprocessor line, and Shell for `${var}` and `$(cmd)` inside double quotes.  A nested context ends at its own `Ending`, or
@@ -205,7 +206,7 @@ Roughly NEdit's feature set is here: search and replace (also across files and o
 contexts, folding, tags, macros, shell commands, split panes, sessions, plus things NEdit never had on this OS (Markdown preview, remote
 editing, word completion, clipboard history, text encodings).  The sections above say what each does.
 
-Parked for the next major iteration: **a text view of JOSE's own** in place of `NSTextView`, drawing the visible lines itself with FreeType
+Parked for the next major iteration: **a text view of Pilcrow's own** in place of `NSTextView`, drawing the visible lines itself with FreeType
 (both FreeType and FriBidi are already ported in `openstep-pkg`).  It would give real Unicode display from fonts you supply (Greek,
 Cyrillic, CJK, Hebrew), an input method for them, and an end to the slowness and crashes that come from OPENSTEP's text system on very
 large files.  Not planned: complex-script shaping (Indic, Thai), which needs HarfBuzz.
@@ -214,7 +215,7 @@ large files.  Not planned: complex-script shaping (Indic, Thai), which needs Har
 
 ```
 make -f Makefile.openstep test     # the C unit tests, with the real compiler
-make -f Makefile.openstep          # build JOSE.app
+make -f Makefile.openstep          # build Pilcrow.app
 ```
 
 On a development Mac (not for OPENSTEP): `make test lint check-objc hk-smoke doc-smoke`.
@@ -222,10 +223,10 @@ On a development Mac (not for OPENSTEP): `make test lint check-objc hk-smoke doc
 ## Third-party code
 
 * `hk/` is HighlighterKit by Saso Kiselkov (LGPL), adapted.
-* `core/md*.c`, `core/md*.h` and `core/nsenc*` are MarkStep's Markdown parser and RTF writer (MIT, by the author of JOSE; MarkStep's own
+* `core/md*.c`, `core/md*.h` and `core/nsenc*` are MarkStep's Markdown parser and RTF writer (MIT, by the author of Pilcrow; MarkStep's own
   repository has the full CommonMark test suite).  `nsenc` is the NeXTSTEP character-set table that StepTTY also uses.
 
 ## Licence
 
-MIT for JOSE's own sources.  The `hk/` directory is HighlighterKit 0.1.3 by Saso Kiselkov under the LGPL 2.1 or later,
+MIT for Pilcrow's own sources.  The `hk/` directory is HighlighterKit 0.1.3 by Saso Kiselkov under the LGPL 2.1 or later,
 with the changes described at the top of `hk/HKCompat.h` and in the git history.

@@ -235,7 +235,7 @@ static NSString *qpath(NSString *rpath)
     if ([self remoteChanged:d] &&
         NSRunAlertPanel(@"Save Remote File", @"%@ has changed on the other machine since it was read. Overwrite it with this text?", @"Overwrite", @"Cancel", nil, [d remoteSpec]) != NSAlertDefaultReturn)
         return NO;
-    tmp = [rpath stringByAppendingString:@".jose-tmp"];
+    tmp = [rpath stringByAppendingString:@".pilcrow-tmp"];
     if (![self run:[NSString stringWithFormat:@"cat > %@ && cat %@ > %@ && rm -f %@", qpath(tmp), qpath(tmp), qpath(rpath), qpath(tmp)] userhost:uh input:data result:&r]) { shell_result_free(&r); return NO; }
     ok = r.status == 0 && !r.timed_out;
     if (!ok) {

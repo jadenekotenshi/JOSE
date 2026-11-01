@@ -44,7 +44,7 @@ static BOOL write_text(NSString *text, NSString *path)
     self = [super init];
     if (self) {
         owner = anOwner;
-        folder = [[NSHomeDirectory() stringByAppendingPathComponent:@".JOSE.sessions"] retain];
+        folder = [[NSHomeDirectory() stringByAppendingPathComponent:@".Pilcrow.sessions"] retain];
     }
     return self;
 }
@@ -117,7 +117,7 @@ static BOOL write_text(NSString *text, NSString *path)
     if (buf == NULL) { session_free(s); return NO; }
     session_format(s, buf, need + 1);
     if (![fm fileExistsAtPath:folder isDirectory:&isDir]) [fm createDirectoryAtPath:folder attributes:nil];
-    ok = write_text([@"# JOSE session\n" stringByAppendingString:ui_string_from_utf8(buf)], [folder stringByAppendingPathComponent:fileName]);
+    ok = write_text([@"# Pilcrow session\n" stringByAppendingString:ui_string_from_utf8(buf)], [folder stringByAppendingPathComponent:fileName]);
     free(buf);
     session_free(s);
     return ok;

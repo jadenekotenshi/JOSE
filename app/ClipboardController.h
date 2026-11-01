@@ -1,7 +1,7 @@
 #import "Compat.h"
 #include "cliphist.h"
 
-/* The clipboard history: what was cut or copied in JOSE (and, whenever JOSE becomes the active program again, what was copied
+/* The clipboard history: what was cut or copied in Pilcrow (and, whenever Pilcrow becomes the active program again, what was copied
  * elsewhere), the last thirty, newest first.  Edit > Paste from History pastes one and makes it the current clipboard; the Clipboard
  * History panel lists them whole.  Kept in memory only. */
 @interface ClipboardController : NSObject

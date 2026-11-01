@@ -1,11 +1,11 @@
 # build output
 build/
 dist/
-JOSE.app/
+Pilcrow.app/
 *.o
 *.dSYM/
 
 # macOS
 .DS_Store
-JOSE-*.tar.gz
-JOSE.pkg/
+Pilcrow-*.tar.gz
+Pilcrow.pkg/
