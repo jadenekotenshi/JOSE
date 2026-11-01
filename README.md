@@ -59,6 +59,12 @@ Status: **prototype (0.0.1)** -- nothing here has been run on OPENSTEP yet.
   and comments are skipped in the C-like modes.  When there are problems, the first `}` that starts its line but is not indented
   like the line that opened its block is listed too, because an extra or missing brace shows up there long before the place where
   the counts finally run out.  If everything is paired it says so.
+* **Word completion** (Edit > Complete Word, cmd-I; Complete Word, Previous, shift-cmd-I): finishes the word before the insertion point
+  and, pressed again, goes on to the next candidate -- then back to the word as typed, and round again; shift-cmd-I goes the other way.
+  Candidates, in this order: words of this text, nearest first (before the word, then after it); words of the other open windows
+  (the first 400,000 characters of each); the keywords of the language mode; names from loaded tags files.  Case counts; if nothing
+  matches, it is ignored.  Each press replaces the last candidate, so one Undo takes the whole completion out; any other edit or
+  move of the insertion point ends the cycle.  The status line says which candidate it is on.
 * **Clipboard history** (Edit > Paste from History; Edit > Clipboard History..., shift-cmd-V): the last thirty things cut or copied in JOSE --
   and, whenever JOSE becomes the active program again, what was copied elsewhere -- newest first.  Choosing one from the submenu makes it
   the current clipboard (so cmd-V pastes it too) and pastes it at once; the panel lists them with a longer look at the selected one and

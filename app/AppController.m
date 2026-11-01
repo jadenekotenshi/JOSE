@@ -8,6 +8,7 @@
 #import "FilesController.h"
 #import "SessionController.h"
 #import "ClipboardController.h"
+#include "complete.h"
 #import "Appearance.h"
 #import "UIHelpers.h"
 #import "HKSyntaxDefinition.h"
@@ -288,6 +289,8 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
     [self addItem:@"Shift Right" action:@selector(shiftRight:) key:@"]" target:self toMenu:m];
     [self addItem:@"Comment" action:@selector(commentLines:) key:@"/" target:self toMenu:m];
     [self addItem:@"Uncomment" action:@selector(uncommentLines:) key:@"\\" target:self toMenu:m];
+    [self addItem:@"Complete Word" action:@selector(completeWord:) key:@"i" target:self toMenu:m];
+    [self addItem:@"Complete Word, Previous" action:@selector(completeWordBack:) key:@"I" target:self toMenu:m];
     [self addItem:@"Fill Paragraph" action:@selector(fillParagraph:) key:@"j" target:self toMenu:m];
     [self addItem:@"Fold/Unfold Block" action:@selector(toggleFold:) key:@"k" target:self toMenu:m];
     [self addItem:@"Fold All Blocks" action:@selector(foldAll:) key:@"" target:self toMenu:m];
@@ -400,7 +403,7 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
     if (a == @selector(saveDoc:) || a == @selector(openIncluded:) || a == @selector(findDefinition:) || a == @selector(returnFromDefinition:) || a == @selector(showCallTip:) || a == @selector(saveDocAs:) || a == @selector(closeDoc:) || a == @selector(gotoLine:) || a == @selector(showFind:) || a == @selector(findAgain:)
         || a == @selector(findPrevious:) || a == @selector(findSelection:)
         || a == @selector(toggleWrap:) || a == @selector(setMode:)
-        || a == @selector(findUnmatched:) || a == @selector(gotoBracket:) || a == @selector(selectBracket:) || a == @selector(shiftLeft:) || a == @selector(shiftRight:) || a == @selector(commentLines:) || a == @selector(uncommentLines:)
+        || a == @selector(findUnmatched:) || a == @selector(completeWord:) || a == @selector(completeWordBack:) || a == @selector(gotoBracket:) || a == @selector(selectBracket:) || a == @selector(shiftLeft:) || a == @selector(shiftRight:) || a == @selector(commentLines:) || a == @selector(uncommentLines:)
         || a == @selector(fillParagraph:) || a == @selector(toggleFold:) || a == @selector(foldAll:) || a == @selector(expandAll:) || a == @selector(filterSelection:) || a == @selector(executeCommand:) || a == @selector(sortLines:))
         if (d == nil) return NO;
     if (a == @selector(pasteFromHistory:)) return d != nil;
@@ -596,6 +599,8 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
     if (r == 0) NSRunAlertPanel(@"Find Unmatched Bracket", @"Every bracket and block keyword in this file has a partner.", @"OK", nil, nil);
 }
 
+- (void)completeWord:(id)sender { [self macroNote:@"complete-word"]; if (![[self frontDocument] completeWord:1]) NSBeep(); }
+- (void)completeWordBack:(id)sender { [self macroNote:@"complete-word-back"]; if (![[self frontDocument] completeWord:-1]) NSBeep(); }
 - (void)gotoBracket:(id)sender { [self macroNote:@"match-bracket"]; [[self frontDocument] gotoMatchingBracket:NO]; }
 - (void)selectBracket:(id)sender { [self macroNote:@"select-bracket"]; [[self frontDocument] gotoMatchingBracket:YES]; }
 - (void)shiftLeft:(id)sender { [self macroNote:@"shift-left"]; [[self frontDocument] shiftSelection:-1]; }
@@ -765,7 +770,7 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
     static const struct { const char *name; const char *sel; } T[] = {
         { "shift-left", "shiftLeft:" }, { "shift-right", "shiftRight:" },
         { "comment", "commentLines:" }, { "uncomment", "uncommentLines:" },
-        { "fill-paragraph", "fillParagraph:" },
+        { "fill-paragraph", "fillParagraph:" }, { "complete-word", "completeWord:" }, { "complete-word-back", "completeWordBack:" },
         { "fold-toggle", "toggleFold:" }, { "fold-all", "foldAll:" }, { "expand-all", "expandAll:" },
         { "match-bracket", "gotoBracket:" }, { "select-bracket", "selectBracket:" },
         { "undo", "undoDoc:" }, { "redo", "redoDoc:" },
@@ -872,6 +877,63 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
 
 - (void)splitPane:(id)sender { [[self frontDocument] splitPane]; }
 - (void)closePane:(id)sender { [[self frontDocument] closePane]; }
+
+/* ---- word completion ---- */
+
+#define COMPLETE_MAX 300
+#define COMPLETE_OTHER_CHARS 400000U           /* how much of each other window is read */
+
+- (NSArray *)extraCompletionsForPrefix:(NSString *)prefix document:(EditorDoc *)d icase:(BOOL)icase
+{
+    NSMutableArray *out = [NSMutableArray array];
+    CompList l;
+    u16 pre[128];
+    unsigned int plen = [prefix length], i, k;
+
+    if (plen == 0 || plen > 120) return out;
+    [prefix getCharacters:pre];
+    comp_init(&l, icase);
+    for (i = 0; i < [docs count] && l.n < COMPLETE_MAX; i++) {                     /* the other windows */
+        EditorDoc *o = [docs objectAtIndex:i];
+        NSString *s;
+        unsigned int n;
+        u16 *t;
+
+        if (o == d) continue;
+        s = [[o textView] string];
+        n = [s length];
+        if (n > COMPLETE_OTHER_CHARS) n = COMPLETE_OTHER_CHARS;
+        t = (u16 *)malloc((n + 1) * sizeof(u16));
+        if (t == NULL) continue;
+        [s getCharacters:t range:NSMakeRange(0, n)];
+        comp_add_words_of(&l, t, n, pre, plen, COMPLETE_MAX);
+        free(t);
+    }
+    if ([d mode] != nil) {                                                           /* the language's keywords */
+        NSData *syn = [NSData dataWithContentsOfFile:[syntaxDir stringByAppendingPathComponent:[[d mode] stringByAppendingString:@".syntax"]]];
+
+        if (syn != nil) {
+            char *text = (char *)malloc([syn length] + 1);
+
+            if (text != NULL) {
+                [syn getBytes:text];
+                text[[syn length]] = '\0';
+                comp_add_syntax_keywords(&l, text, pre, plen, COMPLETE_MAX);
+                free(text);
+            }
+        }
+    }
+    for (k = 0; k < l.n; k++) [out addObject:[NSString stringWithCharacters:l.v[k].w length:l.v[k].len]];
+    comp_free(&l);
+    if (tags == nil) tags = [[TagsController alloc] initWithOwner:self];
+    {
+        NSArray *names = [tags completionNamesForPrefix:prefix document:d max:COMPLETE_MAX];
+
+        for (k = 0; k < [names count]; k++)
+            if (![out containsObject:[names objectAtIndex:k]]) [out addObject:[names objectAtIndex:k]];
+    }
+    return out;
+}
 
 /* ---- clipboard history ---- */
 

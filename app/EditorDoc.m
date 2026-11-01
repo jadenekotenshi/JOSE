@@ -11,6 +11,7 @@
 #include "rect.h"
 #include "fold.h"
 #include "words.h"
+#include "complete.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -477,6 +478,7 @@ static void line_col(NSString *s, unsigned int loc, unsigned int *line, unsigned
     undo_free(undo);
     [ruler release];
     [altRuler release];
+    [compCands release];
     [statusNote release];
     [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(refreshFoldInfo) object:nil];
     foldlines_free(&foldInfo);
@@ -2172,6 +2174,96 @@ static NSString *rect_clip;                 /* what Copy last took from a rectan
         else if (!forward && r.location > 0) r = NSMakeRange(r.location - 1, 1);
     }
     return [self editNearEnd:r with:@""];
+}
+
+static BOOL rectOnForCompletion(EditTextView *tv)
+{
+    return [tv rectActive];
+}
+
+/* ---- word completion ---- */
+
+#define COMPLETE_MAX_OWN 300
+
+/* The candidates for the word before the insertion point: from this text (nearest first), then the other windows, the mode's keywords
+ * and tags.  Matched exactly; if that finds nothing, ignoring case. */
+- (NSMutableArray *)completionCandidatesStart:(unsigned int)start length:(unsigned int)plen
+{
+    NSString *s = [textView string];
+    unsigned int n = [s length], pass, k;
+    u16 *t = (u16 *)malloc((n + 1) * sizeof(u16));
+    NSMutableArray *out = [NSMutableArray array];
+
+    if (t == NULL) return out;
+    if (n > 0) [s getCharacters:t];
+    for (pass = 0; pass < 2 && [out count] == 0; pass++) {
+        CompList l;
+        NSString *prefix = [s substringWithRange:NSMakeRange(start, plen)];
+        NSArray *extra;
+
+        comp_init(&l, (int)pass);
+        comp_add_text_words(&l, t, n, start, start + plen, COMPLETE_MAX_OWN);
+        for (k = 0; k < l.n; k++) [out addObject:[NSString stringWithCharacters:l.v[k].w length:l.v[k].len]];
+        comp_free(&l);
+        if ([owner respondsToSelector:@selector(extraCompletionsForPrefix:document:icase:)]) {
+            extra = [owner extraCompletionsForPrefix:prefix document:self icase:(BOOL)pass];
+            for (k = 0; k < [extra count]; k++)
+                if (![out containsObject:[extra objectAtIndex:k]]) [out addObject:[extra objectAtIndex:k]];
+        }
+    }
+    free(t);
+    return out;
+}
+
+- (BOOL)completeWord:(int)direction
+{
+    NSRange sel = [textView selectedRange];
+    int idx;
+    NSString *cand;
+
+    if (rectOnForCompletion(textView)) return NO;
+    if (compCands != nil && undo_version(undo) == compVersion && sel.length == 0 && sel.location == compCaret) {
+        idx = compIndex + (direction < 0 ? -1 : 1);                       /* carry on round the candidates and the word as typed */
+        if (idx >= (int)[compCands count]) idx = -1;
+        if (idx < -1) idx = (int)[compCands count] - 1;
+        if (compIndex >= 0) [self undo];                                  /* take the last candidate out again (one undo step stays) */
+    } else {
+        unsigned int plen, n;
+        u16 *t;
+
+        [compCands release];
+        compCands = nil;
+        if (sel.length != 0) return NO;
+        n = [[textView string] length];
+        t = (u16 *)malloc((n + 1) * sizeof(u16));
+        if (t == NULL) return NO;
+        if (n > 0) [[textView string] getCharacters:t];
+        plen = comp_prefix_len(t, n, sel.location);
+        free(t);
+        if (plen == 0) return NO;
+        compStart = sel.location - plen;
+        compPlen = plen;
+        compCands = [[self completionCandidatesStart:compStart length:plen] retain];
+        if ([compCands count] == 0) { [compCands release]; compCands = nil; return NO; }
+        compIndex = -1;
+        idx = direction < 0 ? (int)[compCands count] - 1 : 0;
+    }
+    if (idx >= 0) {
+        cand = [compCands objectAtIndex:idx];
+        [self replaceRange:NSMakeRange(compStart, compPlen) with:cand select:NSMakeRange(compStart + [cand length], 0)];
+        compCaret = compStart + [cand length];
+    } else {
+        compCaret = compStart + compPlen;                                 /* back to the word as typed */
+        [textView setSelectedRange:NSMakeRange(compCaret, 0)];
+    }
+    compIndex = idx;
+    compVersion = undo_version(undo);
+    if ([compCands count] > 1) {
+        [statusNote release];
+        statusNote = [[NSString stringWithFormat:@"Completion %d of %u%@", idx + 1, (unsigned)[compCands count], idx < 0 ? @" (the word as typed)" : @""] retain];
+        [self updateStatus];
+    }
+    return YES;
 }
 
 - (int)scrollY

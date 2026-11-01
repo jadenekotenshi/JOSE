@@ -98,6 +98,36 @@
     [super dealloc];
 }
 
+/* The names in the loaded tags files (and any found for the document) that start with the prefix, without repeats. */
+- (NSArray *)completionNamesForPrefix:(NSString *)prefix document:(EditorDoc *)d max:(unsigned int)max
+{
+    NSMutableArray *found = [NSMutableArray array];
+    NSData *pd = ui_utf8_cstring(prefix);
+    const char *pc = (const char *)[pd bytes];
+    unsigned int plen = [pd length] - 1, si, i;
+
+    if (d != nil) [self discoverFor:d];
+    for (si = 0; si < [sets count] && [found count] < max; si++) {
+        Tags *t = [[sets objectAtIndex:si] tags];
+        unsigned int n = t != NULL ? tags_count(t) : 0;
+        const char *last = NULL;
+
+        for (i = 0; i < n && [found count] < max; i++) {
+            const Tag *tag = tags_at(t, i);
+
+            if (tag == NULL || tag->name == NULL || strncmp(tag->name, pc, plen) != 0 || strlen(tag->name) <= plen) continue;
+            if (last != NULL && strcmp(last, tag->name) == 0) continue;         /* the same name on the next line */
+            last = tag->name;
+            {
+                NSString *name = ui_string_from_utf8(tag->name);
+
+                if (![found containsObject:name]) [found addObject:name];
+            }
+        }
+    }
+    return found;
+}
+
 /* ---- loading ---- */
 
 - (BOOL)loadFileAtPath:(NSString *)p

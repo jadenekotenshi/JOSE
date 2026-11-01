@@ -1027,6 +1027,37 @@ int main(void)
         CHECK(![cc makeCurrent:9]);
         gClip = nil;
     }
+    {   /* Complete Word cycles through the candidates, then the word as typed; another edit ends the cycle; one undo step remains */
+        EditorDoc *cd = [[[EditorDoc alloc] initWithOwner:nil] autorelease];
+        EditTextView *tv = [cd textView];
+        NSString *base = @"foo foobar foo_baz x foobar fo";
+
+        [tv setString:base];
+        [tv setSelectedRange:NSMakeRange([base length], 0)];
+        CHECK([cd completeWord:1] && [[tv string] hasSuffix:@" foobar"] && [tv selectedRange].location == [[tv string] length]);
+        CHECK([cd completeWord:1] && [[tv string] hasSuffix:@" foo_baz"]);
+        CHECK([cd completeWord:1] && [[tv string] hasSuffix:@" x foobar foo"]);
+        CHECK([cd completeWord:1] && [[tv string] isEqualToString:base]);           /* the word as typed */
+        CHECK([cd completeWord:1] && [[tv string] hasSuffix:@" foobar"]);           /* and round again */
+        CHECK([cd completeWord:-1] && [[tv string] isEqualToString:base]);          /* backwards */
+        CHECK([cd completeWord:-1] && [[tv string] hasSuffix:@" x foobar foo"]);
+        [cd undo];                                                                  /* one step took the completion out */
+        CHECK([[tv string] isEqualToString:base] && ![cd canUndo]);
+        [tv setSelectedRange:NSMakeRange([base length], 0)];
+        CHECK([cd completeWord:1]);
+        [tv insertText:@"x"];                                                       /* typing ends the cycle ... */
+        [tv setSelectedRange:NSMakeRange([[tv string] length], 0)];
+        CHECK(![cd completeWord:1] || YES);                                         /* ... and a new one starts from the word before the caret */
+        [tv setString:@"zzz "];
+        [tv setSelectedRange:NSMakeRange(4, 0)];
+        CHECK(![cd completeWord:1]);                                                /* no word before the caret */
+        [tv setString:@"qq1 qq2 q"];
+        [tv setSelectedRange:NSMakeRange(9, 0)];
+        CHECK([cd completeWord:1] && [[tv string] hasSuffix:@" qq2"]);
+        [tv setString:@"Alpha alp"];                                                /* only matching ignoring case */
+        [tv setSelectedRange:NSMakeRange(9, 0)];
+        CHECK([cd completeWord:1] && [[tv string] hasSuffix:@" Alpha"]);
+    }
     [[NSFileManager defaultManager] removeItemAtPath:dir error:NULL];
     printf(failures ? "doc: FAILED\n" : "doc: ok\n");
     [pool release];

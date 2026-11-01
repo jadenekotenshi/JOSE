@@ -54,6 +54,7 @@
 - (void)openAtLaunch:(NSString *)path;
 - (EditorDoc *)openPath:(NSString *)path;
 - (EditorDoc *)frontDocument;
+- (NSArray *)extraCompletionsForPrefix:(NSString *)prefix document:(EditorDoc *)d icase:(BOOL)icase;   /* words from the other windows, the mode's keywords and the tags */
 - (SessionController *)sessionController;
 - (ClipboardController *)clipboardController;
 - (void)noteClipboard;                  /* Copy or Cut was done: the history looks at the clipboard */

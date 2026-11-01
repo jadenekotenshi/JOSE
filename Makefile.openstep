@@ -36,12 +36,12 @@ SYNTAXFILES = syntax/C.syntax
 ICONFLAGS = -sectcreate __ICON __header $(ICONHDR) -segprot __ICON r r -sectcreate __ICON app $(ICONTIFF)
 
 HK_OBJS   = hk/HKTextPattern.o hk/HKSyntaxDefinition.o hk/HKSyntaxHighlighter.o
-CORE_OBJS = core/langmodes.o core/eol.o core/undo.o core/search.o core/edit.o core/brace.o core/fill.o core/rect.o core/shellrun.o core/fold.o core/words.o core/includes.o core/tags.o core/foldlines.o core/macro.o core/modeprefs.o core/grep.o core/session.o core/cliphist.o
+CORE_OBJS = core/langmodes.o core/eol.o core/undo.o core/search.o core/edit.o core/brace.o core/fill.o core/rect.o core/shellrun.o core/fold.o core/words.o core/includes.o core/tags.o core/foldlines.o core/macro.o core/modeprefs.o core/grep.o core/session.o core/cliphist.o core/complete.o
 APP_OBJS  = app/AppController.o app/EditorDoc.o app/FindController.o app/FilesController.o app/SessionController.o app/ClipboardController.o app/LineNumberView.o app/ShellController.o app/MacroController.o app/TagsController.o app/Appearance.o app/PrefsController.o app/UIHelpers.o app/main.o
 
 # Every header, so that a changed one rebuilds what includes it.  tools/lint_openstep.sh checks the list is complete.
 HEADERS   = hk/HKCompat.h hk/HKSyntaxDefinition.h hk/HKSyntaxHighlighter.h hk/HKTextPattern.h \
-            core/eol.h core/langmodes.h core/undo.h core/search.h core/edit.h core/brace.h core/fill.h core/rect.h core/shellrun.h core/fold.h core/words.h core/includes.h core/tags.h core/foldlines.h core/macro.h core/modeprefs.h core/grep.h core/session.h core/cliphist.h \
+            core/eol.h core/langmodes.h core/undo.h core/search.h core/edit.h core/brace.h core/fill.h core/rect.h core/shellrun.h core/fold.h core/words.h core/includes.h core/tags.h core/foldlines.h core/macro.h core/modeprefs.h core/grep.h core/session.h core/cliphist.h core/complete.h \
             app/AppController.h app/Compat.h app/EditorDoc.h app/FindController.h app/FilesController.h app/SessionController.h app/ClipboardController.h app/LineNumberView.h app/ShellController.h app/MacroController.h app/TagsController.h app/Appearance.h app/PrefsController.h app/UIHelpers.h
 .SUFFIXES: .c .m .o
 
@@ -124,6 +124,11 @@ build/test_cliphist: tests/test_cliphist.c core/cliphist.o
 	@( cd build ) >/dev/null 2>&1 || { echo "make: build is missing or is not a directory:"; ls -ld build; echo "remove it and run make again"; exit 1; }
 	$(CC) $(CFLAGS) -o build/test_cliphist tests/test_cliphist.c core/cliphist.o
 
+build/test_complete: tests/test_complete.c core/complete.o
+	-mkdir build
+	@( cd build ) >/dev/null 2>&1 || { echo "make: build is missing or is not a directory:"; ls -ld build; echo "remove it and run make again"; exit 1; }
+	$(CC) $(CFLAGS) -o build/test_complete tests/test_complete.c core/complete.o
+
 build/test_tags: tests/test_tags.c core/tags.o
 	-mkdir build
 	@( cd build ) >/dev/null 2>&1 || { echo "make: build is missing or is not a directory:"; ls -ld build; echo "remove it and run make again"; exit 1; }
@@ -149,7 +154,7 @@ build/test_core: tests/test_core.c $(CORE_OBJS)
 	@( cd build ) >/dev/null 2>&1 || { echo "make: build is missing or is not a directory:"; ls -ld build; echo "remove it and run make again"; exit 1; }
 	$(CC) $(CFLAGS) -o build/test_core tests/test_core.c $(CORE_OBJS)
 
-test: build/test_core build/test_search build/test_edit build/test_brace build/test_fill build/test_shell build/test_fold build/test_words build/test_includes build/test_tags build/test_foldlines build/test_macro build/test_modeprefs build/test_grep build/test_session build/test_cliphist
+test: build/test_core build/test_search build/test_edit build/test_brace build/test_fill build/test_shell build/test_fold build/test_words build/test_includes build/test_tags build/test_foldlines build/test_macro build/test_modeprefs build/test_grep build/test_session build/test_cliphist build/test_complete
 	build/test_core
 	build/test_search
 	build/test_edit
@@ -164,6 +169,7 @@ test: build/test_core build/test_search build/test_edit build/test_brace build/t
 	build/test_grep
 	build/test_session
 	build/test_cliphist
+	build/test_complete
 	build/test_foldlines
 	build/test_macro
 

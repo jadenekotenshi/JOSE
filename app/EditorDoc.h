@@ -67,6 +67,12 @@
     NSScrollView        *altScroll;        /* the pane that is not the active one (nil if not split); textView/scroll/ruler are the active pane */
     EditTextView        *altView;
     LineNumberView      *altRuler;
+    NSMutableArray      *compCands;        /* Complete Word: the candidates for the word being completed (nil when not cycling) */
+    int                  compIndex;        /* the one in the text now, -1 for the word as typed */
+    unsigned int         compStart;       /* where the word begins, and how long it was as typed */
+    unsigned int         compPlen;
+    unsigned int         compCaret;       /* where the insertion point must be for the next press to carry on */
+    unsigned long        compVersion;     /* the undo version after our last change: another edit ends the cycle */
     NSString            *statusNote;       /* extra words for the status line until the selection moves */
 }
 - (id)initWithOwner:(id)anOwner;
@@ -137,6 +143,7 @@
 - (BOOL)editNearEnd:(NSRange)r with:(NSString *)str;   /* replace a range that lies in the last few lines by hand: YES if it was done (see EditTextView) */
 - (BOOL)cutNearEnd;                        /* Cut of a selection in the last few lines, by hand */
 - (BOOL)deleteNearEnd:(BOOL)forward;        /* Backspace/Delete in the last few lines, done by hand: YES if it was (see EditTextView) */
+- (BOOL)completeWord:(int)direction;       /* finish the word before the insertion point; again: the next candidate (-1: the previous); NO if there is none */
 - (int)scrollY;                            /* how far the text is scrolled, in points */
 - (void)restoreSelection:(NSRange)sel scrollY:(int)y;   /* a saved caret and scroll position (the selection is cut to the text) */
 - (void)splitPane;                          /* a second view of the same text under (or over) the first */

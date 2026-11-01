@@ -6,7 +6,7 @@ OBJCFLAGS = -x objective-c -fno-objc-arc -w -g -Ihk -Icore -Iapp
 CFLAGS  = -std=c89 -pedantic -Wall -Wextra -Wdeclaration-after-statement \
           -Wno-long-long -Wno-unused-parameter -O2 -g -Icore
 
-test: $(BUILD)/test_core $(BUILD)/test_search $(BUILD)/test_edit $(BUILD)/test_brace $(BUILD)/test_fill $(BUILD)/test_shell $(BUILD)/test_fold $(BUILD)/test_words $(BUILD)/test_includes $(BUILD)/test_tags $(BUILD)/test_foldlines $(BUILD)/test_macro $(BUILD)/test_modeprefs $(BUILD)/test_grep $(BUILD)/test_session $(BUILD)/test_cliphist
+test: $(BUILD)/test_core $(BUILD)/test_search $(BUILD)/test_edit $(BUILD)/test_brace $(BUILD)/test_fill $(BUILD)/test_shell $(BUILD)/test_fold $(BUILD)/test_words $(BUILD)/test_includes $(BUILD)/test_tags $(BUILD)/test_foldlines $(BUILD)/test_macro $(BUILD)/test_modeprefs $(BUILD)/test_grep $(BUILD)/test_session $(BUILD)/test_cliphist $(BUILD)/test_complete
 	$(BUILD)/test_core
 	$(BUILD)/test_search
 	$(BUILD)/test_edit
@@ -21,6 +21,7 @@ test: $(BUILD)/test_core $(BUILD)/test_search $(BUILD)/test_edit $(BUILD)/test_b
 	$(BUILD)/test_grep
 	$(BUILD)/test_session
 	$(BUILD)/test_cliphist
+	$(BUILD)/test_complete
 	$(BUILD)/test_foldlines
 	$(BUILD)/test_macro
 
@@ -55,6 +56,10 @@ $(BUILD)/test_session: tests/test_session.c tests/test.h core/session.c core/ses
 $(BUILD)/test_cliphist: tests/test_cliphist.c tests/test.h core/cliphist.c core/cliphist.h
 	mkdir -p $(BUILD)
 	$(CC) $(CFLAGS) tests/test_cliphist.c core/cliphist.c -o $@
+
+$(BUILD)/test_complete: tests/test_complete.c tests/test.h core/complete.c core/complete.h
+	mkdir -p $(BUILD)
+	$(CC) $(CFLAGS) tests/test_complete.c core/complete.c -o $@
 
 $(BUILD)/test_tags: tests/test_tags.c tests/test.h core/tags.c core/tags.h
 	mkdir -p $(BUILD)

@@ -22,4 +22,5 @@
 - (void)showCallTip;                      /* for the name at the insertion point */
 - (void)showCallTipAfterParenIn:(EditorDoc *)doc;   /* a `(` was just typed after a name */
 - (void)hideCallTip;
+- (NSArray *)completionNamesForPrefix:(NSString *)prefix document:(EditorDoc *)d max:(unsigned int)max;   /* tag names that start with it */
 @end
