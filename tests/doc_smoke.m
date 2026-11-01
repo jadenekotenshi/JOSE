@@ -1224,6 +1224,48 @@ int main(void)
         CHECK([hdoc completeWord:1] && [[[hdoc textView] string] hasSuffix:@"{ frobnicateWidgetWithName"]);
         [ac release];
     }
+    {   /* the character under the pointer in a preview, and files dropped on a window */
+        EditorDoc *md = [[[EditorDoc alloc] initWithOwner:nil] autorelease];
+        PreviewController *pc = [[[PreviewController alloc] initWithOwner:nil] autorelease];
+        NSTextView *ptv;
+        NSString *shown;
+        NSRange u;
+
+        [[md textView] setString:@"Some text before [a link](http://example.com/page) and more after it.\n"];
+        [pc toggleFor:md];
+        ptv = [pc previewViewFor:md];
+        shown = [ptv string];
+        u = [shown rangeOfString:@"http://example.com/page"];
+        CHECK(ptv != nil && u.length > 0);
+        {
+            NSLayoutManager *lm = [ptv layoutManager];
+            NSPoint o = [ptv textContainerOrigin];
+            NSRect r;
+            unsigned int k, hit, inside = 0, sample = 0;
+
+            for (k = 0; k < u.length; k += 3) {                                  /* points along the address, and some before and after */
+                r = [lm boundingRectForGlyphRange:NSMakeRange(u.location + k, 1) inTextContainer:[ptv textContainer]];
+                hit = [PreviewController characterIndexAt:NSMakePoint(NSMidX(r) + o.x, NSMidY(r) + o.y) inView:ptv];
+                sample++;
+                if (hit >= u.location && hit < NSMaxRange(u) && hit == u.location + k) inside++;
+            }
+            CHECK(sample > 4 && inside == sample);                               /* each point finds its own character, not the line's first */
+            r = [lm boundingRectForGlyphRange:NSMakeRange(2, 1) inTextContainer:[ptv textContainer]];
+            hit = [PreviewController characterIndexAt:NSMakePoint(NSMidX(r) + o.x, NSMidY(r) + o.y) inView:ptv];
+            CHECK(hit == 2);
+        }
+        [pc toggleFor:md];
+    }
+    {   /* files dropped on a window: files open, folders and missing names do not */
+        SessionOwner *o = [[[SessionOwner alloc] init] autorelease];
+        EditorDoc *dd = [[[EditorDoc alloc] initWithOwner:o] autorelease];
+        NSString *f1 = [dir stringByAppendingPathComponent:@"drop one.txt"], *f2 = [dir stringByAppendingPathComponent:@"drop2.c"];
+
+        [@"one\n" writeToFile:f1 atomically:YES];
+        [@"two\n" writeToFile:f2 atomically:YES];
+        [dd openDroppedFiles:[NSArray arrayWithObjects:f1, dir, [dir stringByAppendingPathComponent:@"nonesuch"], f2, nil]];
+        CHECK([[o docs] count] == 2 && [[[[o docs] objectAtIndex:0] path] isEqualToString:f1] && [[[[o docs] objectAtIndex:1] path] isEqualToString:f2]);
+    }
     [[NSFileManager defaultManager] removeItemAtPath:dir error:NULL];
     printf(failures ? "doc: FAILED\n" : "doc: ok\n");
     [pool release];

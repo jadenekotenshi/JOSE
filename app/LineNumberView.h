@@ -27,5 +27,6 @@
 @interface NSObject (LineNumberFoldSource)
 - (int)foldStateForLineStart:(unsigned int)lineStart;      /* 0 nothing, 1 a block begins there, 2 it is folded */
 - (void)toggleFoldAtLineStart:(unsigned int)lineStart;
+- (void)openDroppedFiles:(NSArray *)paths;                  /* files dropped on the margin */
 - (unsigned int)lineStartForPoint:(NSPoint)p;              /* the text view's line at a point of its own coordinates */
 @end

@@ -94,15 +94,14 @@ Status: **prototype (0.0.1)** -- nothing here has been run on OPENSTEP yet.
   can paste, make current, delete or clear.  Something copied from a rectangle stays a rectangle.  Anything over 400,000 bytes is not kept,
   and the history lives in memory only.  (Several copies made one after another in another program, without JOSE becoming active
   between, are seen only as the last.)
-* **Files dropped on the icon**: a file dragged from Workspace onto JOSE's icon (or opened with it) opens in a window, whether JOSE is
-  running or is started by the drop; several files at once open together.  Workspace only accepts a drop on an application that says
-  which file types it opens, so JOSE's icon header (`app/JOSE.iconheader`, the same format as Edit.app's) lists about fifty extensions
-  -- `c h m mm cc cpp cxx hpp C py pl pm sh ksh bash csh zsh rb js json md markdown plist strings mk txt text log conf html xml css
-  tex patch diff` and the like -- with a page icon (`app/JOSEdoc.tiff`).  Consequences to know about: Workspace may now show that
-  icon for such files and offer JOSE (alongside Edit) when you open them; if it picks JOSE where you want Edit, use the Inspector's
-  *Open With* for that type, or delete the types' `S` lines from the header and rebuild.  Add an extension by adding a line
-  `S<tab>ext<tab>JOSE<tab>doc`.  After installing a new build, Workspace may need to be told to look again (log out and in, or
-  touch the application) before it notices.
+* **Files dropped on a window**: a file dragged from Workspace onto an editor window (its text or its line-number margin) opens in a window
+  of its own instead of pasting its name; several at once open together, folders are ignored.  (Dropping on the application icon or the
+  Dock tile does not work with this Workspace -- none of the sibling programs gets it to either -- so that path was given up;
+  `application:openFile:` is still there for whatever Workspace does send.)  JOSE's icon header lists the file types it opens
+  (`app/JOSE.iconheader`, in Edit.app's format: `S<tab>ext<tab>JOSE<tab>doc`, about fifty extensions, with the page icon
+  `app/JOSEdoc.tiff`), so from `/LocalApps` Workspace offers JOSE for them and double-clicking one can open it here.  Workspace may then
+  show that icon for such files; if it picks JOSE where you want Edit, use the Inspector's *Open With* for that type, or delete the
+  type's `S` line and rebuild.
 * **Sessions** (File > Sessions): *Save Session As...* keeps the windows that show files -- with each caret, scroll position, window
   frame and wrap setting -- as a named set in `~/.JOSE.sessions`; *Save Session* writes it again under the current name.  *Open
   Session* adds a saved set to what is open; *Switch to Session* first closes the windows that are not in it (asking about unsaved

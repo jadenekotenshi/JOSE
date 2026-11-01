@@ -36,18 +36,18 @@
     NSRange g;
     u16 *t;
 
-    if (n > 0 && n < 2000000U && [lm respondsToSelector:@selector(characterIndexForGlyphAtIndex:)]) {
-        g = [lm glyphRangeForBoundingRect:NSMakeRect(p.x - o.x, p.y - o.y, 1.0, 1.0) inTextContainer:[self textContainer]];
-        if (g.length > 0) {
-            ci = [lm characterIndexForGlyphAtIndex:g.location];
+    if (n > 0 && n < 2000000U) {
+        ci = [PreviewController characterIndexAt:p inView:self];
+        if (ci < n) {
             t = (u16 *)malloc((n + 1) * sizeof(u16));
             if (t != NULL) {
                 [s getCharacters:t];
-                len = ci < n ? url_at(t, n, ci, &start) : 0;
+                len = url_at(t, n, ci, &start);
                 free(t);
             }
         }
     }
+    (void)o; (void)lm; (void)g;
     SSTrace("preview click: count %d at (%d,%d), character %u of %u, %s", (int)[event clickCount], (int)p.x, (int)p.y, ci, n, len > 0 ? "on an address" : "not on an address");
     if (len > 0) {
         NSString *url = [s substringWithRange:NSMakeRange(start, len)];
@@ -118,6 +118,13 @@
 }
 
 - (BOOL)hasPreviewFor:(EditorDoc *)d { return [self itemFor:d] != nil; }
+
+- (NSTextView *)previewViewFor:(EditorDoc *)d
+{
+    PreviewItem *it = [self itemFor:d];
+
+    return it != nil ? it->tv : nil;
+}
 
 - (NSString *)previewStringFor:(EditorDoc *)d
 {
@@ -300,6 +307,32 @@ static NSData *rtf_of(NSString *markdown)
         [[it retain] autorelease];
         [it->window close];
     }
+}
+
+/* ---- the character under the pointer ---- */
+
+/* glyphRangeForBoundingRect: answers with a whole line, so the glyph under the pointer is found by looking at the boxes of the line's
+ * glyphs. */
++ (unsigned int)characterIndexAt:(NSPoint)p inView:(NSTextView *)tv
+{
+    NSLayoutManager *lm = [tv layoutManager];
+    NSPoint o = [tv textContainerOrigin];
+    NSTextContainer *tc = [tv textContainer];
+    unsigned int n = [[tv string] length], k, last;
+    float x = p.x - o.x, y = p.y - o.y;
+    NSRange g;
+
+    if (n == 0 || ![lm respondsToSelector:@selector(characterIndexForGlyphAtIndex:)]) return n;
+    g = [lm glyphRangeForBoundingRect:NSMakeRect(x, y, 1.0, 1.0) inTextContainer:tc];
+    if (g.length == 0) return n;
+    last = NSMaxRange(g);
+    if (g.length > 4000) last = g.location + 4000;
+    for (k = g.location; k < last; k++) {
+        NSRect r = [lm boundingRectForGlyphRange:NSMakeRange(k, 1) inTextContainer:tc];
+
+        if (x >= r.origin.x && x < NSMaxX(r) && y >= r.origin.y && y < NSMaxY(r)) return [lm characterIndexForGlyphAtIndex:k];
+    }
+    return n;
 }
 
 /* ---- the browser ---- */

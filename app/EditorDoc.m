@@ -19,7 +19,46 @@
 #define WINDOW_W 640.0
 #define WINDOW_H 480.0
 
+/* ---- files dropped on a window ---- */
+
+static BOOL drop_has_files(id <NSDraggingInfo> sender)
+{
+    return [[sender draggingPasteboard] availableTypeFromArray:[NSArray arrayWithObject:NSFilenamesPboardType]] != nil;
+}
+
 @implementation EditTextView
+
+/* A file dragged from Workspace opens in a window of its own (the text view would otherwise insert its name); anything else is the
+ * text view's business as before. */
+- (SSDragOp)draggingEntered:(id <NSDraggingInfo>)sender
+{
+    if (drop_has_files(sender)) return NSDragOperationCopy;
+    return [super draggingEntered:sender];
+}
+
+- (SSDragOp)draggingUpdated:(id <NSDraggingInfo>)sender
+{
+    if (drop_has_files(sender)) return NSDragOperationCopy;
+    return [super draggingUpdated:sender];
+}
+
+- (BOOL)prepareForDragOperation:(id <NSDraggingInfo>)sender
+{
+    if (drop_has_files(sender)) return YES;
+    return [super prepareForDragOperation:sender];
+}
+
+- (BOOL)performDragOperation:(id <NSDraggingInfo>)sender
+{
+    if (drop_has_files(sender)) {
+        NSArray *paths = [[sender draggingPasteboard] propertyListForType:NSFilenamesPboardType];
+
+        SSTrace("drop: %u file(s) dropped on a window", (unsigned)[paths count]);
+        [(EditorDoc *)editor openDroppedFiles:paths];
+        return YES;
+    }
+    return [super performDragOperation:sender];
+}
 
 - (void)setHighlighter:(HKSyntaxHighlighter *)h
 {
@@ -528,6 +567,7 @@ static void line_col(NSString *s, unsigned int loc, unsigned int *line, unsigned
     [textView setRichText:NO];
     [textView setDelegate:self];
     [textView setEditor:self];
+    [textView registerForDraggedTypes:[NSArray arrayWithObject:NSFilenamesPboardType]];
     [scroll setDocumentView:textView];
     originalView = textView;
     [self applyFont];
@@ -2229,6 +2269,19 @@ static NSString *rect_clip;                 /* what Copy last took from a rectan
     return [self editNearEnd:sel with:@""];
 }
 
+- (void)openDroppedFiles:(NSArray *)paths
+{
+    unsigned int i;
+    BOOL isDir;
+
+    if (![owner respondsToSelector:@selector(openPath:)]) return;
+    for (i = 0; i < [paths count]; i++) {
+        NSString *p = [paths objectAtIndex:i];
+
+        if ([[NSFileManager defaultManager] fileExistsAtPath:p isDirectory:&isDir] && !isDir) (void)[owner openPath:p];
+    }
+}
+
 - (BOOL)deleteNearEnd:(BOOL)forward
 {
     NSRange r = [textView selectedRange];
@@ -2401,6 +2454,7 @@ static BOOL rectOnForCompletion(EditTextView *tv)
     [altView setRichText:NO];
     [altView setDelegate:self];
     [altView setEditor:self];
+    [altView registerForDraggedTypes:[NSArray arrayWithObject:NSFilenamesPboardType]];
     [altView setHighlighter:highlighter];
     [altScroll setDocumentView:altView];
     [split addSubview:altScroll];

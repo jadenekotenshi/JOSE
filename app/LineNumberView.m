@@ -18,6 +18,22 @@
 
 @implementation LineNumberView
 
+/* Files dropped on the margin open like those dropped on the text. */
+- (SSDragOp)draggingEntered:(id <NSDraggingInfo>)sender
+{
+    return [[sender draggingPasteboard] availableTypeFromArray:[NSArray arrayWithObject:NSFilenamesPboardType]] != nil ? NSDragOperationCopy : NSDragOperationNone;
+}
+- (SSDragOp)draggingUpdated:(id <NSDraggingInfo>)sender { return [self draggingEntered:sender]; }
+- (BOOL)prepareForDragOperation:(id <NSDraggingInfo>)sender { return YES; }
+- (BOOL)performDragOperation:(id <NSDraggingInfo>)sender
+{
+    NSArray *paths = [[sender draggingPasteboard] propertyListForType:NSFilenamesPboardType];
+
+    if ([foldSource respondsToSelector:@selector(openDroppedFiles:)]) [foldSource openDroppedFiles:paths];
+    return paths != nil;
+}
+- (void)concludeDragOperation:(id <NSDraggingInfo>)sender { }
+
 - (id)initWithScrollView:(NSScrollView *)scroll textView:(NSTextView *)tv
 {
     self = [super initWithScrollView:scroll orientation:NSVerticalRuler];
@@ -58,6 +74,7 @@
 - (void)setFoldSource:(id)source
 {
     foldSource = source;
+    [self registerForDraggedTypes:[NSArray arrayWithObject:NSFilenamesPboardType]];
 }
 
 - (float)thicknessForDigits:(int)d

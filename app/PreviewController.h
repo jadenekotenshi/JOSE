@@ -18,6 +18,8 @@
 - (void)documentClosed:(EditorDoc *)d;
 - (void)settingsChanged;                 /* the accent or link settings changed: every preview is made again */
 - (NSString *)previewStringFor:(EditorDoc *)d;   /* the text the preview shows (for tests); nil if none */
+- (NSTextView *)previewViewFor:(EditorDoc *)d;    /* the preview's text view (for tests); nil if none */
 - (void)refreshNowFor:(EditorDoc *)d;            /* make it again without waiting */
++ (unsigned int)characterIndexAt:(NSPoint)p inView:(NSTextView *)tv;   /* the character under a point of the view (n if none): the glyph whose box holds it */
 + (BOOL)openURLString:(NSString *)url;   /* run the browser from Preferences > Markdown on this address (YES if it started); alerts if it cannot */
 @end

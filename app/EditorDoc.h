@@ -145,6 +145,7 @@
 - (void)applyAppearance;                   /* the font or colours changed */
 - (BOOL)editNearEnd:(NSRange)r with:(NSString *)str;   /* replace a range that lies in the last few lines by hand: YES if it was done (see EditTextView) */
 - (BOOL)cutNearEnd;                        /* Cut of a selection in the last few lines, by hand */
+- (void)openDroppedFiles:(NSArray *)paths;  /* files dropped on the window: each opens in a window of its own (folders are left out) */
 - (BOOL)deleteNearEnd:(BOOL)forward;        /* Backspace/Delete in the last few lines, done by hand: YES if it was (see EditTextView) */
 - (BOOL)loadRemoteData:(NSData *)data spec:(NSString *)spec remotePath:(NSString *)rpath;   /* the text of a remote file arrives (YES if it is text we can edit) */
 - (NSString *)remoteSpec;
