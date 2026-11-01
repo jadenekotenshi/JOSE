@@ -111,7 +111,7 @@ Status: **0.1.0**.  Everything described below has been built and run on OPENSTE
   of its own instead of pasting its name; several at once open together, folders are ignored.  (Dropping on the application icon or the
   Dock tile does not work with this Workspace -- none of the sibling programs gets it to either -- so that path was given up;
   `application:openFile:` is still there for whatever Workspace does send.)  Pilcrow's icon header lists the file types it opens
-  (`app/Pilcrow.iconheader`, in Edit.app's format: `S<tab>ext<tab>Pilcrow<tab>doc`, about fifty extensions, with the page icon
+  (`app/Pilcrow.iconheader`, in Edit.app's format: `S<tab>ext<tab>Pilcrow<tab>doc`, about sixty-five extensions, with the page icon
   `app/Pilcrowdoc.tiff`), so from `/LocalApps` Workspace offers Pilcrow for them and double-clicking one can open it here.  Workspace may then
   show that icon for such files; if it picks Pilcrow where you want Edit, use the Inspector's *Open With* for that type, or delete the
   type's `S` line and rebuild.
