@@ -1,4 +1,7 @@
 #import "UIHelpers.h"
+#include "enc.h"
+#include <stdlib.h>
+#include <string.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -87,37 +90,34 @@ NSString *ui_trim(NSString *s)
     return [s substringWithRange:NSMakeRange(a, b - a)];
 }
 
+/* UTF-8 to a string, with characters outside the BMP as surrogate pairs.  Bytes that are not valid UTF-8 are read as Latin-1 (these are
+ * messages and names, not files: the editor reads files with core/enc, which keeps such bytes exactly). */
 NSString *ui_string_from_utf8(const char *s)
 {
-    size_t n = strlen(s), i = 0, o = 0;
-    unichar *out = (unichar *)malloc((n + 1) * sizeof(unichar));
+    size_t n = 0, i;
+    u16 *t = enc_utf8_to_utf16(s, strlen(s), &n);
     NSString *r;
-    while (i < n) {
-        unsigned c = (unsigned char)s[i];
-        unsigned cp = c;
-        int extra = 0, k;
-        if (c >= 0xf0 && c < 0xf8) { cp = c & 0x07; extra = 3; }
-        else if (c >= 0xe0) { cp = c & 0x0f; extra = 2; }
-        else if (c >= 0xc0) { cp = c & 0x1f; extra = 1; }
-        if (c >= 0x80 && extra == 0) { out[o++] = (unichar)c; i++; continue; }          /* stray byte: Latin-1 */
-        if (i + extra >= n + 0 && extra) { out[o++] = (unichar)c; i++; continue; }
-        for (k = 1; k <= extra; k++) {
-            unsigned cc = (unsigned char)s[i + k];
-            if ((cc & 0xc0) != 0x80) break;
-            cp = (cp << 6) | (cc & 0x3f);
-        }
-        if (k <= extra) { out[o++] = (unichar)c; i++; continue; }                        /* truncated: Latin-1 */
-        out[o++] = cp > 0xffff ? (unichar)'?' : (unichar)cp;
-        i += (size_t)extra + 1;
-    }
-    r = [NSString stringWithCharacters:out length:o];
-    free(out);
+
+    if (t == NULL) return @"";
+    for (i = 0; i < n; i++) if (t[i] >= 0xDC80 && t[i] <= 0xDCFF) t[i] = (u16)(t[i] - 0xDC00);        /* an escaped bad byte: Latin-1 */
+    r = [NSString stringWithCharacters:(const unichar *)t length:n];
+    free(t);
     return r;
 }
 
 NSData *ui_utf8_cstring(NSString *s)
 {
-    NSMutableData *d = [NSMutableData dataWithData:[s dataUsingEncoding:NSUTF8StringEncoding allowLossyConversion:YES]];
-    [d appendBytes:"" length:1];
+    size_t n = [s length], m = 0;
+    u16 *t = (u16 *)malloc((n + 1) * sizeof(u16));
+    char *u;
+    NSMutableData *d;
+
+    if (t == NULL) return [NSData dataWithBytes:"" length:1];
+    if (n > 0) [s getCharacters:t];
+    u = enc_utf16_to_utf8(t, n, &m);
+    free(t);
+    if (u == NULL) return [NSData dataWithBytes:"" length:1];
+    d = [NSMutableData dataWithBytes:u length:m + 1];                  /* the NUL is part of it */
+    free(u);
     return d;
 }

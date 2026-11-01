@@ -68,6 +68,17 @@ Status: **prototype (0.0.1)** -- nothing here has been run on OPENSTEP yet.
   `/LocalApps/OmniWeb.app`; any `.app`, such as NetSurf, or any program will do): its executable gets the arguments you give and then the
   address (or `%u` in the arguments stands for it).  Addresses show only with *Links* set to *Text (address)* or *Show the address*.
   `.md`, `.markdown`, `.mkd` and `.mdown` files open in a Markdown mode that colours headings, quotes, fenced code and HTML comments.
+* **Text encodings** (File > Encoding > Reopen with / Save with): a file is read as UTF-8 if it is (or is plain ASCII), as UTF-16 or
+  UTF-8 with a byte order mark if it has one, and otherwise as ISO-8859-1 -- which carries every byte -- and it is written back in the
+  encoding it was read in, so an Latin-1 file stays Latin-1 and a Shift_JIS file stays Shift_JIS.  The status line shows the encoding.
+  *Reopen with* reads the file again as another one (UTF-8, UTF-8 with BOM, UTF-16 LE/BE, ISO-8859-1/-2/-5/-7/-9/-15, Windows-1250/-1251/
+  -1252, KOI8-R, Mac Roman, NeXTSTEP, Shift_JIS (CP932), EUC-JP, GBK, Big5, EUC-KR (CP949)); *Save with* changes the encoding the text is
+  written in (the document counts as changed).  Bytes that are not valid in the encoding in use are kept exactly (they show as boxes and
+  go back as they came), and characters outside the Basic Multilingual Plane are kept as surrogate pairs, so nothing is lost on a
+  round trip.  If you type a character the file's encoding cannot hold, Save asks whether to switch to UTF-8, write `?`, or cancel.
+  What can be *displayed* is another matter: this OS has fonts for Latin letters and symbols only, so Greek, Cyrillic, CJK and the rest
+  show as boxes or `?` however correctly they are kept (`tests/unicode-sample.txt` shows what the font can do).  The status-line column
+  counts wide (East Asian) characters as two cells and combining marks as none.  Find in Files still reads and writes only UTF-8 text.
 * **Remote editing** (File > Open Remote..., shift-cmd-O): opens `[user@]host:path` (`me@sparc:/home/me/x.c`, or `sparc:~/x.c` for the
   home folder) in a window titled with that name, by running `stepssh host 'cat path'` -- or OpenSSH's `ssh` instead; *Preferences >
   Remote Editing...* picks which (default StepSSH at `/usr/local/bin/stepssh`; OpenSSH at `/usr/local/bin/ssh`, run with

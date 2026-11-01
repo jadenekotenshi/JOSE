@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "test.h"
+#include "../core/wide.h"
 #include <stdlib.h>
 #include "langmodes.h"
 #include "eol.h"
@@ -149,6 +150,21 @@ int main(void)
             CHECK(n == 1);                                    /* 12 units > 10: the first went */
         }
         undo_free(u);
+    }
+    {   /* UTF-16 line endings, and character widths */
+        u16 a[8] = { 'a', '\r', '\n', 'b', '\r', 0, 'c', '\n' }, o[16];
+        int mixed = 0;
+        size_t n;
+
+        CHECK(eol16_detect(a, 8, &mixed) == EOL_LF && mixed == 1);
+        n = eol16_normalize(a, 8);
+        CHECK(n == 7 && a[1] == '\n' && a[2] == 'b' && a[3] == '\n' && a[4] == ' ' && a[5] == 'c' && a[6] == '\n');
+        CHECK(eol16_expanded_size(a, n, EOL_CRLF) == 10 && eol16_expanded_size(a, n, EOL_LF) == 7);
+        CHECK(eol16_expand(a, n, EOL_CRLF, o) == 10 && o[1] == '\r' && o[2] == '\n' && o[3] == 'b');
+        CHECK(eol16_expand(a, n, EOL_CR, o) == 7 && o[1] == '\r');
+        CHECK(wide_cp('a') == 1 && wide_cp(0x3042) == 2 && wide_cp(0x4E2D) == 2 && wide_cp(0xAC00) == 2 && wide_cp(0xFF21) == 2);
+        CHECK(wide_cp(0x0301) == 0 && wide_cp(0x200B) == 0 && wide_cp(0xFF71) == 1 && wide_cp(0x20AC) == 1 && wide_cp(0x20000) == 2);
+        CHECK(wide_unit(0xD83D) == 2 && wide_unit(0xDE00) == 0 && wide_unit('x') == 1);
     }
     TEST_DONE("core");
 }

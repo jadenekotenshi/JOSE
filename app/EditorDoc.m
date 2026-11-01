@@ -11,6 +11,8 @@
 #include "rect.h"
 #include "fold.h"
 #include "words.h"
+#include "enc.h"
+#include "wide.h"
 #include "complete.h"
 #include <stdlib.h>
 #include <string.h>
@@ -442,7 +444,19 @@ static void line_col(NSString *s, unsigned int loc, unsigned int *line, unsigned
         pos += got;
     }
     *line = l;
-    *col = loc - lineStart + 1;
+    {   /* the column in cells of a fixed-width display: wide characters take two, combining marks none (a tab counts one) */
+        unsigned int c = 1;
+
+        if (loc - lineStart > 100000) c = loc - lineStart + 1;
+        else
+            for (pos = lineStart; pos < loc; ) {
+                got = loc - pos > 512 ? 512 : loc - pos;
+                [s getCharacters:buf range:NSMakeRange(pos, got)];
+                for (i = 0; i < got; i++) c += (unsigned)wide_unit(buf[i]);
+                pos += got;
+            }
+        *col = c;
+    }
 }
 
 @interface EditorDoc (Private)
@@ -498,6 +512,7 @@ static void line_col(NSString *s, unsigned int loc, unsigned int *line, unsigned
         useSpaces = NO;
         indentWidth = 4;
         undo = undo_new(2000, 2000000UL);
+        forceEncoding = -1;
         folds = [[NSMutableDictionary alloc] init];
         clockBase = [NSDate timeIntervalSinceReferenceDate];
         [self buildWindow];
@@ -787,8 +802,8 @@ static BOOL ident_char(unichar c)
 
     line_col([textView string], sel.location, &line, &col);
     if ([folds count] > 0) line += [self hiddenLinesBefore:sel.location];
-    [status setStringValue:[NSString stringWithFormat:@"Line %u, col %u    %@    %@%@", line, col,
-                            mode != nil ? mode : @"Plain Text", eol == 1 ? @"CRLF" : (eol == 2 ? @"CR" : @"LF"),
+    [status setStringValue:[NSString stringWithFormat:@"Line %u, col %u    %@    %s    %@%@", line, col,
+                            mode != nil ? mode : @"Plain Text", enc_name(encoding), eol == 1 ? @"CRLF" : (eol == 2 ? @"CR" : @"LF"),
                             ([owner respondsToSelector:@selector(macroRecording)] && [owner macroRecording]) ? @"    Learning a macro" : (statusNote != nil ? [@"    " stringByAppendingString:statusNote] : @"")]];
 }
 
@@ -850,7 +865,7 @@ static BOOL ident_char(unichar c)
 
 - (void)markEdited
 {
-    BOOL d = undo_version(undo) != savedVersion;
+    BOOL d = undo_version(undo) != savedVersion || encodingDirty;
 
     [self scheduleFoldRefresh];
     if ([owner respondsToSelector:@selector(documentTextChanged:)]) [owner documentTextChanged:self];
@@ -988,19 +1003,21 @@ static BOOL ident_char(unichar c)
 {
     NSString *text, *firstLine;
     NSRange r;
-    char *bytes;
-    unsigned int n = [data length];
-    int mixed = 0;
+    u16 *units;
+    size_t n, bad = 0;
+    int mixed = 0, enc;
     const char *m;
 
-    bytes = (char *)malloc(n + 1);
-    if (bytes == NULL) return;
-    [data getBytes:bytes];
-    eol = eol_detect(bytes, n, &mixed);
-    n = eol_normalize(bytes, n);                               /* one LF per line; a NUL (which would cut the text short) becomes a space */
-    bytes[n] = '\0';
-    text = ui_string_from_utf8(bytes);
-    free(bytes);
+    enc = forceEncoding >= 0 ? forceEncoding : enc_detect((const unsigned char *)[data bytes], [data length]);
+    forceEncoding = -1;
+    units = enc_decode(enc, (const unsigned char *)[data bytes], [data length], &n, &bad);
+    if (units == NULL) return;
+    encoding = enc;
+    eol = eol16_detect(units, n, &mixed);
+    n = eol16_normalize(units, n);                             /* one LF per line; a NUL (which would cut the text short) becomes a space */
+    text = [NSString stringWithCharacters:(const unichar *)units length:n];
+    free(units);
+    if (bad > 0) SSTrace("encoding: %u byte(s) are not valid %s and are kept as they are", (unsigned)bad, enc_name(enc));
 
     [folds removeAllObjects];
     [textView setString:text];
@@ -1008,6 +1025,7 @@ static BOOL ident_char(unichar c)
     undo_clear(undo);
     savedVersion = undo_version(undo);
     dirty = NO;
+    encodingDirty = NO;
     r = [text lineRangeForRange:NSMakeRange(0, 0)];
     firstLine = [text substringWithRange:r];
     m = lang_mode_for(UI_CPATH(modeName), UI_CPATH(firstLine));
@@ -1053,6 +1071,7 @@ static BOOL ident_char(unichar c)
     undo_break(undo);
     savedVersion = undo_version(undo);
     dirty = NO;
+    encodingDirty = NO;
     [self updateTitle];
 }
 
@@ -1070,17 +1089,57 @@ static BOOL ident_char(unichar c)
 
 - (NSData *)dataToSave
 {
-    NSData *enc = ui_utf8_cstring([self expandedString:[textView string]]);   /* UTF-8, plus a NUL we do not write; folded code goes in full */
-    unsigned int n = [enc length] - 1;
-    size_t outn = eol_expanded_size((const char *)[enc bytes], n, eol);
-    char *buf = (char *)malloc(outn + 1);
+    NSString *str = [self expandedString:[textView string]];      /* folded code goes in full */
+    size_t n = [str length], xn, bn = 0, unmappable = 0;
+    u16 *t = (u16 *)malloc((n + 1) * sizeof(u16)), *x;
+    unsigned char *bytes;
     NSData *out;
 
-    if (buf == NULL) return nil;
-    outn = eol_expand((const char *)[enc bytes], n, eol, buf);
-    out = [NSData dataWithBytes:buf length:outn];
-    free(buf);
+    if (t == NULL) return nil;
+    if (n > 0) [str getCharacters:t];
+    xn = eol16_expanded_size(t, n, eol);
+    x = (u16 *)malloc((xn + 1) * sizeof(u16));
+    if (x == NULL) { free(t); return nil; }
+    xn = eol16_expand(t, n, eol, x);
+    free(t);
+    unmappable = enc_unmappable(encoding, x, xn);
+    if (unmappable > 0) {                                           /* characters the file's encoding cannot hold */
+        int answer = NSRunAlertPanel(@"Save", @"%u character(s) cannot be written in %s. Save the file as UTF-8 instead?",
+                                     @"Save as UTF-8", @"Use ?", @"Cancel", (unsigned)unmappable, enc_name(encoding));
+
+        if (answer == NSAlertDefaultReturn) { encoding = ENC_UTF8; [self updateStatus]; }
+        else if (answer != NSAlertAlternateReturn) { free(x); return nil; }
+    }
+    bytes = enc_encode(encoding, x, xn, &bn, &unmappable);
+    free(x);
+    if (bytes == NULL) return nil;
+    out = [NSData dataWithBytes:bytes length:bn];
+    free(bytes);
     return out;
+}
+
+- (int)encoding { return encoding; }
+
+- (void)setEncodingForSave:(int)enc
+{
+    if (enc < 0 || enc >= ENC_COUNT || enc == encoding) return;
+    encoding = enc;
+    encodingDirty = YES;
+    dirty = YES;
+    [self updateTitle];
+    [self updateStatus];
+}
+
+- (BOOL)reopenWithEncoding:(int)enc
+{
+    BOOL ok = NO;
+
+    if (enc < 0 || enc >= ENC_COUNT) return NO;
+    forceEncoding = enc;
+    if (remoteSpec != nil) ok = [owner respondsToSelector:@selector(remoteReloadDocument:)] && [owner remoteReloadDocument:self];
+    else if (path != nil) { NSString *p = [[path copy] autorelease]; ok = [self openFile:p]; }
+    forceEncoding = -1;
+    return ok;
 }
 
 - (BOOL)writeTo:(NSString *)aPath
@@ -1106,6 +1165,7 @@ static BOOL ident_char(unichar c)
     undo_break(undo);
     savedVersion = undo_version(undo);
     dirty = NO;
+    encodingDirty = NO;
     [self updateTitle];
     return YES;
 }
@@ -1126,6 +1186,7 @@ static BOOL ident_char(unichar c)
     undo_break(undo);
     savedVersion = undo_version(undo);
     dirty = NO;
+    encodingDirty = NO;
     if (mode == nil) {
         const char *m = lang_mode_for(UI_CPATH(path), NULL);
         if (m != NULL) {

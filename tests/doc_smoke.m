@@ -10,6 +10,7 @@
 #import "ClipboardController.h"
 #import "RemoteController.h"
 #import "PreviewController.h"
+#include "enc.h"
 #include <sys/stat.h>
 #import "AppController.h"
 #import "UIHelpers.h"
@@ -1265,6 +1266,62 @@ int main(void)
         [@"two\n" writeToFile:f2 atomically:YES];
         [dd openDroppedFiles:[NSArray arrayWithObjects:f1, dir, [dir stringByAppendingPathComponent:@"nonesuch"], f2, nil]];
         CHECK([[o docs] count] == 2 && [[[[o docs] objectAtIndex:0] path] isEqualToString:f1] && [[[[o docs] objectAtIndex:1] path] isEqualToString:f2]);
+    }
+    {   /* text encodings: a file is written back in the encoding it was read in, byte for byte */
+        NSFileManager *fm = [NSFileManager defaultManager];
+        NSString *ed_dir = [dir stringByAppendingPathComponent:@"encodings"];
+        NSString *pl1 = [ed_dir stringByAppendingPathComponent:@"latin1.txt"], *psj = [ed_dir stringByAppendingPathComponent:@"sjis.txt"];
+        NSString *pbom = [ed_dir stringByAppendingPathComponent:@"bom.txt"], *p16 = [ed_dir stringByAppendingPathComponent:@"utf16.txt"];
+        NSString *pemo = [ed_dir stringByAppendingPathComponent:@"emoji.txt"], *pbad = [ed_dir stringByAppendingPathComponent:@"bad.txt"];
+        EditorDoc *e;
+
+        [fm createDirectoryAtPath:ed_dir attributes:nil];
+        [[NSData dataWithBytes:"caf\xE9 na\xEFve\n" length:11] writeToFile:pl1 atomically:YES];
+        [[NSData dataWithBytes:"\x93\xFA\x96\x7B\x8C\xEA\r\nabc\r\n" length:13] writeToFile:psj atomically:YES];
+        [[NSData dataWithBytes:"\xEF\xBB\xBF" "hi\n" length:6] writeToFile:pbom atomically:YES];
+        [[NSData dataWithBytes:"\xFF\xFE" "h\0i\0\n\0" length:8] writeToFile:p16 atomically:YES];
+        [[NSData dataWithBytes:"a \xF0\x9F\x98\x80 b\n" length:9] writeToFile:pemo atomically:YES];
+        [[NSData dataWithBytes:"ok \xFF\xFE ok\n" length:9] writeToFile:pbad atomically:YES];
+
+        e = [[[EditorDoc alloc] initWithOwner:nil] autorelease];                       /* Latin-1: kept, not turned into UTF-8 */
+        CHECK([e openFile:pl1] && [e encoding] == ENC_LATIN1 && [[[e textView] string] isEqualToString:@"caf\u00e9 na\u00efve\n"]);
+        [[e textView] setSelectedRange:NSMakeRange(0, 0)];
+        [[e textView] insertText:@"\u00e9"];
+        CHECK([e save] && [[NSData dataWithContentsOfFile:pl1] isEqualToData:[NSData dataWithBytes:"\xE9" "caf\xE9 na\xEFve\n" length:12]]);
+        [e setEncodingForSave:ENC_UTF8];                                              /* Save with Encoding */
+        CHECK([e isDirty] && [e encoding] == ENC_UTF8);
+        CHECK([e save] && ![e isDirty] && [[NSData dataWithContentsOfFile:pl1] isEqualToData:[NSData dataWithBytes:"\xC3\xA9" "caf\xC3\xA9 na\xC3\xAFve\n" length:15]]);
+
+        e = [[[EditorDoc alloc] initWithOwner:nil] autorelease];                       /* Shift_JIS: read as Latin-1 at first, then reopened */
+        CHECK([e openFile:psj] && [e encoding] == ENC_LATIN1);
+        CHECK([e reopenWithEncoding:ENC_SJIS] && [e encoding] == ENC_SJIS && [[[e textView] string] isEqualToString:@"\u65e5\u672c\u8a9e\nabc\n"]);
+        [[e textView] setSelectedRange:NSMakeRange(7, 0)];
+        [[e textView] insertText:@"!"];
+        CHECK([e save] && [[NSData dataWithContentsOfFile:psj] isEqualToData:[NSData dataWithBytes:"\x93\xFA\x96\x7B\x8C\xEA\r\nabc!\r\n" length:14]]);   /* CRLF kept too */
+
+        e = [[[EditorDoc alloc] initWithOwner:nil] autorelease];                       /* byte order marks */
+        CHECK([e openFile:pbom] && [e encoding] == ENC_UTF8_BOM && [[[e textView] string] isEqualToString:@"hi\n"]);
+        [[e textView] setSelectedRange:NSMakeRange(2, 0)];
+        [[e textView] insertText:@"!"];
+        CHECK([e save] && [[NSData dataWithContentsOfFile:pbom] isEqualToData:[NSData dataWithBytes:"\xEF\xBB\xBF" "hi!\n" length:7]]);
+        e = [[[EditorDoc alloc] initWithOwner:nil] autorelease];
+        CHECK([e openFile:p16] && [e encoding] == ENC_UTF16LE && [[[e textView] string] isEqualToString:@"hi\n"]);
+        [[e textView] setSelectedRange:NSMakeRange(0, 0)];
+        [[e textView] insertText:@"> "];
+        CHECK([e save] && [[NSData dataWithContentsOfFile:p16] isEqualToData:[NSData dataWithBytes:"\xFF\xFE" ">\0 \0h\0i\0\n\0" length:12]]);
+
+        e = [[[EditorDoc alloc] initWithOwner:nil] autorelease];                       /* outside the BMP survives */
+        CHECK([e openFile:pemo] && [e encoding] == ENC_UTF8 && [[[e textView] string] length] == 7);       /* a, space, 2 units, space, b, newline */
+        [[e textView] setSelectedRange:NSMakeRange(0, 0)];
+        [[e textView] insertText:@"x"];
+        CHECK([e save] && [[NSData dataWithContentsOfFile:pemo] isEqualToData:[NSData dataWithBytes:"xa \xF0\x9F\x98\x80 b\n" length:10]]);
+
+        e = [[[EditorDoc alloc] initWithOwner:nil] autorelease];                       /* bytes that are not valid UTF-8 come back as they were */
+        CHECK([e openFile:pbad] && [e encoding] == ENC_LATIN1);
+        CHECK([e reopenWithEncoding:ENC_UTF8]);
+        [[e textView] setSelectedRange:NSMakeRange(0, 0)];
+        [[e textView] insertText:@"-"];
+        CHECK([e save] && [[NSData dataWithContentsOfFile:pbad] isEqualToData:[NSData dataWithBytes:"-ok \xFF\xFE ok\n" length:10]]);
     }
     [[NSFileManager defaultManager] removeItemAtPath:dir error:NULL];
     printf(failures ? "doc: FAILED\n" : "doc: ok\n");

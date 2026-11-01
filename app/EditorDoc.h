@@ -70,6 +70,9 @@
     NSString            *remoteSpec;       /* user@host:path if this text lives on another machine (then `path` is nil) */
     unsigned long        remoteCrc;        /* cksum of the file as last read or written, to tell if it changed behind our back */
     unsigned long        remoteLength;
+    int                  encoding;         /* the file's text encoding (core/enc.h ENC_*): kept when it is saved */
+    int                  forceEncoding;    /* >= 0: the next load uses this encoding instead of guessing */
+    BOOL                 encodingDirty;    /* the encoding was changed by hand: the document counts as changed until it is saved */
     NSMutableArray      *compCands;        /* Complete Word: the candidates for the word being completed (nil when not cycling) */
     int                  compIndex;        /* the one in the text now, -1 for the word as typed */
     unsigned int         compStart;       /* where the word begins, and how long it was as typed */
@@ -154,6 +157,9 @@
 - (void)setRemoteCrc:(unsigned long)crc length:(unsigned long)length;
 - (NSData *)dataToSave;                    /* the text as it is written: UTF-8 with the file's line endings, folds expanded */
 - (void)savedElsewhere;                    /* the text was saved by someone else (the remote controller): it is clean now */
+- (int)encoding;                           /* ENC_UTF8 ... (see core/enc.h) */
+- (void)setEncodingForSave:(int)enc;       /* Save with Encoding: the text is written in this encoding from now on (the document counts as changed) */
+- (BOOL)reopenWithEncoding:(int)enc;       /* read the file (or the remote file) again, as this encoding; unsaved changes are lost */
 - (BOOL)completeWord:(int)direction;       /* finish the word before the insertion point; again: the next candidate (-1: the previous); NO if there is none */
 - (int)scrollY;                            /* how far the text is scrolled, in points */
 - (void)restoreSelection:(NSRange)sel scrollY:(int)y;   /* a saved caret and scroll position (the selection is cut to the text) */

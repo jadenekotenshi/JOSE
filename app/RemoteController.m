@@ -6,6 +6,7 @@
 #include "remote.h"
 #include "shellrun.h"
 #include "grep.h"
+#include "enc.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -161,9 +162,9 @@ static NSString *qpath(NSString *rpath)
         NSRunAlertPanel(@"Open Remote", @"%@ is too big to edit this way (over %u MB).", @"OK", nil, nil, spec, (unsigned)(REMOTE_MAX_BYTES / (1024UL * 1024UL)));
         return NO;
     }
-    if (!grep_bytes_are_text((const unsigned char *)r.out, (unsigned)r.nout)) {
+    if (enc_looks_binary((const unsigned char *)r.out, r.nout)) {
         shell_result_free(&r);
-        NSRunAlertPanel(@"Open Remote", @"%@ is not UTF-8 text, so it is not opened (a binary or Latin-1 file would be damaged by saving it).", @"OK", nil, nil, spec);
+        NSRunAlertPanel(@"Open Remote", @"%@ looks like a binary file (it holds NUL bytes), so it is not opened.", @"OK", nil, nil, spec);
         return NO;
     }
     data = [NSData dataWithBytes:r.out length:r.nout];

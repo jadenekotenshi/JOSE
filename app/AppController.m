@@ -11,6 +11,7 @@
 #import "RemoteController.h"
 #import "PreviewController.h"
 #include "complete.h"
+#include "enc.h"
 #include "includes.h"
 #import "Appearance.h"
 #import "UIHelpers.h"
@@ -275,6 +276,16 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
         sessionDeleteMenu = [self submenuNamed:@"Delete Session" inMenu:sm];
         [self rebuildSessionMenus];
     }
+    {
+        NSMenu *em = [self submenuNamed:@"Encoding" inMenu:m];
+        NSMenu *rm = [self submenuNamed:@"Reopen with" inMenu:em], *sm = [self submenuNamed:@"Save with" inMenu:em];
+        int ei;
+
+        for (ei = 0; ei < ENC_COUNT; ei++) {
+            [[self addItem:[NSString stringWithCString:enc_name(ei)] action:@selector(reopenWithEncoding:) key:@"" target:self toMenu:rm] setTag:ei];
+            [[self addItem:[NSString stringWithCString:enc_name(ei)] action:@selector(saveWithEncoding:) key:@"" target:self toMenu:sm] setTag:ei];
+        }
+    }
     [self addItem:@"Open Included File" action:@selector(openIncluded:) key:@"d" target:self toMenu:m];
     [self addItem:@"Save" action:@selector(saveDoc:) key:@"s" target:self toMenu:m];
     [self addItem:@"Save As..." action:@selector(saveDocAs:) key:@"S" target:self toMenu:m];
@@ -414,6 +425,14 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
         || a == @selector(findUnmatched:) || a == @selector(completeWord:) || a == @selector(completeWordBack:) || a == @selector(gotoBracket:) || a == @selector(selectBracket:) || a == @selector(shiftLeft:) || a == @selector(shiftRight:) || a == @selector(commentLines:) || a == @selector(uncommentLines:)
         || a == @selector(fillParagraph:) || a == @selector(toggleFold:) || a == @selector(foldAll:) || a == @selector(expandAll:) || a == @selector(filterSelection:) || a == @selector(executeCommand:) || a == @selector(sortLines:))
         if (d == nil) return NO;
+    if (a == @selector(saveWithEncoding:)) {
+        [item setState:(d != nil && [d encoding] == tag) ? NSOnState : NSOffState];
+        return d != nil;
+    }
+    if (a == @selector(reopenWithEncoding:)) {
+        [item setState:(d != nil && [d encoding] == tag) ? NSOnState : NSOffState];
+        return d != nil && ([d path] != nil || [d remoteSpec] != nil);
+    }
     if (a == @selector(togglePreview:)) {
         [item setTitle:(d != nil && preview != nil && [preview hasPreviewFor:d]) ? @"Close Markdown Preview" : @"Markdown Preview"];
         return d != nil;
@@ -898,6 +917,25 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
 
 - (void)splitPane:(id)sender { [[self frontDocument] splitPane]; }
 - (void)closePane:(id)sender { [[self frontDocument] closePane]; }
+
+/* ---- encodings ---- */
+
+- (void)reopenWithEncoding:(id)sender
+{
+    EditorDoc *d = [self frontDocument];
+
+    if (d == nil) return;
+    if ([d isDirty] && NSRunAlertPanel(@"Reopen", @"Reading the file again as %s throws away the changes you have made. Continue?",
+                                       @"Reopen", @"Cancel", nil, enc_name([sender tag])) != NSAlertDefaultReturn) return;
+    if (![d reopenWithEncoding:[sender tag]]) NSRunAlertPanel(@"Reopen", @"The file could not be read again.", @"OK", nil, nil);
+}
+
+- (void)saveWithEncoding:(id)sender
+{
+    EditorDoc *d = [self frontDocument];
+
+    if (d != nil) [d setEncodingForSave:[sender tag]];
+}
 
 /* ---- Markdown preview ---- */
 

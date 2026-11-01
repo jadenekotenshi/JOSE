@@ -6,7 +6,7 @@ OBJCFLAGS = -x objective-c -fno-objc-arc -w -g -Ihk -Icore -Iapp
 CFLAGS  = -std=c89 -pedantic -Wall -Wextra -Wdeclaration-after-statement \
           -Wno-long-long -Wno-unused-parameter -O2 -g -Icore
 
-test: $(BUILD)/test_core $(BUILD)/test_search $(BUILD)/test_edit $(BUILD)/test_brace $(BUILD)/test_fill $(BUILD)/test_shell $(BUILD)/test_fold $(BUILD)/test_words $(BUILD)/test_includes $(BUILD)/test_tags $(BUILD)/test_foldlines $(BUILD)/test_macro $(BUILD)/test_modeprefs $(BUILD)/test_grep $(BUILD)/test_session $(BUILD)/test_cliphist $(BUILD)/test_complete $(BUILD)/test_remote $(BUILD)/test_markdown $(BUILD)/test_url
+test: $(BUILD)/test_core $(BUILD)/test_search $(BUILD)/test_edit $(BUILD)/test_brace $(BUILD)/test_fill $(BUILD)/test_shell $(BUILD)/test_fold $(BUILD)/test_words $(BUILD)/test_includes $(BUILD)/test_tags $(BUILD)/test_foldlines $(BUILD)/test_macro $(BUILD)/test_modeprefs $(BUILD)/test_grep $(BUILD)/test_session $(BUILD)/test_cliphist $(BUILD)/test_complete $(BUILD)/test_remote $(BUILD)/test_markdown $(BUILD)/test_url $(BUILD)/test_enc
 	$(BUILD)/test_core
 	$(BUILD)/test_search
 	$(BUILD)/test_edit
@@ -25,6 +25,7 @@ test: $(BUILD)/test_core $(BUILD)/test_search $(BUILD)/test_edit $(BUILD)/test_b
 	$(BUILD)/test_remote
 	$(BUILD)/test_markdown
 	$(BUILD)/test_url
+	$(BUILD)/test_enc
 	$(BUILD)/test_foldlines
 	$(BUILD)/test_macro
 
@@ -76,6 +77,10 @@ $(BUILD)/test_url: tests/test_url.c tests/test.h core/url.c core/url.h
 	mkdir -p $(BUILD)
 	$(CC) $(CFLAGS) tests/test_url.c core/url.c -o $@
 
+$(BUILD)/test_enc: tests/test_enc.c tests/test.h core/enc.c core/enc.h core/enc_tables.c core/enc_tables.h core/nsenc_tab.h
+	mkdir -p $(BUILD)
+	$(CC) $(CFLAGS) tests/test_enc.c core/enc.c core/enc_tables.c -o $@
+
 $(BUILD)/test_tags: tests/test_tags.c tests/test.h core/tags.c core/tags.h
 	mkdir -p $(BUILD)
 	$(CC) $(CFLAGS) tests/test_tags.c core/tags.c -o $@
@@ -104,9 +109,9 @@ $(BUILD)/test_search: tests/test_search.c tests/test.h core/search.c core/search
 	mkdir -p $(BUILD)
 	$(CC) $(CFLAGS) tests/test_search.c core/search.c -o $@
 
-$(BUILD)/test_core: tests/test_core.c tests/test.h core/langmodes.c core/eol.c core/undo.c core/langmodes.h core/eol.h core/undo.h
+$(BUILD)/test_core: tests/test_core.c tests/test.h core/langmodes.c core/eol.c core/undo.c core/wide.c core/wide.h core/langmodes.h core/eol.h core/undo.h
 	mkdir -p $(BUILD)
-	$(CC) $(CFLAGS) tests/test_core.c core/langmodes.c core/eol.c core/undo.c -o $@
+	$(CC) $(CFLAGS) tests/test_core.c core/langmodes.c core/eol.c core/undo.c core/wide.c -o $@
 
 lint:
 	sh tools/lint_openstep.sh
