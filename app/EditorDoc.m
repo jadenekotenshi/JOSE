@@ -474,7 +474,13 @@ static void line_col(NSString *s, unsigned int loc, unsigned int *line, unsigned
 {
     SSTrace("close: the document is deallocated");
     [[NSNotificationCenter defaultCenter] removeObserver:self];
-    [highlighter detach];
+    [textView setHighlighter:nil];                  /* the closed window's views outlive this object: they must not point at it */
+    [altView setHighlighter:nil];
+    [textView setEditor:nil];
+    [altView setEditor:nil];
+    [textView setDelegate:nil];
+    [altView setDelegate:nil];
+    [highlighter stopWatching];                     /* not detach: the text is going away, so its marks need not be stripped one by one */
     [highlighter release];
     undo_free(undo);
     [ruler release];

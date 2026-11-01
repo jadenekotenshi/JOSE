@@ -807,6 +807,13 @@ static float overrideFontSize = 0.0;
     }
 }
 
+/* Stops watching the text and leaves its marks as they are.  For a document that is going away: taking the marks off a very large text
+ * is an edit as big as the text, which the text system then has to react to for a window that is already closed. */
+- (void) stopWatching
+{
+  [[NSNotificationCenter defaultCenter] removeObserver: self];
+}
+
 /* Stops watching the text and removes the marks left in it, so that another highlighter (or none) can take over. */
 - (void) detach
 {

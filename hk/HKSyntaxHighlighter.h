@@ -69,6 +69,7 @@
 
 - (void) highlightRange: (NSRange) r;
 - (void) detach;
+- (void) stopWatching;   /* only stops listening to the text storage: the marks stay (for a document that is being thrown away) */
 
 - (void) textStorageWillProcessEditing: (NSNotification *) notif;
 
