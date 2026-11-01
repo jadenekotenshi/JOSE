@@ -1,0 +1,3 @@
+Encoding: windows-1251 (reopen with that, then Save; the bytes must not change)
+Это русский текст.
+Проверка редактора.

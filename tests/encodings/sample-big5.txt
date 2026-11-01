@@ -1,0 +1,3 @@
+Encoding: big5 (reopen with that, then Save; the bytes must not change)
+這是一個中文文字。
+漢字編輯器測試。

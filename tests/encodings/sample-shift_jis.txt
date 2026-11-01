@@ -1,0 +1,3 @@
+Encoding: shift_jis (reopen with that, then Save; the bytes must not change)
+日本語のテキストです。
+カタカナ：テスト。半角ｶﾀｶﾅ。

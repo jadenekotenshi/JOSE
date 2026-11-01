@@ -1,0 +1,2 @@
+Encoding: windows-1252 (reopen with that, then Save; the bytes must not change)
+Smart “quotes”, a dash – and the € sign.

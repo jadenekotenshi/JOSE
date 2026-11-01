@@ -1,0 +1,3 @@
+Encoding: euc-kr (reopen with that, then Save; the bytes must not change)
+이것은 한국어 텍스트입니다.
+한글 편집기 시험.

@@ -1,0 +1,3 @@
+Encoding: gbk (reopen with that, then Save; the bytes must not change)
+这是一个中文文本。
+汉字编辑器测试。

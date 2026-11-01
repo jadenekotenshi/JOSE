@@ -1,0 +1,3 @@
+Encoding: iso-8859-1 (reopen with that, then Save; the bytes must not change)
+Où est la façade de l'été naïf?
+Ångström, über, señor.
