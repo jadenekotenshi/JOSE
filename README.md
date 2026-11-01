@@ -59,6 +59,12 @@ Status: **prototype (0.0.1)** -- nothing here has been run on OPENSTEP yet.
   and comments are skipped in the C-like modes.  When there are problems, the first `}` that starts its line but is not indented
   like the line that opened its block is listed too, because an extra or missing brace shows up there long before the place where
   the counts finally run out.  If everything is paired it says so.
+* **Markdown preview** (Windows > Markdown Preview, shift-cmd-P; works on any window): a read-only window beside the document shows its
+  text formatted -- headings, emphasis, lists, quotes, code blocks, tables, links as "text (address)" -- made by MarkStep's Markdown-to-RTF
+  converter and shown by the ordinary text view.  It follows the document half a second after each edit and keeps about the same
+  place in the text as the document is scrolled to; closing the document closes it.  *Preferences > Markdown...* chooses how accents
+  are written into the RTF (NeXTSTEP by default on OPENSTEP; try Windows-1252 if letters come out wrong) and how links show.
+  `.md`, `.markdown`, `.mkd` and `.mdown` files open in a Markdown mode that colours headings, quotes, fenced code and HTML comments.
 * **Remote editing** (File > Open Remote..., shift-cmd-O): opens `[user@]host:path` (`me@sparc:/home/me/x.c`, or `sparc:~/x.c` for the
   home folder) in a window titled with that name, by running `stepssh host 'cat path'` -- or OpenSSH's `ssh` instead; *Preferences >
   Remote Editing...* picks which (default StepSSH at `/usr/local/bin/stepssh`; OpenSSH at `/usr/local/bin/ssh`, run with
@@ -146,7 +152,7 @@ be done.  Only text-view actions (keys) may appear in `action` lines.
 ## Language modes
 
 C, C++, Objective-C and C headers, Python, Perl, Ruby, JavaScript, JSON, shell (sh/ksh/bash), zsh, csh/tcsh, GNU make, BSD make
-(`BSDmakefile`, `bsd.*.mk`), Imake (`Imakefile`, `*.tmpl`, `*.rules`), property lists, `.strings`, GSmarkup, ChangeLogs and plain
+(`BSDmakefile`, `bsd.*.mk`), Imake (`Imakefile`, `*.tmpl`, `*.rules`), property lists, `.strings`, GSmarkup, ChangeLogs, Markdown and plain
 text.  The mode is chosen from the file name, a `#!` line, or by hand from *Preferences > Language Mode*.  A file named `Makefile` or
 `makefile` is taken to be BSD make (OPENSTEP's own `make`); `GNUmakefile`, `*.mk` and `Makefile.openstep`/`.preamble`/`.postamble` are
 taken to be GNU make.  Switch by hand from *Language Mode* where that is wrong.  Ruby folds and matches
@@ -185,6 +191,12 @@ make -f Makefile.openstep          # build JOSE.app
 ```
 
 On a development Mac (not for OPENSTEP): `make test lint check-objc hk-smoke doc-smoke`.
+
+## Third-party code
+
+* `hk/` is HighlighterKit by Saso Kiselkov (LGPL), adapted.
+* `core/md*.c`, `core/md*.h` and `core/nsenc*` are MarkStep's Markdown parser and RTF writer (MIT, by the author of JOSE; MarkStep's own
+  repository has the full CommonMark test suite).  `nsenc` is the NeXTSTEP character-set table that StepTTY also uses.
 
 ## Licence
 

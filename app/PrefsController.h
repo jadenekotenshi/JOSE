@@ -25,10 +25,14 @@
     NSPopUpButton   *remoteProgramPopup;
     NSTextField     *remotePathField;
     NSTextField     *remoteExtraField;
+    NSPanel         *mdPanel;             /* Markdown...: how the preview is made */
+    NSPopUpButton   *mdCharsetPopup;
+    NSPopUpButton   *mdLinksPopup;
     NSArray         *fixedFonts;          /* the names of the fixed-pitch fonts, found the first time the panel opens */
 }
 - (id)initWithOwner:(id)anOwner;
 - (void)showPanel;
 - (void)showModePanel;
+- (void)showMarkdownPanel;             /* accents and links in the Markdown preview */
 - (void)showRemotePanel;               /* which program remote editing runs, where it is, and extra arguments */                 /* the settings each language mode overrides */
 @end

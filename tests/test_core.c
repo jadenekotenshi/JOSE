@@ -32,6 +32,7 @@ int main(void)
     CHECK(str_eq(lang_mode_for("t", "#!/usr/bin/env ruby"), "Ruby") && str_eq(lang_mode_for("t", "#!/usr/bin/env node"), "JavaScript"));
     CHECK(str_eq(lang_mode_for("t.zsh", NULL), "Zsh") && str_eq(lang_mode_for("/home/u/.zshrc", NULL), "Zsh"));
     CHECK(str_eq(lang_mode_for("t", "#!/bin/zsh"), "Zsh") && str_eq(lang_mode_for("t", "#!/bin/sh"), "Shell"));
+    CHECK(str_eq(lang_mode_for("notes.md", NULL), "Markdown") && str_eq(lang_mode_for("README.markdown", NULL), "Markdown"));
     CHECK(str_eq(lang_mode_for("Imakefile", NULL), "Imakefile") && str_eq(lang_mode_for("Motif.tmpl", NULL), "Imakefile"));
     CHECK(str_eq(lang_mode_for("BSDmakefile", NULL), "BSDMakefile") && str_eq(lang_mode_for("/usr/share/mk/bsd.prog.mk", NULL), "BSDMakefile"));
     CHECK(str_eq(lang_mode_for("first", "# JOSE macro\n"), "JOSEMacro") && str_eq(lang_mode_for("a.jmacro", NULL), "JOSEMacro"));

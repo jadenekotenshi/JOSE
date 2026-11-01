@@ -29,6 +29,10 @@
 + (void)setRemotePath:(NSString *)path for:(int)which;
 + (NSString *)remoteExtra;                /* extra arguments for it (such as -p 2222), put before the host name */
 + (void)setRemoteExtra:(NSString *)extra;
++ (int)previewCharset;                    /* how the Markdown preview writes accents: 0 Windows-1252, 1 NeXTSTEP, 2 \\u escapes only */
++ (void)setPreviewCharset:(int)which;
++ (int)previewLinks;                      /* what a link shows in the preview: 0 its text, 1 its address, 2 "text (address)" */
++ (void)setPreviewLinks:(int)which;
 + (BOOL)reopenLastSession;                /* open the previous session's files at launch */
 + (void)setReopenLastSession:(BOOL)flag;
 + (BOOL)foldMargin;

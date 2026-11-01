@@ -139,6 +139,14 @@ write("JOSEMacro", file_text("JOSE macros", [keyword("^%s>" % w, KEYWORD) for w 
       [context('"', '"', STRING, skips=ESC),
        context("#", "\n", COMMENT, italic=True)]))
 
+# ---- Markdown: headings, quotes, fenced code, HTML comments (everything else is plain text) ----
+write("Markdown", file_text("Markdown", [],
+      [context("```", "```", STRING),
+       context("~~~", "~~~", STRING),
+       context("^#", "\n", "0.1 0.3 0.8", bold=True),
+       context("^\\>", "\n", COMMENT, italic=True),
+       context("\\<!--", "--\\>", COMMENT, italic=True)]))
+
 # ---- Zsh: the Shell rules and the words that zsh adds ----
 extra = """autoload bindkey builtin bye cdr chdir compdef compinit declare disown emulate fc float functions getopts hash history integer
 jobs kill limit local nocorrect noglob popd print pushd rehash repeat setopt shopt sched stat typeset unfunction unhash unlimit

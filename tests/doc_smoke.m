@@ -9,6 +9,7 @@
 #import "SessionController.h"
 #import "ClipboardController.h"
 #import "RemoteController.h"
+#import "PreviewController.h"
 #include <sys/stat.h>
 #import "AppController.h"
 #import "UIHelpers.h"
@@ -1125,6 +1126,28 @@ int main(void)
         CHECK(rd != nil && [[[rd textView] string] isEqualToString:@"in home\n"]);
         [Appearance setRemoteProgram:oldProg];
         [Appearance setRemotePath:oldPath for:1];
+    }
+    {   /* Markdown preview: made from the text, follows an edit, shows folded text, closes with the document */
+        EditorDoc *md = [[[EditorDoc alloc] initWithOwner:nil] autorelease];
+        PreviewController *pc = [[[PreviewController alloc] initWithOwner:nil] autorelease];
+        NSString *shown;
+
+        [[md textView] setString:@"# Heading\n\nSome *emphasis* and **strong** text.\n\n- one\n- two\n"];
+        CHECK(![pc hasPreviewFor:md]);
+        [pc toggleFor:md];
+        CHECK([pc hasPreviewFor:md]);
+        shown = [pc previewStringFor:md];
+        CHECK(shown != nil && [shown rangeOfString:@"Heading"].length > 0 && [shown rangeOfString:@"Some emphasis and strong text."].length > 0);
+        CHECK([shown rangeOfString:@"*"].length == 0 && [shown rangeOfString:@"#"].length == 0);          /* the marks are gone */
+        [[md textView] setString:@"Changed *now*\n"];
+        [pc refreshNowFor:md];
+        shown = [pc previewStringFor:md];
+        CHECK([shown rangeOfString:@"Changed now"].length > 0 && [shown rangeOfString:@"Heading"].length == 0);
+        [pc toggleFor:md];                                                        /* closes it */
+        CHECK(![pc hasPreviewFor:md] && [pc previewStringFor:md] == nil);
+        [pc toggleFor:md];
+        [pc documentClosed:md];
+        CHECK(![pc hasPreviewFor:md]);
     }
     [[NSFileManager defaultManager] removeItemAtPath:dir error:NULL];
     printf(failures ? "doc: FAILED\n" : "doc: ok\n");

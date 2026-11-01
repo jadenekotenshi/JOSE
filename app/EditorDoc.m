@@ -806,6 +806,7 @@ static BOOL ident_char(unichar c)
     BOOL d = undo_version(undo) != savedVersion;
 
     [self scheduleFoldRefresh];
+    if ([owner respondsToSelector:@selector(documentTextChanged:)]) [owner documentTextChanged:self];
     if (d != dirty) {
         dirty = d;
         [self updateTitle];

@@ -10,6 +10,7 @@
 @class SessionController;
 @class ClipboardController;
 @class RemoteController;
+@class PreviewController;
 @class FilesController;
 @class FindController;
 @class ShellController;
@@ -31,6 +32,7 @@
     SessionController *sessions;
     ClipboardController *clipboard;
     RemoteController *remote;
+    PreviewController *preview;
     NSMenu         *clipMenu;           /* Edit > Paste from History */
     NSMenu         *sessionOpenMenu;    /* File > Sessions > Open / Switch to / Delete */
     NSMenu         *sessionSwitchMenu;
@@ -59,6 +61,8 @@
 - (NSArray *)extraCompletionsForPrefix:(NSString *)prefix document:(EditorDoc *)d icase:(BOOL)icase;   /* words from the other windows, the mode's keywords and the tags */
 - (SessionController *)sessionController;
 - (ClipboardController *)clipboardController;
+- (void)documentTextChanged:(EditorDoc *)d;   /* a document's text changed (the Markdown preview follows it) */
+- (void)previewSettingsChanged;
 - (BOOL)remoteSaveDocument:(EditorDoc *)d;     /* Save for a document that lives on another machine */
 - (BOOL)remoteReloadDocument:(EditorDoc *)d;
 - (void)noteClipboard;                  /* Copy or Cut was done: the history looks at the clipboard */

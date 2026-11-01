@@ -9,6 +9,7 @@
 #import "SessionController.h"
 #import "ClipboardController.h"
 #import "RemoteController.h"
+#import "PreviewController.h"
 #include "complete.h"
 #import "Appearance.h"
 #import "UIHelpers.h"
@@ -365,6 +366,7 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
     m = [self submenuNamed:@"Windows" inMenu:main];
     [self addItem:@"Arrange in Front" action:@selector(arrangeInFront:) key:@"" target:nil toMenu:m];
     [self addItem:@"Miniaturize Window" action:@selector(performMiniaturize:) key:@"m" target:nil toMenu:m];
+    [self addItem:@"Markdown Preview" action:@selector(togglePreview:) key:@"P" target:self toMenu:m];
     [self addItem:@"Split Pane" action:@selector(splitPane:) key:@"2" target:self toMenu:m];
     [self addItem:@"Close Pane" action:@selector(closePane:) key:@"1" target:self toMenu:m];
     [NSApp setWindowsMenu:m];
@@ -408,6 +410,10 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
         || a == @selector(findUnmatched:) || a == @selector(completeWord:) || a == @selector(completeWordBack:) || a == @selector(gotoBracket:) || a == @selector(selectBracket:) || a == @selector(shiftLeft:) || a == @selector(shiftRight:) || a == @selector(commentLines:) || a == @selector(uncommentLines:)
         || a == @selector(fillParagraph:) || a == @selector(toggleFold:) || a == @selector(foldAll:) || a == @selector(expandAll:) || a == @selector(filterSelection:) || a == @selector(executeCommand:) || a == @selector(sortLines:))
         if (d == nil) return NO;
+    if (a == @selector(togglePreview:)) {
+        [item setTitle:(d != nil && preview != nil && [preview hasPreviewFor:d]) ? @"Close Markdown Preview" : @"Markdown Preview"];
+        return d != nil;
+    }
     if (a == @selector(pasteFromHistory:)) return d != nil;
     if (a == @selector(saveSession:)) return [[self sessionController] currentName] != nil;
     if (a == @selector(reopenLastSession:)) return [[self sessionController] hasLast];
@@ -480,6 +486,7 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
 {
     [[doc retain] autorelease];                                  /* the window is still telling us it is closing */
     [self hideCallTip];
+    if (preview != nil) [preview documentClosed:doc];
     [docs removeObject:doc];
     [[self sessionController] recordLast];
 }
@@ -879,6 +886,31 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
 
 - (void)splitPane:(id)sender { [[self frontDocument] splitPane]; }
 - (void)closePane:(id)sender { [[self frontDocument] closePane]; }
+
+/* ---- Markdown preview ---- */
+
+- (PreviewController *)previewController
+{
+    if (preview == nil) preview = [[PreviewController alloc] initWithOwner:self];
+    return preview;
+}
+
+- (void)togglePreview:(id)sender
+{
+    EditorDoc *d = [self frontDocument];
+
+    if (d != nil) [[self previewController] toggleFor:d];
+}
+
+- (void)documentTextChanged:(EditorDoc *)d
+{
+    if (preview != nil) [preview documentChanged:d];
+}
+
+- (void)previewSettingsChanged
+{
+    if (preview != nil) [preview settingsChanged];
+}
 
 /* ---- remote editing ---- */
 

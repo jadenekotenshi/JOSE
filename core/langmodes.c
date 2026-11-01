@@ -20,6 +20,7 @@ static const ExtMode EXTS[] = {
     { "rb", "Ruby" }, { "rake", "Ruby" }, { "gemspec", "Ruby" }, { "ru", "Ruby" },
     { "zsh", "Zsh" },
     { "jmacro", "JOSEMacro" },
+    { "md", "Markdown" }, { "markdown", "Markdown" }, { "mkd", "Markdown" }, { "mdown", "Markdown" },
     { "tmpl", "Imakefile" }, { "rules", "Imakefile" },
     { NULL, NULL }
 };
@@ -89,7 +90,7 @@ int lang_comment_style(const char *mode, const char **open, const char **close)
     static const struct { const char *mode; const char *open; const char *close; } T[] = {
         { "C", "/*", "*/" }, { "C-Header", "/*", "*/" }, { "ObjC", "/*", "*/" },
         { "C++", "//", "" }, { "ObjC++", "//", "" },
-        { "JOSEMacro", "#", "" }, { "JavaScript", "//", "" }, { "Ruby", "#", "" }, { "Zsh", "#", "" }, { "BSDMakefile", "#", "" }, { "Imakefile", "XCOMM", "" },
+        { "JOSEMacro", "#", "" }, { "JavaScript", "//", "" }, { "Ruby", "#", "" }, { "Zsh", "#", "" }, { "BSDMakefile", "#", "" }, { "Markdown", "<!--", "-->" }, { "Imakefile", "XCOMM", "" },
         { "Python", "#", "" }, { "Shell", "#", "" }, { "Csh", "#", "" }, { "Perl", "#", "" }, { "GNUmakefile", "#", "" },
         { "Plist", "/*", "*/" }, { "Strings", "/*", "*/" }, { "GSmarkup", "<!--", "-->" },
         { NULL, NULL, NULL }

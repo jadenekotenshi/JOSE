@@ -33,6 +33,10 @@ static const int font_sizes[] = { 8, 9, 10, 11, 12, 13, 14, 16, 18, 20, 24 };
 - (void)remoteProgramChanged:(id)sender;
 - (void)remoteFieldsChanged:(id)sender;
 - (void)closeRemotePanel:(id)sender;
+- (void)showMarkdown:(id)sender;
+- (void)buildMarkdownPanel;
+- (void)markdownChanged:(id)sender;
+- (void)closeMarkdownPanel:(id)sender;
 @end
 
 @implementation PrefsController
@@ -138,8 +142,9 @@ static const int font_sizes[] = { 8, 9, 10, 11, 12, 13, 14, 16, 18, 20, 24 };
     [sessionSwitch setAction:@selector(sessionChanged:)];
     [cv addSubview:sessionSwitch];
 
-    [cv addSubview:ui_button(@"Language Modes...", NSMakeRect(16, 8, 140, 28), self, @selector(showModes:))];
-    [cv addSubview:ui_button(@"Remote Editing...", NSMakeRect(162, 8, 140, 28), self, @selector(showRemote:))];
+    [cv addSubview:ui_button(@"Language Modes...", NSMakeRect(16, 8, 120, 28), self, @selector(showModes:))];
+    [cv addSubview:ui_button(@"Remote Editing...", NSMakeRect(140, 8, 118, 28), self, @selector(showRemote:))];
+    [cv addSubview:ui_button(@"Markdown...", NSMakeRect(262, 8, 86, 28), self, @selector(showMarkdown:))];
     [cv addSubview:ui_button(@"Close", NSMakeRect(354, 8, 70, 28), self, @selector(closePanel:))];
     [panel center];
 }
@@ -437,6 +442,66 @@ static int popup_flag(NSPopUpButton *p)
 {
     [self remoteFieldsChanged:nil];
     [remotePanel orderOut:nil];
+}
+
+/* ---- the Markdown panel ---- */
+
+- (void)buildMarkdownPanel
+{
+    NSView *cv;
+
+    mdPanel = [[NSPanel alloc] initWithContentRect:NSMakeRect(0, 0, 380, 190)
+                                         styleMask:(NSTitledWindowMask | NSClosableWindowMask)
+                                           backing:NSBackingStoreBuffered defer:NO];
+    [mdPanel setTitle:@"Markdown Preview"];
+    [mdPanel setReleasedWhenClosed:NO];
+    cv = [mdPanel contentView];
+    [cv addSubview:ui_label(@"Accents:", NSMakeRect(16, 154, 90, 18))];
+    mdCharsetPopup = [[[NSPopUpButton alloc] initWithFrame:NSMakeRect(110, 150, 250, 24) pullsDown:NO] autorelease];
+    [mdCharsetPopup addItemWithTitle:@"Windows-1252"];
+    [mdCharsetPopup addItemWithTitle:@"NeXTSTEP"];
+    [mdCharsetPopup addItemWithTitle:@"ASCII only (\\u escapes)"];
+    [mdCharsetPopup setTarget:self];
+    [mdCharsetPopup setAction:@selector(markdownChanged:)];
+    [cv addSubview:mdCharsetPopup];
+    [cv addSubview:ui_label(@"Links:", NSMakeRect(16, 120, 90, 18))];
+    mdLinksPopup = [[[NSPopUpButton alloc] initWithFrame:NSMakeRect(110, 116, 250, 24) pullsDown:NO] autorelease];
+    [mdLinksPopup addItemWithTitle:@"Show the text"];
+    [mdLinksPopup addItemWithTitle:@"Show the address"];
+    [mdLinksPopup addItemWithTitle:@"Text (address)"];
+    [mdLinksPopup setTarget:self];
+    [mdLinksPopup setAction:@selector(markdownChanged:)];
+    [cv addSubview:mdLinksPopup];
+    [cv addSubview:ui_wrapping_label(@"If accented letters come out wrong in the preview, try the other encoding. The preview opens from Windows > Markdown Preview.",
+                                     NSMakeRect(16, 44, 348, 62), NO)];
+    [cv addSubview:ui_button(@"Close", NSMakeRect(294, 8, 70, 28), self, @selector(closeMarkdownPanel:))];
+    [mdPanel center];
+}
+
+- (void)showMarkdown:(id)sender
+{
+    [self showMarkdownPanel];
+}
+
+- (void)showMarkdownPanel
+{
+    if (mdPanel == nil) [self buildMarkdownPanel];
+    [mdCharsetPopup selectItemAtIndex:[Appearance previewCharset]];
+    [mdLinksPopup selectItemAtIndex:[Appearance previewLinks]];
+    [mdPanel makeKeyAndOrderFront:nil];
+}
+
+- (void)markdownChanged:(id)sender
+{
+    [Appearance setPreviewCharset:[mdCharsetPopup indexOfSelectedItem]];
+    [Appearance setPreviewLinks:[mdLinksPopup indexOfSelectedItem]];
+    [Appearance saveSettings];
+    if ([owner respondsToSelector:@selector(previewSettingsChanged)]) [owner previewSettingsChanged];
+}
+
+- (void)closeMarkdownPanel:(id)sender
+{
+    [mdPanel orderOut:nil];
 }
 
 @end

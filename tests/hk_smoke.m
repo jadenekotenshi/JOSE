@@ -36,6 +36,19 @@ int main(int argc, char **argv)
     CHECK(![kw isEqual:cm]);
     CHECK(![cm isEqual:str]);
     CHECK(![kw isEqual:plain] || plain == nil);
+    {   /* Markdown: a heading, a quote and fenced code are coloured, the body text is not */
+        NSString *mdsrc = @"# Title\n\nbody text\n\n```\ncode here\n```\n\n> quoted\n";
+        NSTextStorage *mts = [[[NSTextStorage alloc] initWithString:mdsrc] autorelease];
+        HKSyntaxHighlighter *mh = [[HKSyntaxHighlighter alloc] initWithHighlighterType:@"Markdown" textStorage:mts defaultTextColor:[NSColor blackColor]];
+
+        CHECK(mh != nil);
+        [mh highlightRange:NSMakeRange(0, [mts length])];
+        CHECK(![colourAt(mts, [mdsrc rangeOfString:@"Title"].location) isEqual:colourAt(mts, [mdsrc rangeOfString:@"body"].location)]);
+        CHECK(![colourAt(mts, [mdsrc rangeOfString:@"code here"].location) isEqual:colourAt(mts, [mdsrc rangeOfString:@"body"].location)]);
+        CHECK(![colourAt(mts, [mdsrc rangeOfString:@"quoted"].location) isEqual:colourAt(mts, [mdsrc rangeOfString:@"body"].location)]);
+        [mh detach];
+        [mh release];
+    }
     {   /* nested contexts: <header> and a comment inside a preprocessor line, ${var} inside a shell string */
         NSString *cp = @"#include <stdio.h> /* c */\nint x;\n#define A 1\n";
         NSTextStorage *cts = [[[NSTextStorage alloc] initWithString:cp] autorelease];
