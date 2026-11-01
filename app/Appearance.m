@@ -10,6 +10,11 @@ static float fontSize = 0.0;
 static NSString *includePath = nil;
 static BOOL callTips = YES;
 static BOOL reopenLast = NO;
+static int remoteProgram = 0;
+static NSString *remotePaths[2];
+static NSString *remoteExtra = nil;
+#define DEFAULT_STEPSSH_PATH @"/usr/local/bin/stepssh"
+#define DEFAULT_OPENSSH_PATH @"/usr/local/bin/ssh"
 static BOOL foldMargin = YES;
 
 #define DEFAULT_INCLUDE_PATH @"/usr/include:/usr/local/include:/NextDeveloper/Headers:/LocalDeveloper/Headers:/NextLibrary/Frameworks:/LocalLibrary/Frameworks"
@@ -67,6 +72,14 @@ static BOOL get_bool(NSUserDefaults *ud, NSString *key, BOOL def)
     includePath = [[ud stringForKey:@"IncludePath"] copy];
     callTips = get_bool(ud, @"CallTips", YES);
     reopenLast = get_bool(ud, @"ReopenLastSession", NO);
+    v = [ud stringForKey:@"RemoteProgram"];
+    remoteProgram = (v != nil && [v intValue] == 1) ? 1 : 0;
+    [remotePaths[0] release];
+    remotePaths[0] = [[ud stringForKey:@"StepsshPath"] copy];
+    [remotePaths[1] release];
+    remotePaths[1] = [[ud stringForKey:@"OpensshPath"] copy];
+    [remoteExtra release];
+    remoteExtra = [[ud stringForKey:@"RemoteExtra"] copy];
     foldMargin = get_bool(ud, @"FoldMargin", YES);
     [self push];
 }
@@ -87,6 +100,10 @@ static BOOL get_bool(NSUserDefaults *ud, NSString *key, BOOL def)
     else [ud removeObjectForKey:@"IncludePath"];
     [ud setObject:callTips ? @"YES" : @"NO" forKey:@"CallTips"];
     [ud setObject:reopenLast ? @"YES" : @"NO" forKey:@"ReopenLastSession"];
+    [ud setObject:[NSString stringWithFormat:@"%d", remoteProgram] forKey:@"RemoteProgram"];
+    if (remotePaths[0] != nil) [ud setObject:remotePaths[0] forKey:@"StepsshPath"]; else [ud removeObjectForKey:@"StepsshPath"];
+    if (remotePaths[1] != nil) [ud setObject:remotePaths[1] forKey:@"OpensshPath"]; else [ud removeObjectForKey:@"OpensshPath"];
+    if (remoteExtra != nil) [ud setObject:remoteExtra forKey:@"RemoteExtra"]; else [ud removeObjectForKey:@"RemoteExtra"];
     [ud setObject:foldMargin ? @"YES" : @"NO" forKey:@"FoldMargin"];
     [ud synchronize];
 }
@@ -169,6 +186,25 @@ static BOOL get_bool(NSUserDefaults *ud, NSString *key, BOOL def)
 
 + (BOOL)callTips { return callTips; }
 + (void)setCallTips:(BOOL)flag { callTips = flag; }
++ (int)remoteProgram { return remoteProgram; }
++ (void)setRemoteProgram:(int)which { remoteProgram = which == 1 ? 1 : 0; }
++ (NSString *)remotePathFor:(int)which
+{
+    which = which == 1 ? 1 : 0;
+    return remotePaths[which] != nil ? remotePaths[which] : (which == 1 ? DEFAULT_OPENSSH_PATH : DEFAULT_STEPSSH_PATH);
+}
++ (void)setRemotePath:(NSString *)path for:(int)which
+{
+    which = which == 1 ? 1 : 0;
+    [remotePaths[which] release];
+    remotePaths[which] = [path length] > 0 ? [path copy] : nil;
+}
++ (NSString *)remoteExtra { return remoteExtra != nil ? remoteExtra : @""; }
++ (void)setRemoteExtra:(NSString *)extra
+{
+    [remoteExtra release];
+    remoteExtra = [extra length] > 0 ? [extra copy] : nil;
+}
 + (BOOL)reopenLastSession { return reopenLast; }
 + (void)setReopenLastSession:(BOOL)flag { reopenLast = flag; }
 + (BOOL)foldMargin { return foldMargin; }

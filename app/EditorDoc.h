@@ -67,6 +67,9 @@
     NSScrollView        *altScroll;        /* the pane that is not the active one (nil if not split); textView/scroll/ruler are the active pane */
     EditTextView        *altView;
     LineNumberView      *altRuler;
+    NSString            *remoteSpec;       /* user@host:path if this text lives on another machine (then `path` is nil) */
+    unsigned long        remoteCrc;        /* cksum of the file as last read or written, to tell if it changed behind our back */
+    unsigned long        remoteLength;
     NSMutableArray      *compCands;        /* Complete Word: the candidates for the word being completed (nil when not cycling) */
     int                  compIndex;        /* the one in the text now, -1 for the word as typed */
     unsigned int         compStart;       /* where the word begins, and how long it was as typed */
@@ -143,6 +146,13 @@
 - (BOOL)editNearEnd:(NSRange)r with:(NSString *)str;   /* replace a range that lies in the last few lines by hand: YES if it was done (see EditTextView) */
 - (BOOL)cutNearEnd;                        /* Cut of a selection in the last few lines, by hand */
 - (BOOL)deleteNearEnd:(BOOL)forward;        /* Backspace/Delete in the last few lines, done by hand: YES if it was (see EditTextView) */
+- (BOOL)loadRemoteData:(NSData *)data spec:(NSString *)spec remotePath:(NSString *)rpath;   /* the text of a remote file arrives (YES if it is text we can edit) */
+- (NSString *)remoteSpec;
+- (unsigned long)remoteCrc;
+- (unsigned long)remoteLength;
+- (void)setRemoteCrc:(unsigned long)crc length:(unsigned long)length;
+- (NSData *)dataToSave;                    /* the text as it is written: UTF-8 with the file's line endings, folds expanded */
+- (void)savedElsewhere;                    /* the text was saved by someone else (the remote controller): it is clean now */
 - (BOOL)completeWord:(int)direction;       /* finish the word before the insertion point; again: the next candidate (-1: the previous); NO if there is none */
 - (int)scrollY;                            /* how far the text is scrolled, in points */
 - (void)restoreSelection:(NSRange)sel scrollY:(int)y;   /* a saved caret and scroll position (the selection is cut to the text) */

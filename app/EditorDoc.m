@@ -479,6 +479,7 @@ static void line_col(NSString *s, unsigned int loc, unsigned int *line, unsigned
     [ruler release];
     [altRuler release];
     [compCands release];
+    [remoteSpec release];
     [statusNote release];
     [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(refreshFoldInfo) object:nil];
     foldlines_free(&foldInfo);
@@ -725,7 +726,7 @@ static BOOL ident_char(unichar c)
 
 - (void)updateTitle
 {
-    NSString *name = path != nil ? [path lastPathComponent] : @"Untitled";
+    NSString *name = path != nil ? [path lastPathComponent] : (remoteSpec != nil ? remoteSpec : @"Untitled");
 
     if (path != nil) [window setTitleWithRepresentedFilename:path];
     else [window setTitle:name];
@@ -934,24 +935,18 @@ static BOOL ident_char(unichar c)
 /* ---- reading and writing ---- */
 
 /* The file's bytes as text: UTF-8 if it is, Latin-1 where it is not (see ui_string_from_utf8). */
-- (BOOL)openFile:(NSString *)aPath
+/* The text arrives: line endings are noted and normalised, the text is shown, the history starts afresh, and the mode follows the name. */
+- (void)installData:(NSData *)data modeName:(NSString *)modeName
 {
-    NSData *data = [NSData dataWithContentsOfFile:aPath];
-    NSString *text;
-    NSString *firstLine;
+    NSString *text, *firstLine;
     NSRange r;
     char *bytes;
-    unsigned int n;
+    unsigned int n = [data length];
     int mixed = 0;
     const char *m;
 
-    if (data == nil) {
-        NSRunAlertPanel(@"Open", @"%@ could not be read.", @"OK", nil, nil, aPath);
-        return NO;
-    }
-    n = [data length];
     bytes = (char *)malloc(n + 1);
-    if (bytes == NULL) return NO;
+    if (bytes == NULL) return;
     [data getBytes:bytes];
     eol = eol_detect(bytes, n, &mixed);
     n = eol_normalize(bytes, n);                               /* one LF per line; a NUL (which would cut the text short) becomes a space */
@@ -959,8 +954,6 @@ static BOOL ident_char(unichar c)
     text = ui_string_from_utf8(bytes);
     free(bytes);
 
-    [path release];
-    path = [aPath copy];
     [folds removeAllObjects];
     [textView setString:text];
     [self rulersTextReplaced];
@@ -969,27 +962,85 @@ static BOOL ident_char(unichar c)
     dirty = NO;
     r = [text lineRangeForRange:NSMakeRange(0, 0)];
     firstLine = [text substringWithRange:r];
-    m = lang_mode_for(UI_CPATH(path), UI_CPATH(firstLine));
+    m = lang_mode_for(UI_CPATH(modeName), UI_CPATH(firstLine));
     [self setMode:m != NULL ? [NSString stringWithCString:m] : nil];
     if ([owner respondsToSelector:@selector(applyModePrefsTo:)]) [owner applyModePrefsTo:self];
     [self updateTitle];
     [self updateStatus];
+}
+
+- (BOOL)openFile:(NSString *)aPath
+{
+    NSData *data = [NSData dataWithContentsOfFile:aPath];
+
+    if (data == nil) {
+        NSRunAlertPanel(@"Open", @"%@ could not be read.", @"OK", nil, nil, aPath);
+        return NO;
+    }
+    [path release];
+    path = [aPath copy];
+    [remoteSpec release];
+    remoteSpec = nil;
+    [self installData:data modeName:aPath];
     return YES;
 }
 
-- (BOOL)writeTo:(NSString *)aPath
+- (BOOL)loadRemoteData:(NSData *)data spec:(NSString *)spec remotePath:(NSString *)rpath
+{
+    [path release];
+    path = nil;
+    [remoteSpec release];
+    remoteSpec = [spec copy];
+    [self installData:data modeName:rpath];
+    return YES;
+}
+
+- (NSString *)remoteSpec { return remoteSpec; }
+- (unsigned long)remoteCrc { return remoteCrc; }
+- (unsigned long)remoteLength { return remoteLength; }
+- (void)setRemoteCrc:(unsigned long)crc length:(unsigned long)length { remoteCrc = crc; remoteLength = length; }
+
+- (void)savedElsewhere
+{
+    undo_break(undo);
+    savedVersion = undo_version(undo);
+    dirty = NO;
+    [self updateTitle];
+}
+
+- (BOOL)revert
+{
+    NSString *p = [[path copy] autorelease];
+
+    if (remoteSpec != nil) {
+        if ([owner respondsToSelector:@selector(remoteReloadDocument:)]) return [owner remoteReloadDocument:self];
+        return NO;
+    }
+    if (p == nil) return NO;
+    return [self openFile:p];
+}
+
+- (NSData *)dataToSave
 {
     NSData *enc = ui_utf8_cstring([self expandedString:[textView string]]);   /* UTF-8, plus a NUL we do not write; folded code goes in full */
     unsigned int n = [enc length] - 1;
     size_t outn = eol_expanded_size((const char *)[enc bytes], n, eol);
     char *buf = (char *)malloc(outn + 1);
     NSData *out;
-    BOOL ok;
 
-    if (buf == NULL) return NO;
+    if (buf == NULL) return nil;
     outn = eol_expand((const char *)[enc bytes], n, eol, buf);
     out = [NSData dataWithBytes:buf length:outn];
     free(buf);
+    return out;
+}
+
+- (BOOL)writeTo:(NSString *)aPath
+{
+    NSData *out = [self dataToSave];
+    BOOL ok;
+
+    if (out == nil) return NO;
     ok = [out writeToFile:aPath atomically:YES];
     if (!ok) NSRunAlertPanel(@"Save", @"%@ could not be written.", @"OK", nil, nil, aPath);
     return ok;
@@ -997,6 +1048,11 @@ static BOOL ident_char(unichar c)
 
 - (BOOL)save
 {
+    if (remoteSpec != nil) {
+        if (![owner respondsToSelector:@selector(remoteSaveDocument:)] || ![owner remoteSaveDocument:self]) return NO;
+        [self savedElsewhere];
+        return YES;
+    }
     if (path == nil) return [self saveAs];
     if (![self writeTo:path]) return NO;
     undo_break(undo);
@@ -1016,6 +1072,8 @@ static BOOL ident_char(unichar c)
     if (![self writeTo:[panel filename]]) return NO;
     [path release];
     path = [[panel filename] copy];
+    [remoteSpec release];
+    remoteSpec = nil;
     if ([owner respondsToSelector:@selector(noteRecentFile:)]) [owner noteRecentFile:path];
     undo_break(undo);
     savedVersion = undo_version(undo);
@@ -1031,13 +1089,6 @@ static BOOL ident_char(unichar c)
     return YES;
 }
 
-- (BOOL)revert
-{
-    NSString *p = [[path copy] autorelease];
-
-    if (p == nil) return NO;
-    return [self openFile:p];
-}
 
 /* ---- closing ---- */
 

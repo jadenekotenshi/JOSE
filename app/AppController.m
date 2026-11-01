@@ -8,6 +8,7 @@
 #import "FilesController.h"
 #import "SessionController.h"
 #import "ClipboardController.h"
+#import "RemoteController.h"
 #include "complete.h"
 #import "Appearance.h"
 #import "UIHelpers.h"
@@ -255,6 +256,7 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
     m = [self submenuNamed:@"File" inMenu:main];
     [self addItem:@"New" action:@selector(newDoc:) key:@"n" target:self toMenu:m];
     [self addItem:@"Open..." action:@selector(openDoc:) key:@"o" target:self toMenu:m];
+    [self addItem:@"Open Remote..." action:@selector(openRemote:) key:@"O" target:self toMenu:m];
     recentMenu = [self submenuNamed:@"Open Recent" inMenu:m];
     [self rebuildRecentMenu];
     {
@@ -877,6 +879,18 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
 
 - (void)splitPane:(id)sender { [[self frontDocument] splitPane]; }
 - (void)closePane:(id)sender { [[self frontDocument] closePane]; }
+
+/* ---- remote editing ---- */
+
+- (RemoteController *)remoteController
+{
+    if (remote == nil) remote = [[RemoteController alloc] initWithOwner:self];
+    return remote;
+}
+
+- (void)openRemote:(id)sender { [[self remoteController] openDialog]; }
+- (BOOL)remoteSaveDocument:(EditorDoc *)d { return [[self remoteController] saveDocument:d]; }
+- (BOOL)remoteReloadDocument:(EditorDoc *)d { return [[self remoteController] reloadDocument:d]; }
 
 /* ---- word completion ---- */
 

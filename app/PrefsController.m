@@ -28,6 +28,11 @@ static const int font_sizes[] = { 8, 9, 10, 11, 12, 13, 14, 16, 18, 20, 24 };
 - (void)modeSelected:(id)sender;
 - (void)modeSettingChanged:(id)sender;
 - (void)closeModePanel:(id)sender;
+- (void)showRemote:(id)sender;
+- (void)buildRemotePanel;
+- (void)remoteProgramChanged:(id)sender;
+- (void)remoteFieldsChanged:(id)sender;
+- (void)closeRemotePanel:(id)sender;
 @end
 
 @implementation PrefsController
@@ -134,6 +139,7 @@ static const int font_sizes[] = { 8, 9, 10, 11, 12, 13, 14, 16, 18, 20, 24 };
     [cv addSubview:sessionSwitch];
 
     [cv addSubview:ui_button(@"Language Modes...", NSMakeRect(16, 8, 140, 28), self, @selector(showModes:))];
+    [cv addSubview:ui_button(@"Remote Editing...", NSMakeRect(162, 8, 140, 28), self, @selector(showRemote:))];
     [cv addSubview:ui_button(@"Close", NSMakeRect(354, 8, 70, 28), self, @selector(closePanel:))];
     [panel center];
 }
@@ -351,6 +357,86 @@ static int popup_flag(NSPopUpButton *p)
 - (void)closeModePanel:(id)sender
 {
     [modePanel orderOut:nil];
+}
+
+/* ---- the Remote Editing panel ---- */
+
+#define STEPSSH_ITEM @"StepSSH (stepssh)"
+#define OPENSSH_ITEM @"OpenSSH (ssh)"
+
+- (void)buildRemotePanel
+{
+    NSView *cv;
+
+    remotePanel = [[NSPanel alloc] initWithContentRect:NSMakeRect(0, 0, 420, 214)
+                                            styleMask:(NSTitledWindowMask | NSClosableWindowMask)
+                                              backing:NSBackingStoreBuffered defer:NO];
+    [remotePanel setTitle:@"Remote Editing"];
+    [remotePanel setReleasedWhenClosed:NO];
+    cv = [remotePanel contentView];
+    [cv addSubview:ui_label(@"Run:", NSMakeRect(16, 178, 90, 18))];
+    remoteProgramPopup = [[[NSPopUpButton alloc] initWithFrame:NSMakeRect(110, 174, 200, 24) pullsDown:NO] autorelease];
+    [remoteProgramPopup addItemWithTitle:STEPSSH_ITEM];
+    [remoteProgramPopup addItemWithTitle:OPENSSH_ITEM];
+    [remoteProgramPopup setTarget:self];
+    [remoteProgramPopup setAction:@selector(remoteProgramChanged:)];
+    [cv addSubview:remoteProgramPopup];
+    [cv addSubview:ui_label(@"Program:", NSMakeRect(16, 142, 90, 18))];
+    remotePathField = ui_field(NSMakeRect(110, 140, 292, 22));
+    [remotePathField setTarget:self];
+    [remotePathField setAction:@selector(remoteFieldsChanged:)];
+    [cv addSubview:remotePathField];
+    [cv addSubview:ui_label(@"Arguments:", NSMakeRect(16, 110, 90, 18))];
+    remoteExtraField = ui_field(NSMakeRect(110, 108, 292, 22));
+    [remoteExtraField setTarget:self];
+    [remoteExtraField setAction:@selector(remoteFieldsChanged:)];
+    [cv addSubview:remoteExtraField];
+    [cv addSubview:ui_wrapping_label(@"Remote files are read and written by running this program on the other machine (File > Open Remote). It must log in without asking anything: use a key (and, for OpenSSH, ssh-agent), and connect once from a terminal first so that the host key is known. Arguments such as -p 2222 or -i keyfile go before the host name.",
+                                     NSMakeRect(16, 40, 388, 62), NO)];
+    [cv addSubview:ui_button(@"Close", NSMakeRect(334, 8, 70, 28), self, @selector(closeRemotePanel:))];
+    [remotePanel center];
+}
+
+- (void)showRemote:(id)sender
+{
+    [self showRemotePanel];
+}
+
+- (void)showRemotePanel
+{
+    int which = [Appearance remoteProgram];
+
+    if (remotePanel == nil) [self buildRemotePanel];
+    [remoteProgramPopup selectItemWithTitle:which == 1 ? OPENSSH_ITEM : STEPSSH_ITEM];
+    [remotePathField setStringValue:[Appearance remotePathFor:which]];
+    [remoteExtraField setStringValue:[Appearance remoteExtra]];
+    [remotePanel makeKeyAndOrderFront:nil];
+}
+
+- (void)remoteFieldsChanged:(id)sender
+{
+    int which = [[remoteProgramPopup titleOfSelectedItem] isEqualToString:OPENSSH_ITEM] ? 1 : 0;
+
+    [Appearance setRemoteProgram:which];
+    [Appearance setRemotePath:ui_trim([remotePathField stringValue]) for:which];
+    [Appearance setRemoteExtra:ui_trim([remoteExtraField stringValue])];
+    [Appearance saveSettings];
+}
+
+- (void)remoteProgramChanged:(id)sender
+{
+    int which = [[remoteProgramPopup titleOfSelectedItem] isEqualToString:OPENSSH_ITEM] ? 1 : 0;
+
+    [Appearance setRemotePath:ui_trim([remotePathField stringValue]) for:[Appearance remoteProgram]];     /* what was typed for the one we leave */
+    [Appearance setRemoteProgram:which];                     /* the paths of both are kept; only the one shown changes */
+    [remotePathField setStringValue:[Appearance remotePathFor:which]];
+    [Appearance saveSettings];
+}
+
+- (void)closeRemotePanel:(id)sender
+{
+    [self remoteFieldsChanged:nil];
+    [remotePanel orderOut:nil];
 }
 
 @end

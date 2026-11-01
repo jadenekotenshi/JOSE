@@ -8,6 +8,8 @@
 #import "FilesController.h"
 #import "SessionController.h"
 #import "ClipboardController.h"
+#import "RemoteController.h"
+#include <sys/stat.h>
 #import "AppController.h"
 #import "UIHelpers.h"
 #import "HKSyntaxDefinition.h"
@@ -53,6 +55,21 @@
 }
 - (void)documentDidClose:(id)d { [docs removeObject:d]; }
 - (void)noteRecentFile:(NSString *)p { }
+@end
+
+/* Stands in for the AppController for remote editing: new windows are made and remembered. */
+@interface RemoteOwner : NSObject
+{
+    NSMutableArray *docs;
+}
+@end
+
+@implementation RemoteOwner
+- (id)init { self = [super init]; docs = [[NSMutableArray alloc] init]; return self; }
+- (NSArray *)documents { return [NSArray arrayWithArray:docs]; }
+- (EditorDoc *)newDocument { EditorDoc *d = [[[EditorDoc alloc] initWithOwner:self] autorelease]; [docs addObject:d]; return d; }
+- (void)documentDidClose:(id)d { [docs removeObject:d]; }
+- (BOOL)remoteSaveDocument:(EditorDoc *)d { return NO; }
 @end
 
 static ClipboardController *gClip;             /* the one the stand-in owner forwards Copy/Cut notices to */
@@ -1057,6 +1074,57 @@ int main(void)
         [tv setString:@"Alpha alp"];                                                /* only matching ignoring case */
         [tv setSelectedRange:NSMakeRange(9, 0)];
         CHECK([cd completeWord:1] && [[tv string] hasSuffix:@" Alpha"]);
+    }
+    {   /* remote editing, with a stand-in for ssh that runs the remote command here: open, edit, save, detect a change, reload */
+        RemoteOwner *own = [[[RemoteOwner alloc] init] autorelease];
+        RemoteController *rc = [[[RemoteController alloc] initWithOwner:own] autorelease];
+        NSFileManager *fm = [NSFileManager defaultManager];
+        NSString *rdir = [dir stringByAppendingPathComponent:@"remote dir"];
+        NSString *script = [dir stringByAppendingPathComponent:@"fake-ssh"];
+        NSString *rfile = [rdir stringByAppendingPathComponent:@"r file.txt"], *spec, *crlf = [rdir stringByAppendingPathComponent:@"dos.txt"];
+        NSString *script_text = @"#!/bin/sh\nwhile [ \"${1#-}\" != \"$1\" ]; do\n  case \"$1\" in -o|-p|-i|-l|-c|-m) shift 2;; *) shift;; esac\ndone\nshift\nexec /bin/sh -c \"$1\"\n";
+        EditorDoc *rd;
+        int oldProg = [Appearance remoteProgram];
+        NSString *oldPath = [Appearance remotePathFor:1];
+
+        [fm createDirectoryAtPath:rdir attributes:nil];
+        [script_text writeToFile:script atomically:YES];
+        chmod([script cString], 0755);
+        [Appearance setRemoteProgram:1];
+        [Appearance setRemotePath:script for:1];
+        [@"hello\nworld\n" writeToFile:rfile atomically:YES];
+        [[@"a\r\nb\r\n" dataUsingEncoding:NSASCIIStringEncoding] writeToFile:crlf atomically:YES];
+
+        spec = [@"me@fakehost:" stringByAppendingString:rfile];
+        rd = [rc openSpec:spec];
+        CHECK(rd != nil && [[rd remoteSpec] isEqualToString:spec] && [rd path] == nil);
+        CHECK([[[rd textView] string] isEqualToString:@"hello\nworld\n"] && ![rd isDirty]);
+        CHECK([rc openSpec:spec] == rd);                                         /* already open: the same window */
+        CHECK(![rc remoteChanged:rd]);
+        [[rd textView] setSelectedRange:NSMakeRange(0, 0)];
+        [[rd textView] insertText:@"X"];
+        CHECK([rd isDirty]);
+        CHECK([rc saveDocument:rd] && [rd remoteLength] == 13);                  /* written through the "ssh" */
+        CHECK([[NSString stringWithContentsOfFile:rfile] isEqualToString:@"Xhello\nworld\n"]);
+        CHECK(![fm fileExistsAtPath:[rfile stringByAppendingString:@".jose-tmp"]]);   /* the temporary file is gone */
+        CHECK(![rc remoteChanged:rd]);
+        [@"changed elsewhere\n" writeToFile:rfile atomically:YES];
+        CHECK([rc remoteChanged:rd]);                                            /* noticed (no save is tried: it would ask) */
+        CHECK([rc reloadDocument:rd] && [[[rd textView] string] isEqualToString:@"changed elsewhere\n"] && ![rc remoteChanged:rd]);
+
+        rd = [rc openSpec:[@"u@h:" stringByAppendingString:crlf]];               /* CRLF files keep their line endings */
+        CHECK(rd != nil && [[[rd textView] string] isEqualToString:@"a\nb\n"]);
+        [[rd textView] setSelectedRange:NSMakeRange(0, 0)];
+        [[rd textView] insertText:@"Z"];
+        CHECK([rc saveDocument:rd]);
+        CHECK([[NSData dataWithContentsOfFile:crlf] isEqualToData:[@"Za\r\nb\r\n" dataUsingEncoding:NSASCIIStringEncoding]]);
+
+        setenv("HOME", [rdir cString], 1);                                       /* ~/ is the remote home */
+        [@"in home\n" writeToFile:[rdir stringByAppendingPathComponent:@"tilde.txt"] atomically:YES];
+        rd = [rc openSpec:@"h:~/tilde.txt"];
+        CHECK(rd != nil && [[[rd textView] string] isEqualToString:@"in home\n"]);
+        [Appearance setRemoteProgram:oldProg];
+        [Appearance setRemotePath:oldPath for:1];
     }
     [[NSFileManager defaultManager] removeItemAtPath:dir error:NULL];
     printf(failures ? "doc: FAILED\n" : "doc: ok\n");

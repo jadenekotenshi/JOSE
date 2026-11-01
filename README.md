@@ -59,6 +59,15 @@ Status: **prototype (0.0.1)** -- nothing here has been run on OPENSTEP yet.
   and comments are skipped in the C-like modes.  When there are problems, the first `}` that starts its line but is not indented
   like the line that opened its block is listed too, because an extra or missing brace shows up there long before the place where
   the counts finally run out.  If everything is paired it says so.
+* **Remote editing** (File > Open Remote..., shift-cmd-O): opens `[user@]host:path` (`me@sparc:/home/me/x.c`, or `sparc:~/x.c` for the
+  home folder) in a window titled with that name, by running `stepssh host 'cat path'` -- or OpenSSH's `ssh` instead; *Preferences >
+  Remote Editing...* picks which (default StepSSH at `/usr/local/bin/stepssh`; OpenSSH at `/usr/local/bin/ssh`, run with
+  `BatchMode`), where it is, and extra arguments such as `-p 2222` or `-i keyfile`.  Save writes the text back the same way (into
+  `path.jose-tmp` first, then over the file, so a dropped connection leaves the original alone) after asking the far side's `cksum`
+  whether the file changed since it was read -- if it did, you are asked before it is overwritten.  Line endings are kept; only UTF-8
+  text is opened; a path that does not exist can be created.  Revert to Saved fetches it again.  The program must log in without
+  asking anything (a key; with OpenSSH an agent), and the host key must be known already (connect once from a terminal).  Save As
+  makes a local copy.  Remote windows are not part of sessions, and Open Included File, tags and the like see no local file.
 * **Word completion** (Edit > Complete Word, cmd-I; Complete Word, Previous, shift-cmd-I): finishes the word before the insertion point
   and, pressed again, goes on to the next candidate -- then back to the word as typed, and round again; shift-cmd-I goes the other way.
   Candidates, in this order: words of this text, nearest first (before the word, then after it); words of the other open windows

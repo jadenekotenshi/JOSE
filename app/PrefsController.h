@@ -21,9 +21,14 @@
     NSPopUpButton   *modeSpacesPopup;
     NSPopUpButton   *modeAutoPopup;
     NSPopUpButton   *modeWrapPopup;
+    NSPanel         *remotePanel;         /* Remote Editing...: which ssh to run */
+    NSPopUpButton   *remoteProgramPopup;
+    NSTextField     *remotePathField;
+    NSTextField     *remoteExtraField;
     NSArray         *fixedFonts;          /* the names of the fixed-pitch fonts, found the first time the panel opens */
 }
 - (id)initWithOwner:(id)anOwner;
 - (void)showPanel;
-- (void)showModePanel;                 /* the settings each language mode overrides */
+- (void)showModePanel;
+- (void)showRemotePanel;               /* which program remote editing runs, where it is, and extra arguments */                 /* the settings each language mode overrides */
 @end

@@ -9,6 +9,7 @@
 @class MacroController;
 @class SessionController;
 @class ClipboardController;
+@class RemoteController;
 @class FilesController;
 @class FindController;
 @class ShellController;
@@ -29,6 +30,7 @@
     FilesController *filesFinder;
     SessionController *sessions;
     ClipboardController *clipboard;
+    RemoteController *remote;
     NSMenu         *clipMenu;           /* Edit > Paste from History */
     NSMenu         *sessionOpenMenu;    /* File > Sessions > Open / Switch to / Delete */
     NSMenu         *sessionSwitchMenu;
@@ -57,6 +59,8 @@
 - (NSArray *)extraCompletionsForPrefix:(NSString *)prefix document:(EditorDoc *)d icase:(BOOL)icase;   /* words from the other windows, the mode's keywords and the tags */
 - (SessionController *)sessionController;
 - (ClipboardController *)clipboardController;
+- (BOOL)remoteSaveDocument:(EditorDoc *)d;     /* Save for a document that lives on another machine */
+- (BOOL)remoteReloadDocument:(EditorDoc *)d;
 - (void)noteClipboard;                  /* Copy or Cut was done: the history looks at the clipboard */
 - (void)clipboardHistoryChanged;        /* an entry came or went: the menu is made again */
 - (NSArray *)documents;                 /* every open document, oldest first */

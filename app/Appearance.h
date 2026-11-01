@@ -23,6 +23,12 @@
 + (void)setIncludePath:(NSString *)path;
 + (BOOL)callTips;
 + (void)setCallTips:(BOOL)flag;
++ (int)remoteProgram;                     /* what remote editing runs: 0 StepSSH's stepssh, 1 OpenSSH's ssh */
++ (void)setRemoteProgram:(int)which;
++ (NSString *)remotePathFor:(int)which;   /* where that program is (defaults: /usr/local/bin/stepssh, /usr/local/bin/ssh) */
++ (void)setRemotePath:(NSString *)path for:(int)which;
++ (NSString *)remoteExtra;                /* extra arguments for it (such as -p 2222), put before the host name */
++ (void)setRemoteExtra:(NSString *)extra;
 + (BOOL)reopenLastSession;                /* open the previous session's files at launch */
 + (void)setReopenLastSession:(BOOL)flag;
 + (BOOL)foldMargin;
