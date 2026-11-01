@@ -65,18 +65,39 @@ static BOOL get_bool(NSUserDefaults *ud, NSString *key, BOOL def)
 {
     NSImage *img = [[NSImage alloc] initWithSize:NSMakeSize(32.0, 32.0)];
     BOOL ok = YES;
+    int round;
 
     [img lockFocus];
     NS_DURING
         [f set];
         PSmoveto(2.0, 2.0);
         PSshow("Mi");
-        PSWait();
     NS_HANDLER
-        SSTrace("font %s cannot be selected: %s -- %s", SSCS([f fontName]), SSCS([localException name]), SSCS([localException reason]));
         ok = NO;
     NS_ENDHANDLER
-    [img unlockFocus];
+    /* A bad font makes several operators fail, and each error is raised by a separate wait: take them all here (one left over would
+       show up later as an uncaught exception in the editor), including those from giving up the focus. */
+    for (round = 0; round < 8; round++) {
+        NS_DURING
+            PSWait();
+        NS_HANDLER
+            ok = NO;
+            SSTrace("font %s cannot be selected: %s -- %s", SSCS([f fontName]), SSCS([localException name]), SSCS([localException reason]));
+        NS_ENDHANDLER
+    }
+    NS_DURING
+        [img unlockFocus];
+    NS_HANDLER
+        ok = NO;
+    NS_ENDHANDLER
+    for (round = 0; round < 8; round++) {
+        NS_DURING
+            PSWait();
+        NS_HANDLER
+            ok = NO;
+            SSTrace("font %s: further error: %s", SSCS([f fontName]), SSCS([localException reason]));
+        NS_ENDHANDLER
+    }
     [img release];
     return ok;
 }
