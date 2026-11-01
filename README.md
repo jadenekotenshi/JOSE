@@ -5,8 +5,9 @@ It was called JOSE (Jade's OPENSTEP Editor) until version 0.1.0.
 The aim is approximate feature parity with NEdit.  Plain Objective-C and C for gcc 2.7.2; no libraries beyond the
 OpenStep Foundation and AppKit. 
 
-Status: **0.1.0**.  Everything described below has been built and run on OPENSTEP 4.2 (an x86 VM and a SPARC VM), except the text-encoding work
-(*File > Encoding*, the most recent addition), which has so far been tested only on the development host.
+Status: **0.1.1**.  Everything described below has been built and run on OPENSTEP 4.2 (x86, SPARC and 68k), except that the text-encoding work
+(*File > Encoding*) has so far been tried on the real system only with Latin-1 files; the others (Shift_JIS, EUC-JP, UTF-16 ...) are tested
+on the development host, and `tests/encodings` has sample files for trying them.
 
 ## What works so far
 
