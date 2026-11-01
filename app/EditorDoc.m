@@ -1129,6 +1129,7 @@ static BOOL ident_char(unichar c)
     u16 *t;
     const char *m = mode != nil ? [mode cString] : NULL;
 
+    [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(refreshFoldInfo) object:nil];   /* this scan stands in for a pending one */
     foldlines_free(&foldInfo);
     if (ruler == nil || ![Appearance foldMargin] || n == 0 || n > FOLD_SCAN_LIMIT) { [self rulersRedraw]; return; }
     t = (u16 *)malloc((n + 1) * sizeof(u16));
@@ -1155,8 +1156,7 @@ static BOOL ident_char(unichar c)
 {
     [textView setSelectedRange:NSMakeRange(lineStart, 0)];
     [window makeFirstResponder:textView];
-    [self toggleFold];
-    [self refreshFoldInfo];
+    [self toggleFold];                           /* the change refreshes the margin itself */
 }
 
 /* A problem found: where it is, how long, and what to say about it. */
@@ -1772,10 +1772,15 @@ static NSString *rect_clip;                 /* what Copy last took from a rectan
 - (void)foldReplaceRange:(NSRange)range with:(NSString *)str select:(NSRange)sel
 {
     BOOL wasClean = !dirty;
+    unsigned long t0 = [self nowMillis], t1, t2, t3;
 
     [self replaceRange:range with:str select:sel];
+    t1 = [self nowMillis];
     [self rulersTextReplaced];
+    t2 = [self nowMillis];
     [self refreshFoldInfo];
+    t3 = [self nowMillis];
+    SSTrace("fold change of %u units -> %u: edit %u ms, ruler %u ms, margin scan %u ms", (unsigned)range.length, (unsigned)[str length], (unsigned)(t1 - t0), (unsigned)(t2 - t1), (unsigned)(t3 - t2));
     if (wasClean) {
         savedVersion = undo_version(undo);
         dirty = NO;
