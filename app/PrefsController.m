@@ -17,6 +17,8 @@ static const int font_sizes[] = { 8, 9, 10, 11, 12, 13, 14, 16, 18, 20, 24 };
 - (void)textChanged:(id)sender;
 - (void)resetColors:(id)sender;
 - (void)fontChanged:(id)sender;
+- (void)allFontsChanged:(id)sender;
+- (void)fillFontPopup;
 - (void)pathChanged:(id)sender;
 - (void)tipsChanged:(id)sender;
 - (void)marginChanged:(id)sender;
@@ -51,6 +53,7 @@ static const int font_sizes[] = { 8, 9, 10, 11, 12, 13, 14, 16, 18, 20, 24 };
 - (void)dealloc
 {
     [fixedFonts release];
+    [allFonts release];
     [super dealloc];
 }
 
@@ -72,53 +75,86 @@ static const int font_sizes[] = { 8, 9, 10, 11, 12, 13, 14, 16, 18, 20, 24 };
     return fixedFonts;
 }
 
+/* The fonts the popup offers: the fixed-pitch ones, or every font (composite fonts for Japanese and Korean are not reported as fixed-pitch). */
+- (NSArray *)fontChoices
+{
+    if (![Appearance showAllFonts]) return [self fixedPitchFonts];
+    if (allFonts == nil)
+        allFonts = [[[[NSFontManager sharedFontManager] availableFonts] sortedArrayUsingSelector:@selector(caseInsensitiveCompare:)] retain];
+    return allFonts;
+}
+
+/* Fills the font popup; the font in use is always on the list, even if it would not be otherwise. */
+- (void)fillFontPopup
+{
+    NSArray *fonts = [self fontChoices];
+    NSString *fn = [Appearance fontName];
+    unsigned int i;
+
+    [fontPopup removeAllItems];
+    [fontPopup addItemWithTitle:DEFAULT_ITEM];
+    for (i = 0; i < [fonts count]; i++) [fontPopup addItemWithTitle:[fonts objectAtIndex:i]];
+    if (fn != nil && [fontPopup indexOfItemWithTitle:fn] < 0) [fontPopup addItemWithTitle:fn];
+}
+
+- (void)allFontsChanged:(id)sender
+{
+    [Appearance setShowAllFonts:[allFontsSwitch state] == NSOnState];
+    [self fillFontPopup];
+    [self syncControls];
+    [Appearance saveSettings];
+}
+
 - (void)buildPanel
 {
     NSView *cv;
-    NSArray *fonts = [self fixedPitchFonts];
     unsigned int i;
 
-    panel = [[NSPanel alloc] initWithContentRect:NSMakeRect(0, 0, 440, 318)
+    panel = [[NSPanel alloc] initWithContentRect:NSMakeRect(0, 0, 440, 344)
                                        styleMask:(NSTitledWindowMask | NSClosableWindowMask)
                                          backing:NSBackingStoreBuffered defer:NO];
     [panel setTitle:@"Preferences"];
     [panel setReleasedWhenClosed:NO];
     cv = [panel contentView];
 
-    [cv addSubview:ui_label(@"Colours:", NSMakeRect(16, 280, 90, 18))];
-    schemePopup = [[[NSPopUpButton alloc] initWithFrame:NSMakeRect(110, 276, 110, 24) pullsDown:NO] autorelease];
+    [cv addSubview:ui_label(@"Colours:", NSMakeRect(16, 306, 90, 18))];
+    schemePopup = [[[NSPopUpButton alloc] initWithFrame:NSMakeRect(110, 302, 110, 24) pullsDown:NO] autorelease];
     [schemePopup addItemWithTitle:@"Light"];
     [schemePopup addItemWithTitle:@"Dark"];
     [schemePopup setTarget:self];
     [schemePopup setAction:@selector(schemeChanged:)];
     [cv addSubview:schemePopup];
-    [cv addSubview:ui_button(@"Reset Colours", NSMakeRect(300, 276, 124, 26), self, @selector(resetColors:))];
+    [cv addSubview:ui_button(@"Reset Colours", NSMakeRect(300, 302, 124, 26), self, @selector(resetColors:))];
 
-    [cv addSubview:ui_label(@"Background:", NSMakeRect(16, 244, 90, 18))];
-    backgroundWell = [[[NSColorWell alloc] initWithFrame:NSMakeRect(110, 238, 44, 28)] autorelease];
+    [cv addSubview:ui_label(@"Background:", NSMakeRect(16, 270, 90, 18))];
+    backgroundWell = [[[NSColorWell alloc] initWithFrame:NSMakeRect(110, 264, 44, 28)] autorelease];
     [backgroundWell setTarget:self];
     [backgroundWell setAction:@selector(backgroundChanged:)];
     [cv addSubview:backgroundWell];
-    [cv addSubview:ui_label(@"Text:", NSMakeRect(190, 244, 40, 18))];
-    textWell = [[[NSColorWell alloc] initWithFrame:NSMakeRect(234, 238, 44, 28)] autorelease];
+    [cv addSubview:ui_label(@"Text:", NSMakeRect(190, 270, 40, 18))];
+    textWell = [[[NSColorWell alloc] initWithFrame:NSMakeRect(234, 264, 44, 28)] autorelease];
     [textWell setTarget:self];
     [textWell setAction:@selector(textChanged:)];
     [cv addSubview:textWell];
 
-    [cv addSubview:ui_label(@"Font:", NSMakeRect(16, 206, 90, 18))];
-    fontPopup = [[[NSPopUpButton alloc] initWithFrame:NSMakeRect(110, 202, 214, 24) pullsDown:NO] autorelease];
-    [fontPopup addItemWithTitle:DEFAULT_ITEM];
-    for (i = 0; i < [fonts count]; i++) [fontPopup addItemWithTitle:[fonts objectAtIndex:i]];
+    [cv addSubview:ui_label(@"Font:", NSMakeRect(16, 232, 90, 18))];
+    fontPopup = [[[NSPopUpButton alloc] initWithFrame:NSMakeRect(110, 228, 214, 24) pullsDown:NO] autorelease];
+    [self fillFontPopup];
     [fontPopup setTarget:self];
     [fontPopup setAction:@selector(fontChanged:)];
     [cv addSubview:fontPopup];
-    [cv addSubview:ui_label(@"Size:", NSMakeRect(334, 206, 36, 18))];
-    sizePopup = [[[NSPopUpButton alloc] initWithFrame:NSMakeRect(372, 202, 56, 24) pullsDown:NO] autorelease];
+    [cv addSubview:ui_label(@"Size:", NSMakeRect(334, 232, 36, 18))];
+    sizePopup = [[[NSPopUpButton alloc] initWithFrame:NSMakeRect(372, 228, 56, 24) pullsDown:NO] autorelease];
     [sizePopup addItemWithTitle:@"-"];
     for (i = 0; i < N_FONT_SIZES; i++) [sizePopup addItemWithTitle:[NSString stringWithFormat:@"%d", font_sizes[i]]];
     [sizePopup setTarget:self];
     [sizePopup setAction:@selector(fontChanged:)];
     [cv addSubview:sizePopup];
+
+    allFontsSwitch = ui_switch(@"Show all fonts (such as Japanese and Korean ones), not only fixed-pitch", NSMakeRect(110, 198, 316, 20));
+    [allFontsSwitch setTarget:self];
+    [allFontsSwitch setAction:@selector(allFontsChanged:)];
+    [cv addSubview:allFontsSwitch];
 
     [cv addSubview:ui_label(@"Include path:", NSMakeRect(16, 168, 90, 18))];
     pathField = ui_field(NSMakeRect(110, 166, 314, 22));
@@ -167,6 +203,7 @@ static const int font_sizes[] = { 8, 9, 10, 11, 12, 13, 14, 16, 18, 20, 24 };
     [tipsSwitch setState:[Appearance callTips] ? NSOnState : NSOffState];
     [marginSwitch setState:[Appearance foldMargin] ? NSOnState : NSOffState];
     [sessionSwitch setState:[Appearance reopenLastSession] ? NSOnState : NSOffState];
+    [allFontsSwitch setState:[Appearance showAllFonts] ? NSOnState : NSOffState];
 }
 
 - (void)showPanel

@@ -37,6 +37,8 @@
 + (void)setPreviewCharset:(int)which;
 + (int)previewLinks;                      /* what a link shows in the preview: 0 its text, 1 its address, 2 "text (address)" */
 + (void)setPreviewLinks:(int)which;
++ (BOOL)showAllFonts;                      /* list every font in Preferences, not only the fixed-pitch ones (composite CJK fonts are not) */
++ (void)setShowAllFonts:(BOOL)flag;
 + (BOOL)reopenLastSession;                /* open the previous session's files at launch */
 + (void)setReopenLastSession:(BOOL)flag;
 + (BOOL)foldMargin;

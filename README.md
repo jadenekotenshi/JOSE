@@ -71,6 +71,11 @@ on the development host, and `tests/encodings` has sample files for trying them.
   `/LocalApps/OmniWeb.app`; any `.app`, such as NetSurf, or any program will do): its executable gets the arguments you give and then the
   address (or `%u` in the arguments stands for it).  Addresses show only with *Links* set to *Text (address)* or *Show the address*.
   `.md`, `.markdown`, `.mkd` and `.mdown` files open in a Markdown mode that colours headings, quotes, fenced code and HTML comments.
+* **Fonts and input methods**: *Preferences > Show all fonts* lists every installed font, not only the fixed-pitch ones, so composite
+  Japanese or Korean fonts (from the 4.2J packages in the NeXT Community archive, installed in `/LocalLibrary/Fonts`) can be chosen.  With
+  `~/.Pilcrow.trace` present, startup writes two lines saying whether an input manager is active, which parts of the `NSTextInput`
+  protocol the system's text view implements, and which installed fonts have CJK-looking names.  (Whether Pilcrow's editor works with a
+  Japanese or Korean input method is not known yet.)
 * **Text encodings** (File > Encoding > Reopen with / Save with): a file is read as UTF-8 if it is (or is plain ASCII), as UTF-16 or
   UTF-8 with a byte order mark if it has one, and otherwise as ISO-8859-1 -- which carries every byte -- and it is written back in the
   encoding it was read in, so an Latin-1 file stays Latin-1 and a Shift_JIS file stays Shift_JIS.  The status line shows the encoding.

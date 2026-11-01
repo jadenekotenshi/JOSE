@@ -10,6 +10,7 @@ static float fontSize = 0.0;
 static NSString *includePath = nil;
 static BOOL callTips = YES;
 static BOOL reopenLast = NO;
+static BOOL showAllFonts = NO;
 #ifdef OPENSTEP
 static int previewCharset = 1;                  /* NeXT's own RTF reader takes \'hh as NeXTSTEP encoding */
 #else
@@ -81,6 +82,7 @@ static BOOL get_bool(NSUserDefaults *ud, NSString *key, BOOL def)
     includePath = [[ud stringForKey:@"IncludePath"] copy];
     callTips = get_bool(ud, @"CallTips", YES);
     reopenLast = get_bool(ud, @"ReopenLastSession", NO);
+    showAllFonts = get_bool(ud, @"ShowAllFonts", NO);
     [browserPath release];
     browserPath = [[ud stringForKey:@"BrowserPath"] copy];
     [browserArgs release];
@@ -117,6 +119,7 @@ static BOOL get_bool(NSUserDefaults *ud, NSString *key, BOOL def)
     else [ud removeObjectForKey:@"IncludePath"];
     [ud setObject:callTips ? @"YES" : @"NO" forKey:@"CallTips"];
     [ud setObject:reopenLast ? @"YES" : @"NO" forKey:@"ReopenLastSession"];
+    [ud setObject:showAllFonts ? @"YES" : @"NO" forKey:@"ShowAllFonts"];
     if (browserPath != nil) [ud setObject:browserPath forKey:@"BrowserPath"]; else [ud removeObjectForKey:@"BrowserPath"];
     if (browserArgs != nil) [ud setObject:browserArgs forKey:@"BrowserArgs"]; else [ud removeObjectForKey:@"BrowserArgs"];
     [ud setObject:[NSString stringWithFormat:@"%d", previewCharset] forKey:@"PreviewCharset"];
@@ -234,6 +237,8 @@ static BOOL get_bool(NSUserDefaults *ud, NSString *key, BOOL def)
     [remoteExtra release];
     remoteExtra = [extra length] > 0 ? [extra copy] : nil;
 }
++ (BOOL)showAllFonts { return showAllFonts; }
++ (void)setShowAllFonts:(BOOL)flag { showAllFonts = flag; }
 + (BOOL)reopenLastSession { return reopenLast; }
 + (void)setReopenLastSession:(BOOL)flag { reopenLast = flag; }
 + (BOOL)foldMargin { return foldMargin; }

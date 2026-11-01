@@ -18,6 +18,7 @@ NSData   *ui_utf8_cstring(NSString *s);              /* bytes of s in UTF-8 plus
 /* Startup diagnostics.  If the file ~/.Pilcrow.trace exists (create it with `touch`), SSTrace()
  * appends printf-style lines to it; otherwise it does nothing.  Workspace discards a launched
  * application's stderr, so this is how to see how far a launch from Workspace got. */
+BOOL SSTraceIsOn(void);                          /* is ~/.Pilcrow.trace there?  (to skip work that only a trace line needs) */
 void SSTrace(const char *fmt, ...);
 void SSTraceV(NSString *path, const char *fmt, va_list ap);   /* same, for any path (used by the tests) */
 /* Where the program has got to, for a crash report: SSCrumb("drawing a row") remembers the text (a string constant) in a

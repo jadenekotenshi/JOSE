@@ -25,6 +25,11 @@ void SSTraceV(NSString *path, const char *fmt, va_list ap)
     fclose(f);                                  /* closed every time so a crash keeps earlier lines */
 }
 
+BOOL SSTraceIsOn(void)
+{
+    return [[NSFileManager defaultManager] fileExistsAtPath:[NSHomeDirectory() stringByAppendingPathComponent:@".Pilcrow.trace"]];
+}
+
 void SSTrace(const char *fmt, ...)
 {
     va_list ap;

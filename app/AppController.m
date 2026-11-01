@@ -28,6 +28,7 @@
 - (void)macroNote:(NSString *)name;
 - (void)rebuildMacroMenus;
 - (void)rebuildSessionMenus;
+- (void)traceInputAndFonts;
 - (void)takeOverOldPreferences;
 - (NSString *)resolveInclude:(NSString *)name inDirectory:(NSString *)firstDir searched:(NSMutableArray *)searched;
 - (NSArray *)headerWordsForDocument:(EditorDoc *)d;
@@ -1422,10 +1423,46 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
                     @"OK", nil, nil);
 }
 
+/* For ~/.Pilcrow.trace: what the system offers for input methods and non-Latin fonts, to see what Unicode support is possible here. */
+- (void)traceInputAndFonts
+{
+    Class imc = NSClassFromString(@"NSInputManager");
+    id cur = nil;
+    NSString *curName = nil;
+    NSArray *fonts = [[NSFontManager sharedFontManager] availableFonts];
+    NSMutableString *cjk = [NSMutableString string];
+    static const char *const hints[] = { "ryumin", "gothic", "mincho", "heisei", "hangul", "myung", "kakugo", "kanji", "jis", "korean", "japan",
+                                         "gungsuh", "nahru", "capri", "shin", "song", "kai", "hei", "ming", NULL };
+    unsigned int i, found = 0, k;
+
+    if (imc != Nil && [imc respondsToSelector:@selector(currentInputManager)]) {
+        cur = [imc performSelector:@selector(currentInputManager)];
+        if (cur != nil && [cur respondsToSelector:@selector(localizedInputManagerName)]) curName = [cur performSelector:@selector(localizedInputManagerName)];
+    }
+#define YN(sel) ([NSTextView instancesRespondToSelector:@selector(sel)] ? "yes" : "no")
+    SSTrace("input: NSInputManager class %s; current input manager %s (%s); NSTextView implements insertText: %s, doCommandBySelector: %s, "
+            "setMarkedText:selectedRange: %s, getMarkedText:selectedRange: %s, unmarkText %s, hasMarkedText %s, conversationIdentifier %s",
+            imc != Nil ? "present" : "absent", cur != nil ? "present" : "none", SSCS(curName), YN(insertText:), YN(doCommandBySelector:),
+            YN(setMarkedText:selectedRange:), YN(getMarkedText:selectedRange:), YN(unmarkText), YN(hasMarkedText), YN(conversationIdentifier));
+#undef YN
+    for (i = 0; i < [fonts count]; i++) {
+        NSString *name = [fonts objectAtIndex:i];
+
+        for (k = 0; hints[k] != NULL; k++)
+            if ([name rangeOfString:[NSString stringWithCString:hints[k]] options:NSCaseInsensitiveSearch].length > 0) {
+                if (found < 25) { [cjk appendString:name]; [cjk appendString:@" "]; }
+                found++;
+                break;
+            }
+    }
+    SSTrace("fonts: %u installed; %u with names that look Japanese/Korean/Chinese: %s", (unsigned)[fonts count], found, SSCS(cjk));
+}
+
 - (void)applicationDidFinishLaunching:(NSNotification *)notification
 {
     int i;
     launched = YES;
+    if (SSTraceIsOn()) [self traceInputAndFonts];
     [self buildFullMenu];
     for (i = 0; i < (int)[startupFiles count]; i++) [self openPath:[startupFiles objectAtIndex:i]];
     [startupFiles release]; startupFiles = nil;
