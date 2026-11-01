@@ -36,6 +36,39 @@ int main(int argc, char **argv)
     CHECK(![kw isEqual:cm]);
     CHECK(![cm isEqual:str]);
     CHECK(![kw isEqual:plain] || plain == nil);
+    {   /* the newer modes load and colour what they should: each named token must differ in colour from a plain word */
+        struct { NSString *mode, *text, *plain, *tokens[8]; } cases[] = {
+            { @"INI", @"[core]\nname = value ; x\n; the comment\nflag = true\nplainword\n", @"value", { @"core", @"name", @"comment", @"true", nil } },
+            { @"CSS", @"/* note */\n.box { color: #fff; margin: 10px; }\n@media screen { }\n", @"screen", { @"note", @".box", @"color:", @"#fff", @"10px", @"@media", nil } },
+            { @"XML", @"<?xml version=\"1.0\"?>\n<a b=\"cval\">text &amp; more</a>\n<!-- remark -->\n<![CDATA[ rawdata ]]>\n", @"text", { @"xml", @"<a", @"cval", @"amp", @"remark", @"rawdata", nil } },
+            { @"HTML", @"<!DOCTYPE html>\n<p class=\"xval\">Hi &copy;</p>\n<script>var a = \"sval\"; // jsc\nif (a<b) {}</script>\n<style>p { color: red; }</style>\n", @"Hi",
+              { @"DOCTYPE", @"<p", @"xval", @"copy", @"var", @"sval", @"jsc", @"color:", nil } },
+            { @"AsmX86", @"\t.globl _main\n_main:\n\tmovl $0x10, %eax # remark\n\tpushl %ebp\n\tcall printf\n#include <stdio.h>\n", @"printf", { @".globl", @"_main:", @"movl", @"$0x10", @"%eax", @"remark", @"include", nil } },
+            { @"AsmM68k", @"\tmoveq #0,d0 | remark\n\tmove.l d0,a1\n\tjsr printf\n", @"printf", { @"moveq", @"#0", @"d0", @"remark", @"move.l", nil } },
+            { @"AsmSparc", @"\tsave %sp, -96, %sp ! remark\n\tsethi %hi(x), %o0\n\tcall printf\n", @"printf", { @"save", @"%sp", @"remark", @"sethi", @"%o0", nil } }
+        };
+        unsigned int ci, ti;
+
+        for (ci = 0; ci < sizeof cases / sizeof cases[0]; ci++) {
+            NSTextStorage *nts = [[[NSTextStorage alloc] initWithString:cases[ci].text] autorelease];
+            HKSyntaxHighlighter *nh = [[HKSyntaxHighlighter alloc] initWithHighlighterType:cases[ci].mode textStorage:nts defaultTextColor:[NSColor blackColor]];
+            NSColor *plainColour;
+
+            if (nh == nil) { printf("FAIL: the %s syntax does not load\n", [cases[ci].mode cString]); failures++; continue; }
+            [nh highlightRange:NSMakeRange(0, [nts length])];
+            plainColour = colourAt(nts, [cases[ci].text rangeOfString:cases[ci].plain].location);
+            for (ti = 0; ti < 8 && cases[ci].tokens[ti] != nil; ti++) {
+                NSRange r = [cases[ci].text rangeOfString:cases[ci].tokens[ti]];
+
+                if (r.length == 0 || [colourAt(nts, r.location) isEqual:plainColour]) {
+                    printf("FAIL: %s: \"%s\" is not coloured\n", [cases[ci].mode cString], [cases[ci].tokens[ti] cString]);
+                    failures++;
+                }
+            }
+            [nh detach];
+            [nh release];
+        }
+    }
     {   /* Markdown: a heading, a quote and fenced code are coloured, the body text is not */
         NSString *mdsrc = @"# Title\n\nbody text\n\n```\ncode here\n```\n\n> quoted\n";
         NSTextStorage *mts = [[[NSTextStorage alloc] initWithString:mdsrc] autorelease];

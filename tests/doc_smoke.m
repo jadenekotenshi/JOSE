@@ -1323,6 +1323,19 @@ int main(void)
         [[e textView] insertText:@"-"];
         CHECK([e save] && [[NSData dataWithContentsOfFile:pbad] isEqualToData:[NSData dataWithBytes:"-ok \xFF\xFE ok\n" length:10]]);
     }
+    {   /* a .s file opens in the assembler dialect its text shows */
+        EditorDoc *a = [[[EditorDoc alloc] initWithOwner:nil] autorelease];
+        NSString *ps = [dir stringByAppendingPathComponent:@"t.s"];
+
+        [@"\t.global main\nmain:\n\tsave %sp, -96, %sp\n\tmov 0, %i0\n\tret\n\trestore\n" writeToFile:ps atomically:YES];
+        CHECK([a openFile:ps] && [[a mode] isEqualToString:@"AsmSparc"]);
+        [@"_main:\n\tlink a6,#0\n\tmoveq #0,d0\n\tunlk a6\n\trts\n" writeToFile:ps atomically:YES];
+        CHECK([a openFile:ps] && [[a mode] isEqualToString:@"AsmM68k"]);
+        [@"\t.data\nx: .long 1\n" writeToFile:ps atomically:YES];
+        CHECK([a openFile:ps] && [[a mode] isEqualToString:@"AsmX86"]);                 /* nothing to go on: the default */
+        [@"<html><body><p>hi</p></body></html>\n" writeToFile:[dir stringByAppendingPathComponent:@"p.html"] atomically:YES];
+        CHECK([a openFile:[dir stringByAppendingPathComponent:@"p.html"]] && [[a mode] isEqualToString:@"HTML"]);
+    }
     [[NSFileManager defaultManager] removeItemAtPath:dir error:NULL];
     printf(failures ? "doc: FAILED\n" : "doc: ok\n");
     [pool release];

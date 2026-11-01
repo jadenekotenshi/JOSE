@@ -1029,6 +1029,11 @@ static BOOL ident_char(unichar c)
     r = [text lineRangeForRange:NSMakeRange(0, 0)];
     firstLine = [text substringWithRange:r];
     m = lang_mode_for(UI_CPATH(modeName), UI_CPATH(firstLine));
+    if (m != NULL && strncmp(m, "Asm", 3) == 0) {                   /* .s files: x86, m68k or SPARC is told by the text */
+        NSData *head = ui_utf8_cstring([text length] > 8192 ? [text substringToIndex:8192] : text);
+
+        m = lang_refine_mode(m, (const char *)[head bytes], [head length] - 1);
+    }
     [self setMode:m != NULL ? [NSString stringWithCString:m] : nil];
     if ([owner respondsToSelector:@selector(applyModePrefsTo:)]) [owner applyModePrefsTo:self];
     [self updateTitle];

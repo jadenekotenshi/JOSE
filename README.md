@@ -180,9 +180,14 @@ be done.  Only text-view actions (keys) may appear in `action` lines.
 
 ## Language modes
 
-C, C++, Objective-C and C headers, Python, Perl, Ruby, JavaScript, JSON, shell (sh/ksh/bash), zsh, csh/tcsh, GNU make, BSD make
+C, C++, Objective-C and C headers, Python, Perl, Ruby, JavaScript, JSON, shell (sh/ksh/bash), zsh, csh/tcsh, HTML (HTML5 and earlier, with
+`<script>` and `<style>` highlighted as JavaScript and CSS), CSS, XML, INI files, assembly language in the syntax of `as` (x86, m68k and SPARC),
+GNU make, BSD make
 (`BSDmakefile`, `bsd.*.mk`), Imake (`Imakefile`, `*.tmpl`, `*.rules`), property lists, `.strings`, GSmarkup, ChangeLogs, Markdown and plain
-text.  The mode is chosen from the file name, a `#!` line, or by hand from *Preferences > Language Mode*.  A file named `Makefile` or
+text.  The mode is chosen from the file name, a `#!` line (or `<?xml` / `<!DOCTYPE html` for HTML and XML), or by hand from *Language Mode*.  For `.s`,
+`.S` and `.asm` files the registers and mnemonics in the first few thousand bytes decide between the three assemblers (`%eax`, `movl` -> x86;
+`%o0`, `save %sp` -> SPARC; `d0`, `moveq`, `rts` -> m68k; nothing clear -> x86).  Comments are `#` (x86), `|` (m68k) and `!` (SPARC), and
+`#include`/`#define` lines are shown as such in all three.  A file named `Makefile` or
 `makefile` is taken to be BSD make (OPENSTEP's own `make`); `GNUmakefile`, `*.mk` and `Makefile.openstep`/`.preamble`/`.postamble` are
 taken to be GNU make.  Switch by hand from *Language Mode* where that is wrong.  Ruby folds and matches
 `def`/`class`/`if`/`do`...`end`; JSON and JavaScript fold arrays as well as objects; Imake files use the C preprocessor rules for

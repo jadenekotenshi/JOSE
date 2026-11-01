@@ -17,7 +17,7 @@ DIRECTIVE = "0.8 0 0"
 
 def q(s):
     """A pattern as it is written in a property list (backslashes and quotes doubled up)."""
-    return s.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
+    return s.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n").replace("\t", "\\t")
 
 
 def keyword(pattern, color, bold=True, italic=False):
@@ -146,6 +146,184 @@ write("Markdown", file_text("Markdown", [],
        context("^#", "\n", "0.1 0.3 0.8", bold=True),
        context("^\\>", "\n", COMMENT, italic=True),
        context("\\<!--", "--\\>", COMMENT, italic=True)]))
+
+
+# ---- character sets (HighlighterKit's [...] holds the characters themselves: there are no ranges) ----
+LOW = "abcdefghijklmnopqrstuvwxyz"
+UP = LOW.upper()
+DIG = "0123456789"
+HEXC = "0123456789abcdefABCDEF"
+
+
+def setof(chars):
+    return "[" + "".join(("\\" + c) if c in "]\\" else c for c in chars) + "]"
+
+
+ID = LOW + UP + DIG + "_"
+IDS = setof(ID)
+STR_END = '[\\"\n]'                                 # a string ends at its closing quote or at the end of the line
+
+
+def line_string(quote, color=STRING, skips=None, parent=None, comment=None):
+    return context(quote, setof(quote + "\n"), color, skips=skips if skips is not None else (ESC if quote == '"' else ESC1), parent=parent, comment=comment)
+
+
+# ---- INI ----
+ini_key = "^" + setof(ID + ".-") + setof(ID + ".-") + "*"
+write("INI", file_text("INI files (sections, keys, ; and # comments)",
+      [keyword(ini_key, BUILTIN, False), keyword("<0x[0123456789abcdefABCDEF]*>", NUMBER, False), NUM] +
+      words(["true", "false", "yes", "no", "on", "off"], KEYWORD, False),
+      [context("^\\[", "\n", DIRECTIVE, bold=True, comment="[section]"),
+       context("^;", "\n", COMMENT, italic=True),
+       context("^#", "\n", COMMENT, italic=True),
+       line_string('"')]))
+
+# ---- CSS ----
+CSSID = ID + "-"
+css_decl = [keyword("<" + setof(CSSID) + setof(CSSID) + "*[ ]*:", BUILTIN, False),
+            keyword("<" + setof(DIG) + setof(DIG + ".") + "*" + setof(LOW + "%") + "*", NUMBER, False),
+            keyword("#" + setof(HEXC) + "{3,8}", NUMBER, False),
+            keyword("!important", DIRECTIVE)]
+css_top = [keyword("@" + setof(CSSID) + "*", DIRECTIVE),
+           keyword("\\." + setof(CSSID) + setof(CSSID) + "*", KEYWORD, False),
+           keyword("#" + setof(CSSID) + setof(CSSID) + "*", VARIABLE, False),
+           keyword(":" + ":?" + setof(CSSID) + "*", BUILTIN, False)]
+write("CSS", file_text("CSS style sheets", css_top,
+      [context("/\\*", "\\*/", COMMENT, italic=True),
+       context("\\{", "\\}", "0.15 0.15 0.15", keywords=css_decl, comment="a declaration block"),
+       line_string('"'), line_string("'"),
+       context("/\\*", "\\*/", COMMENT, italic=True, parent=2),
+       line_string('"', parent=2), line_string("'", parent=2)]))
+
+# ---- HTML and XML ----
+ATTR = setof(ID + "-:.")
+attr_kw = [keyword(ATTR + ATTR + "*=", VARIABLE, False)]
+ent = keyword("&" + setof(ID + "#") + setof(ID + "#") + "*;", NUMBER, False)
+TAGC = "0.2 0.3 0.8"
+
+
+def tag_contexts(base):
+    """the contexts that follow `base` (the number of contexts so far): a tag and the quoted values in it."""
+    return [context("\\<" + setof("/" + LOW + UP + "_:"), "\\>", TAGC, bold=True, keywords=attr_kw, comment="a tag"),
+            context('"', '"', STRING, skips=None, parent=base),
+            context("'", "'", STRING, skips=None, parent=base)]
+
+
+def html_embedded(name, kwlist, extra_children):
+    """<script>/<style> elements, in lower and upper case, each one context with the language's words and its own strings and comments."""
+    out = []
+    for tag in (name, name.upper()):
+        out.append(context("\\<" + tag, "\\<\\/" + tag + "\\>", "0.2 0.2 0.2", keywords=kwlist, comment="<%s> element" % tag))
+    return out
+
+
+common_head = [context("\\<!--", "--\\>", COMMENT, italic=True),
+               context("\\<!\\[CDATA\\[", "\\]\\]\\>", "0.4 0.4 0.4", comment="CDATA"),
+               context("\\<\\?", "\\?\\>", DIRECTIVE, bold=True, comment="processing instruction"),
+               context("\\<!", "\\>", DIRECTIVE, bold=True, comment="<!DOCTYPE ...>")]
+
+# XML: comments, CDATA, processing instructions, declarations, tags (with their quoted values), entities
+write("XML", file_text("XML", [ent], common_head + tag_contexts(len(common_head) + 1)))
+
+# HTML5 (and the HTML before it): comments and <!DOCTYPE>, <script> (JavaScript words, strings and comments), <style> (CSS words), tags
+js_html_kw = words(js_kw, KEYWORD) + words(js_lit, BUILTIN) + [HEX, NUM]
+css_html_kw = css_decl + css_top
+html_head = [common_head[0], common_head[3]]                      # <!-- --> and <!DOCTYPE ...>
+elements = html_embedded("script", js_html_kw, None) + html_embedded("style", css_html_kw, None)   # script, SCRIPT, style, STYLE
+first_element = len(html_head) + 1                                  # their context numbers start here (0 is the default one)
+embedded_children = []
+for k in range(4):                                                  # strings and comments inside each of the four
+    parent = first_element + k
+    embedded_children += [context('"', '"', STRING, skips=ESC, parent=parent),
+                          context("'", "'", STRING, skips=ESC1, parent=parent),
+                          context("/\\*", "\\*/", COMMENT, italic=True, parent=parent)]
+    if k < 2:
+        embedded_children.append(context("//", "\n", COMMENT, italic=True, parent=parent))
+tag_index = first_element + len(elements) + len(embedded_children)  # the context number of the tag context
+write("HTML", file_text("HTML (HTML5 and earlier)", [ent], html_head + elements + embedded_children + tag_contexts(tag_index)))
+
+
+# ---- assembly language, in the syntax of `as` (the GNU/NeXT assembler) ----
+TAB = "\t"
+ASMID = ID + "._$"
+asm_cpp = "include define undef if ifdef ifndef else elif endif error pragma line".split()
+
+
+def asm_contexts(comment_char, line_comment_hash):
+    ctx = [context("^#[ ]*<%s>" % w, "\n", DIRECTIVE, bold=True, skips=("\\\\\n",), comment="cpp line") for w in asm_cpp]
+    ctx.append(context("/\\*", "\\*/", COMMENT, italic=True))
+    if comment_char:
+        ctx.append(context(comment_char, "\n", COMMENT, italic=True))
+    if line_comment_hash:
+        ctx.append(context("^#", "\n", COMMENT, italic=True, comment="# at the start of a line"))
+    ctx.append(line_string('"'))
+    return ctx
+
+
+asm_directives = """text data bss const cstring literal4 literal8 globl global local weak weak_definition private_extern no_dead_strip
+align p2align balign space skip zero ascii asciz string byte word long quad short half hword int octa float double single comm lcomm common
+reserve proc seg register xword uaword uahalf noalias set equ equiv def endef type size section file ident include macro endm if else elseif endif
+ifdef ifndef ifc ifnc rept endr irp irpc org fill code16 code32 intel_syntax att_syntax syntax stabs stabd stabn stabx loc cfi_startproc cfi_endproc
+cfi_def_cfa cfi_def_cfa_offset cfi_def_cfa_register cfi_offset cfi_restore cfi_adjust_cfa_offset sleb128 uleb128 abort err error warning print
+arch cpu mri nops purgem list nolist title sbttl tag weakref hidden internal protected symver eject end data1 data2 data4 indirect_symbol
+lazy_symbol_pointer non_lazy_symbol_pointer symbol_stub picsymbol_stub subsections_via_symbols desc lsym zerofill tbss tdata
+objc_class objc_meta_class objc_class_names objc_meth_var_names objc_meth_var_types objc_symbols objc_module_info objc_selector_strs
+reference_no_dead_strip even""".split()
+
+
+def asm_common(registers, immediates):
+    kw = [keyword("\\." + w + ">", DIRECTIVE, True) for w in asm_directives] + [keyword("^" + setof(ASMID) + setof(ASMID) + "*:", VARIABLE, True),                     # a label
+          keyword("<0x" + setof(HEXC) + "*", NUMBER, False), keyword("<0b[01]*", NUMBER, False), NUM] + registers + immediates
+    return kw
+
+
+# x86 (AT&T syntax: %register, $immediate, size suffix on the mnemonic, source first)
+x86_sized = """mov movs movz movzb movzw movsb movsw movsl movslq add sub adc sbb and or xor not neg inc dec cmp test lea push pop xchg imul mul
+idiv div shl shr sar sal rol ror rcl rcr shld shrd bt bts btr btc bsf bsr bswap cmpxchg xadd in out ins outs lods stos scas cmps xlat
+pushf popf call jmp ret lret enter leave iret nop clc stc cmc cld std cli sti hlt cpuid rdtsc int into lahf sahf wait lock""".split()
+x86_plain = """rep repe repne repz repnz cbtw cwtl cltd cwtd cltq cqto movzbl movzbw movzwl movzbq movzwq movsbl movsbw movswl movsbq movswq
+ja jae jb jbe jc je jg jge jl jle jna jnae jnb jnbe jnc jne jng jnge jnl jnle jno jnp jns jnz jo jp jpe jpo js jz jcxz jecxz loop loope loopne
+seta setae setb setbe setc sete setg setge setl setle setna setnae setnb setnbe setnc setne setng setnge setnl setnle setno setnp setns setnz seto setp sets setz
+cmova cmovae cmovb cmovbe cmovc cmove cmovg cmovge cmovl cmovle cmovna cmovne cmovnz cmovnl cmovnle cmovno cmovns cmovo cmovs cmovz
+fld flds fldl fldt fst fsts fstl fstp fstps fstpl fstpt fild filds fildl fildll fist fists fistl fistp fistps fistpl fistpll fadd fadds faddl faddp
+fsub fsubs fsubl fsubp fsubr fsubrs fsubrl fsubrp fmul fmuls fmull fmulp fdiv fdivs fdivl fdivp fdivr fdivrs fdivrl fdivrp fxch fchs fabs fsqrt
+fsin fcos fptan fpatan fyl2x f2xm1 fscale frndint fcom fcoms fcoml fcomp fcomps fcompl fcompp fucom fucomp fucompp fcomi fcomip fucomi fucomip
+fnstsw fnstcw fldcw fnclex fninit fldz fld1 fldpi fldl2e fldl2t fldlg2 fldln2 fwait ftst fxam fprem fprem1 ffree fnop fnsave frstor
+movd movq movaps movups movss movsd movdqa movdqu movhlps movlhps movmskps pxor por pand pandn paddb paddw paddd paddq psubb psubw psubd psubq
+pmullw pmulld pcmpeqb pcmpeqw pcmpeqd pcmpgtb pcmpgtw pcmpgtd punpcklbw punpcklwd punpckldq packuswb psllw pslld psllq psrlw psrld psrlq psraw psrad
+pshufd shufps unpcklps emms addss addsd addps addpd subss subsd subps subpd mulss mulsd mulps mulpd divss divsd divps divpd sqrtss sqrtsd
+cvtsi2ss cvtsi2sd cvttss2si cvttsd2si cvtss2sd cvtsd2ss ucomiss ucomisd comiss comisd xorps xorpd andps andpd orps maxss maxsd minss minsd""".split()
+x86_kw = [keyword("<%s[bwlq]?>" % w, KEYWORD, True) for w in x86_sized] + [keyword("<%s>" % w, KEYWORD, True) for w in x86_plain]
+x86_regs = [keyword("%" + setof(LOW + DIG) + setof(LOW + DIG) + "*", BUILTIN, False)]
+x86_imm = [keyword("\\$" + setof(ASMID + "+-") + "*", NUMBER, False)]
+write("AsmX86", file_text("x86 assembly (as, AT&T syntax)", asm_common(x86_regs, x86_imm) + x86_kw, asm_contexts("", False)[:-1] + [context("#", "\n", COMMENT, italic=True), line_string('"')]))
+
+# m68k (NeXT/GNU as: dN/aN registers, #immediate, mnemonic.size or mnemonicsize, | comments)
+m68k_ops = """abcd add adda addi addq addx and andi asl asr bcc bcs beq bge bgt bhi ble bls blt bmi bne bpl bvc bvs bchg bclr bra bset bsr btst chk clr
+cmp cmpa cmpi cmpm dbcc dbcs dbeq dbf dbge dbgt dbhi dble dbls dblt dbmi dbne dbpl dbra dbt dbvc dbvs divs divsl divu divul eor eori exg ext extb
+illegal jmp jsr lea link lsl lsr move movea movec movem movep moveq moves muls mulu nbcd neg negx nop not or ori pack pea reset rol ror roxl roxr
+rte rtd rtr rts sbcd scc scs seq sf sge sgt shi sle sls slt smi sne spl st stop sub suba subi subq subx svc svs swap tas trap trapv tst unlk unpk
+fabs fadd fbeq fbne fbgt fbge fblt fble fcmp fdiv fint fintrz flog2 flogn fmove fmovem fmul fneg fnop fsin fcos fsqrt fsub ftan ftst fetox fatan
+cinv cpush pflush ptest""".split()
+m68k_kw = [keyword("<%s[.]?[bwlsdxp]?>" % w, KEYWORD, True) for w in m68k_ops]
+m68k_regs = [keyword("%?<d[01234567]>", BUILTIN, False), keyword("%?<a[01234567]>", BUILTIN, False), keyword("%?<fp[01234567]>", BUILTIN, False)] + \
+            [keyword("%?<" + r + ">", BUILTIN, False) for r in "sp fp pc sr ccr usp vbr sfc dfc cacr caar msp isp fpcr fpsr fpiar".split()]
+m68k_imm = [keyword("#" + setof(ASMID + "+-") + "*", NUMBER, False)]
+write("AsmM68k", file_text("m68k assembly (as)", asm_common(m68k_regs, m68k_imm) + m68k_kw, asm_contexts("\\|", True)))
+
+# SPARC (as: %registers, mnemonics, ! comments)
+sparc_ops = """ld ldub ldsb lduh ldsh ldd ldf lddf ldfsr lda lduba ldsba lduha ldsha ldda st stb sth std stf stdf stfsr sta stba stha stda swap ldstub
+add addcc addx addxcc sub subcc subx subxcc and andcc andn andncc or orcc orn orncc xor xorcc xnor xnorcc sll srl sra umul umulcc smul smulcc
+udiv udivcc sdiv sdivcc mulscc taddcc taddcctv tsubcc tsubcctv sethi nop mov cmp tst clr clrb clrh not neg inc inccc dec deccc btst bset bclr btog
+save restore call jmp jmpl retl ret rett flush unimp stbar rd wr set setuw setsw
+b ba bn bne bnz be bz bg ble bge bl bgu bleu bcc bgeu bcs blu bpos bneg bvc bvs
+fba fbn fbu fbg fbug fbl fbul fblg fbne fbe fbue fbge fbuge fble fbule fbo
+ta tn tne te tg tle tge tl tgu tleu tcc tcs tpos tneg tvc tvs
+fadds faddd faddq fsubs fsubd fsubq fmuls fmuld fmulq fdivs fdivd fdivq fsqrts fsqrtd fsqrtq fmovs fnegs fabss fitos fitod fitoq fstoi fdtoi fqtoi
+fstod fstoq fdtos fdtoq fqtos fqtod fcmps fcmpd fcmpq fcmpes fcmped fcmpeq fsmuld fdmulq""".split()
+sparc_kw = [keyword("<%s>" % w, KEYWORD, True) for w in sparc_ops]
+sparc_regs = [keyword("%" + setof(LOW + DIG) + setof(LOW + DIG) + "*", BUILTIN, False)]
+write("AsmSparc", file_text("SPARC assembly (as)", asm_common(sparc_regs, []) + sparc_kw, asm_contexts("!", True)))
 
 # ---- Zsh: the Shell rules and the words that zsh adds ----
 extra = """autoload bindkey builtin bye cdr chdir compdef compinit declare disown emulate fc float functions getopts hash history integer

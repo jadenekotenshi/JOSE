@@ -1,6 +1,8 @@
 #ifndef LANGMODES_H
 #define LANGMODES_H
 
+#include <stddef.h>
+
 /* Which language mode (the base name of a .syntax file) a file should open in, from its name and first line.
  * Returns NULL for "plain text".  The name is a string constant; the caller does not free it. */
 const char *lang_mode_for(const char *path, const char *first_line);
@@ -28,5 +30,12 @@ int lang_fold_brackets(const char *mode);
 
 /* How code folds in a mode: 'i' by indentation (Python), 'w' by keyword pairs (shell, csh), 'b' by braces. */
 int lang_fold_style(const char *mode);
+
+/* Assembly language comes in dialects with the same file names (.s, .S, .asm): the text decides.  Returns "AsmX86", "AsmM68k" or
+ * "AsmSparc" if the registers and mnemonics in the text (give its first few thousand bytes) point clearly to one, else NULL. */
+const char *lang_sniff_asm(const char *text, size_t n);
+
+/* The mode to use for a file: `mode` as lang_mode_for gave it, except that an assembly mode becomes the dialect the text shows. */
+const char *lang_refine_mode(const char *mode, const char *text, size_t n);
 
 #endif
