@@ -29,11 +29,15 @@ VERSION  = 0.0.1
 # Manager silently refuses to launch a bundle lacking one at all (confirmed: neither `open` nor a
 # Workspace double-click did anything for JOSE.app until this was added -- the exact same failure
 # StepSSH hit before it got its own icon). app/JOSE.iconheader says which icon belongs to the
-# app; app/JOSE.tiff is the icon (regenerate: python3 tools/gen_icon.py).
+# app; app/JOSE.tiff is the icon (regenerate: python3 tools/gen_icon.py).  The same header lists the
+# file types JOSE opens, one "S<tab>extension<tab>JOSE<tab>doc" line each (the format of Edit.app's own
+# header, read with  otool -sv __ICON __header /NextApps/Edit.app/Edit ); a file of a type that no
+# application claims cannot be dropped on an application's icon.  app/JOSEdoc.tiff is their icon.
 ICONHDR   = app/JOSE.iconheader
 ICONTIFF  = app/JOSE.tiff
+DOCTIFF   = app/JOSEdoc.tiff
 SYNTAXFILES = syntax/C.syntax
-ICONFLAGS = -sectcreate __ICON __header $(ICONHDR) -segprot __ICON r r -sectcreate __ICON app $(ICONTIFF)
+ICONFLAGS = -sectcreate __ICON __header $(ICONHDR) -segprot __ICON r r -sectcreate __ICON app $(ICONTIFF) -sectcreate __ICON doc $(DOCTIFF)
 
 HK_OBJS   = hk/HKTextPattern.o hk/HKSyntaxDefinition.o hk/HKSyntaxHighlighter.o
 CORE_OBJS = core/langmodes.o core/eol.o core/undo.o core/search.o core/edit.o core/brace.o core/fill.o core/rect.o core/shellrun.o core/fold.o core/words.o core/includes.o core/tags.o core/foldlines.o core/macro.o core/modeprefs.o core/grep.o core/session.o core/cliphist.o core/complete.o core/remote.o core/md.o core/md_block.o core/md_inline.o core/md_rtf.o core/md_util.o core/nsenc.o core/url.o
@@ -56,14 +60,15 @@ all: $(APP)/JOSE
 # (After "all", which has to be the first rule so that a plain "make" builds the application.)
 $(HK_OBJS) $(CORE_OBJS) $(APP_OBJS): $(HEADERS)
 
-$(APP)/JOSE: $(HK_OBJS) $(CORE_OBJS) $(APP_OBJS) $(ICONHDR) $(ICONTIFF) $(SYNTAXFILES)
+$(APP)/JOSE: $(HK_OBJS) $(CORE_OBJS) $(APP_OBJS) $(ICONHDR) $(ICONTIFF) $(DOCTIFF) $(SYNTAXFILES)
 	-mkdir $(APP)
+	cp $(DOCTIFF) $(APP)/doc.tiff
 	-mkdir $(APP)/syntax
 	cp syntax/*.syntax $(APP)/syntax
 	@( cd $(APP) ) >/dev/null 2>&1 || { echo "make: $(APP) is missing or is not a directory:"; ls -ld $(APP); echo "remove it and run make again"; exit 1; }
 	$(CC) $(ARCHS) -o $(APP)/JOSE $(HK_OBJS) $(CORE_OBJS) $(APP_OBJS) $(ICONFLAGS) $(LIBS) || { echo "make: linking with the __ICON segment failed; retrying without an icon"; $(CC) $(ARCHS) -o $(APP)/JOSE $(HK_OBJS) $(CORE_OBJS) $(APP_OBJS) $(LIBS); }
 
-# Show what was linked in: expect a segment __ICON with sections __header and app.
+# Show what was linked in: expect a segment __ICON with sections __header, app and doc.
 iconcheck:
 	otool -l $(APP)/JOSE | grep -A 3 __ICON
 

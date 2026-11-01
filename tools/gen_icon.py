@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate app/JOSE.tiff, the application icon, in the layout NeXT's own tools write.
+"""Generate app/JOSE.tiff, the application icon, and app/JOSEdoc.tiff, the icon of the documents it opens, in the layout NeXT's own tools write.
 
     python3 tools/gen_icon.py                      # writes app/JOSE.tiff
     python3 tools/gen_icon.py --preview out.png    # also writes an 8x preview of both images
@@ -81,6 +81,35 @@ def draw():
     cv.rect(7, 29, 11, 30, BLUE)
     cv.rect(13, 29, 22, 30, INK)
     cv.rect(24, 29, 24, 34, BLACK)                 # the text cursor
+    return cv
+
+
+def draw_doc():
+    """The icon of a document that JOSE opens: a page with a turned-down corner and a few lines of coloured text."""
+    cv = Canvas()
+    cv.rect(8, 7, 41, 44, SHADOW)                  # drop shadow, down and to the right
+    cv.rect(5, 4, 38, 41, BLACK)                   # page outline
+    cv.rect(6, 5, 37, 40, PAPER)
+    for dy in range(9):                            # the corner: the page is cut along a diagonal, the flap lies inside it
+        for dx in range(9):
+            x, y = 30 + dx, 4 + dy
+            if dx > dy:
+                cv.put(x, y, (0, 0, 0, 0))         # cut away (shadow too)
+            elif dx == dy or dx == 0 or dy == 8:
+                cv.put(x, y, BLACK)
+            else:
+                cv.put(x, y, BAR)
+    cv.rect(8, 15, 13, 16, BLUE)
+    cv.rect(15, 15, 27, 16, INK)
+    cv.rect(11, 19, 15, 20, RED)
+    cv.rect(17, 19, 33, 20, INK)
+    cv.rect(11, 23, 18, 24, GREENC)
+    cv.rect(20, 23, 31, 24, GREENC)
+    cv.rect(8, 27, 12, 28, BLUE)
+    cv.rect(14, 27, 24, 28, INK)
+    cv.rect(11, 31, 17, 32, RED)
+    cv.rect(19, 31, 30, 32, INK)
+    cv.rect(8, 35, 13, 36, INK)
     return cv
 
 
@@ -248,8 +277,11 @@ def main(argv):
     data = build_tiff(draw())
     open(out, 'wb').write(data)
     print("wrote %s (%d bytes)" % (out, len(data)))
+    ddata = build_tiff(draw_doc())
+    open('app/JOSEdoc.tiff', 'wb').write(ddata)
+    print("wrote app/JOSEdoc.tiff (%d bytes)" % len(ddata))
     if len(argv) == 3 and argv[1] == '--preview':
-        preview(decode(data), argv[2])
+        preview(decode(data) + decode(ddata), argv[2])
         print("wrote", argv[2])
     return 0
 
