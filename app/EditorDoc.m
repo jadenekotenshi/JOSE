@@ -1853,15 +1853,14 @@ static NSString *rect_clip;                 /* what Copy last took from a rectan
 - (void)foldReplaceRange:(NSRange)range with:(NSString *)str select:(NSRange)sel
 {
     BOOL wasClean = !dirty;
-    unsigned long t0 = [self nowMillis], t1, t2, t3;
+    unsigned long t0 = [self nowMillis], t1, t2;
 
-    [self replaceRange:range with:str select:sel];
+    [self replaceRange:range with:str select:sel];              /* the ruler's count follows by itself: a marker and the lines it stands for are the same */
     t1 = [self nowMillis];
-    [self rulersTextReplaced];
+    if ([[textView string] length] > 300000) [self scheduleFoldRefresh];     /* a big text: the margin catches up after the screen has changed */
+    else [self refreshFoldInfo];
     t2 = [self nowMillis];
-    [self refreshFoldInfo];
-    t3 = [self nowMillis];
-    SSTrace("fold change of %u units -> %u: edit %u ms, ruler %u ms, margin scan %u ms", (unsigned)range.length, (unsigned)[str length], (unsigned)(t1 - t0), (unsigned)(t2 - t1), (unsigned)(t3 - t2));
+    SSTrace("fold change of %u units -> %u: edit %u ms, margin %u ms", (unsigned)range.length, (unsigned)[str length], (unsigned)(t1 - t0), (unsigned)(t2 - t1));
     if (wasClean) {
         savedVersion = undo_version(undo);
         dirty = NO;
