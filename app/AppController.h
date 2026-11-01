@@ -7,6 +7,7 @@
 @class PrefsController;
 @class TagsController;
 @class MacroController;
+@class SessionController;
 @class FilesController;
 @class FindController;
 @class ShellController;
@@ -25,6 +26,10 @@
     TagsController *tags;
     MacroController *macros;
     FilesController *filesFinder;
+    SessionController *sessions;
+    NSMenu         *sessionOpenMenu;    /* File > Sessions > Open / Switch to / Delete */
+    NSMenu         *sessionSwitchMenu;
+    NSMenu         *sessionDeleteMenu;
     NSMenu         *macroRunMenu;       /* Macro > Run Macro */
     NSMenu         *macroEditMenu;      /* Macro > Edit Macro */
     NSMutableArray *recentFiles;        /* paths, most recent first */
@@ -46,6 +51,7 @@
 - (void)openAtLaunch:(NSString *)path;
 - (EditorDoc *)openPath:(NSString *)path;
 - (EditorDoc *)frontDocument;
+- (SessionController *)sessionController;
 - (NSArray *)documents;                 /* every open document, oldest first */
 - (EditorDoc *)documentForPath:(NSString *)path;   /* the window showing this file, or nil */
 - (void)documentDidClose:(EditorDoc *)doc;

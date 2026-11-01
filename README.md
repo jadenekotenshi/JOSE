@@ -59,6 +59,13 @@ Status: **prototype (0.0.1)** -- nothing here has been run on OPENSTEP yet.
   and comments are skipped in the C-like modes.  When there are problems, the first `}` that starts its line but is not indented
   like the line that opened its block is listed too, because an extra or missing brace shows up there long before the place where
   the counts finally run out.  If everything is paired it says so.
+* **Sessions** (File > Sessions): *Save Session As...* keeps the windows that show files -- with each caret, scroll position, window
+  frame and wrap setting -- as a named set in `~/.JOSE.sessions`; *Save Session* writes it again under the current name.  *Open
+  Session* adds a saved set to what is open; *Switch to Session* first closes the windows that are not in it (asking about unsaved
+  work, and leaving the ones that are in it alone); *Delete Session* removes one.  The windows open now are also kept as the *last
+  session* each time one opens or closes, and at quit, so *Reopen Last Session* brings them back; with *Preferences > Reopen the
+  last session's files when JOSE starts* (off by default) that happens at launch, unless files are named on the command line.
+  Windows without a file are not part of a session, and files that have gone are skipped (and counted).
 * **Split panes** (Windows > Split Pane, cmd-2; Close Pane, cmd-1): the window shows the same text in two panes, one above the
   other, each with its own scroll position, selection, line numbers and fold margin.  Edits, undo, folds and highlighting are
   shared; the commands act on the pane with the insertion point.  Close Pane closes that one and the other fills the window.

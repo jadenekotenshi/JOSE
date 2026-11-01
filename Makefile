@@ -6,7 +6,7 @@ OBJCFLAGS = -x objective-c -fno-objc-arc -w -g -Ihk -Icore -Iapp
 CFLAGS  = -std=c89 -pedantic -Wall -Wextra -Wdeclaration-after-statement \
           -Wno-long-long -Wno-unused-parameter -O2 -g -Icore
 
-test: $(BUILD)/test_core $(BUILD)/test_search $(BUILD)/test_edit $(BUILD)/test_brace $(BUILD)/test_fill $(BUILD)/test_shell $(BUILD)/test_fold $(BUILD)/test_words $(BUILD)/test_includes $(BUILD)/test_tags $(BUILD)/test_foldlines $(BUILD)/test_macro $(BUILD)/test_modeprefs $(BUILD)/test_grep
+test: $(BUILD)/test_core $(BUILD)/test_search $(BUILD)/test_edit $(BUILD)/test_brace $(BUILD)/test_fill $(BUILD)/test_shell $(BUILD)/test_fold $(BUILD)/test_words $(BUILD)/test_includes $(BUILD)/test_tags $(BUILD)/test_foldlines $(BUILD)/test_macro $(BUILD)/test_modeprefs $(BUILD)/test_grep $(BUILD)/test_session
 	$(BUILD)/test_core
 	$(BUILD)/test_search
 	$(BUILD)/test_edit
@@ -19,6 +19,7 @@ test: $(BUILD)/test_core $(BUILD)/test_search $(BUILD)/test_edit $(BUILD)/test_b
 	$(BUILD)/test_tags
 	$(BUILD)/test_modeprefs
 	$(BUILD)/test_grep
+	$(BUILD)/test_session
 	$(BUILD)/test_foldlines
 	$(BUILD)/test_macro
 
@@ -45,6 +46,10 @@ $(BUILD)/test_modeprefs: tests/test_modeprefs.c tests/test.h core/modeprefs.c co
 $(BUILD)/test_grep: tests/test_grep.c tests/test.h core/grep.c core/grep.h core/search.c core/search.h
 	mkdir -p $(BUILD)
 	$(CC) $(CFLAGS) tests/test_grep.c core/grep.c core/search.c -o $@
+
+$(BUILD)/test_session: tests/test_session.c tests/test.h core/session.c core/session.h
+	mkdir -p $(BUILD)
+	$(CC) $(CFLAGS) tests/test_session.c core/session.c -o $@
 
 $(BUILD)/test_tags: tests/test_tags.c tests/test.h core/tags.c core/tags.h
 	mkdir -p $(BUILD)
@@ -99,7 +104,7 @@ hk-smoke:
 
 doc-smoke:
 	mkdir -p $(BUILD)
-	for f in tests/doc_smoke.m app/EditorDoc.m app/UIHelpers.m app/LineNumberView.m app/ShellController.m app/FindController.m app/FilesController.m app/MacroController.m app/Appearance.m hk/*.m; do \
+	for f in tests/doc_smoke.m app/EditorDoc.m app/UIHelpers.m app/LineNumberView.m app/ShellController.m app/FindController.m app/FilesController.m app/SessionController.m app/MacroController.m app/Appearance.m hk/*.m; do \
 	  $(CC) -c $(OBJCFLAGS) -fsanitize=address,undefined $$f -o $(BUILD)/dc_$$(basename $$f .m).o || exit 1; \
 	done
 	for f in core/*.c; do $(CC) -c -w -g -Icore -fsanitize=address,undefined $$f -o $(BUILD)/dc_c_$$(basename $$f .c).o || exit 1; done

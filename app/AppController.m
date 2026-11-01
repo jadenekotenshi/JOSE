@@ -6,6 +6,7 @@
 #import "TagsController.h"
 #import "MacroController.h"
 #import "FilesController.h"
+#import "SessionController.h"
 #import "Appearance.h"
 #import "UIHelpers.h"
 #import "HKSyntaxDefinition.h"
@@ -20,6 +21,8 @@
 - (MacroController *)macroController;
 - (void)macroNote:(NSString *)name;
 - (void)rebuildMacroMenus;
+- (void)rebuildSessionMenus;
+- (NSString *)askName:(NSString *)title;
 - (void)loadRecent;
 - (void)saveRecent;
 - (void)rebuildRecentMenu;
@@ -251,6 +254,17 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
     [self addItem:@"Open..." action:@selector(openDoc:) key:@"o" target:self toMenu:m];
     recentMenu = [self submenuNamed:@"Open Recent" inMenu:m];
     [self rebuildRecentMenu];
+    {
+        NSMenu *sm = [self submenuNamed:@"Sessions" inMenu:m];
+
+        [self addItem:@"Save Session As..." action:@selector(saveSessionAs:) key:@"" target:self toMenu:sm];
+        [self addItem:@"Save Session" action:@selector(saveSession:) key:@"" target:self toMenu:sm];
+        [self addItem:@"Reopen Last Session" action:@selector(reopenLastSession:) key:@"" target:self toMenu:sm];
+        sessionOpenMenu = [self submenuNamed:@"Open Session" inMenu:sm];
+        sessionSwitchMenu = [self submenuNamed:@"Switch to Session" inMenu:sm];
+        sessionDeleteMenu = [self submenuNamed:@"Delete Session" inMenu:sm];
+        [self rebuildSessionMenus];
+    }
     [self addItem:@"Open Included File" action:@selector(openIncluded:) key:@"d" target:self toMenu:m];
     [self addItem:@"Save" action:@selector(saveDoc:) key:@"s" target:self toMenu:m];
     [self addItem:@"Save As..." action:@selector(saveDocAs:) key:@"S" target:self toMenu:m];
@@ -384,6 +398,8 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
         || a == @selector(findUnmatched:) || a == @selector(gotoBracket:) || a == @selector(selectBracket:) || a == @selector(shiftLeft:) || a == @selector(shiftRight:) || a == @selector(commentLines:) || a == @selector(uncommentLines:)
         || a == @selector(fillParagraph:) || a == @selector(toggleFold:) || a == @selector(foldAll:) || a == @selector(expandAll:) || a == @selector(filterSelection:) || a == @selector(executeCommand:) || a == @selector(sortLines:))
         if (d == nil) return NO;
+    if (a == @selector(saveSession:)) return [[self sessionController] currentName] != nil;
+    if (a == @selector(reopenLastSession:)) return [[self sessionController] hasLast];
     if (a == @selector(splitPane:)) return d != nil && ![d hasSplit];
     if (a == @selector(closePane:)) return d != nil && [d hasSplit];
     if (a == @selector(learnMacro:)) {
@@ -445,6 +461,7 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
     [d release];
     [d showWindow];
     [self noteRecentFile:path];
+    [[self sessionController] recordLast];
     return d;
 }
 
@@ -453,6 +470,7 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
     [[doc retain] autorelease];                                  /* the window is still telling us it is closing */
     [self hideCallTip];
     [docs removeObject:doc];
+    [[self sessionController] recordLast];
 }
 
 - (void)newDoc:(id)sender { [self newDocument]; }
@@ -849,6 +867,126 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
 - (void)splitPane:(id)sender { [[self frontDocument] splitPane]; }
 - (void)closePane:(id)sender { [[self frontDocument] closePane]; }
 
+/* ---- sessions ---- */
+
+- (SessionController *)sessionController
+{
+    if (sessions == nil) sessions = [[SessionController alloc] initWithOwner:self];
+    return sessions;
+}
+
+- (void)rebuildSessionMenus
+{
+    NSMenu *menus[3];
+    SEL acts[3];
+    NSArray *names;
+    unsigned int m, i;
+
+    if (sessionOpenMenu == nil) return;
+    names = [[self sessionController] savedNames];
+    menus[0] = sessionOpenMenu;   acts[0] = @selector(openSavedSession:);
+    menus[1] = sessionSwitchMenu; acts[1] = @selector(switchToSavedSession:);
+    menus[2] = sessionDeleteMenu; acts[2] = @selector(deleteSavedSession:);
+    NS_DURING
+        for (m = 0; m < 3; m++) {
+            NSArray *old = [NSArray arrayWithArray:[menus[m] itemArray]];
+            for (i = 0; i < [old count]; i++) [menus[m] removeItem:[old objectAtIndex:i]];
+            for (i = 0; i < [names count]; i++) [[self addItem:[names objectAtIndex:i] action:acts[m] key:@"" target:self toMenu:menus[m]] setTag:(int)i];
+            if ([names count] == 0) [[self addItem:@"(none saved)" action:NULL key:@"" target:self toMenu:menus[m]] setEnabled:NO];
+            if ([menus[m] respondsToSelector:@selector(sizeToFit)]) [menus[m] sizeToFit];
+        }
+    NS_HANDLER
+        SSTrace("session menus: %s -- %s", SSCS([localException name]), SSCS([localException reason]));
+    NS_ENDHANDLER
+}
+
+/* A small modal panel asking for a name; nil if cancelled. */
+- (NSString *)askName:(NSString *)title
+{
+    NSPanel *panel;
+    NSTextField *field;
+    NSString *result = nil;
+
+    panel = [[NSPanel alloc] initWithContentRect:NSMakeRect(0, 0, 300, 92)
+                                       styleMask:(NSTitledWindowMask | NSClosableWindowMask)
+                                         backing:NSBackingStoreBuffered defer:NO];
+    [panel setTitle:title];
+    field = ui_field(NSMakeRect(70, 54, 210, 22));
+    [field setTarget:self];
+    [field setAction:@selector(gotoOK:)];
+    [[panel contentView] addSubview:ui_label(@"Name:", NSMakeRect(16, 56, 50, 18))];
+    [[panel contentView] addSubview:field];
+    [[panel contentView] addSubview:ui_button(@"Save", NSMakeRect(210, 12, 70, 28), self, @selector(gotoOK:))];
+    [[panel contentView] addSubview:ui_button(@"Cancel", NSMakeRect(130, 12, 70, 28), self, @selector(gotoCancel:))];
+    [panel center];
+    [panel makeFirstResponder:field];
+    if ([NSApp runModalForWindow:panel] == NSOKButton) result = [[[field stringValue] copy] autorelease];
+    [panel close];
+    [panel release];
+    return result;
+}
+
+- (void)saveSessionAs:(id)sender
+{
+    NSString *name = [self askName:@"Save Session"];
+
+    if (name == nil) return;
+    if ([[self sessionController] saveAs:name]) [self rebuildSessionMenus];
+    else NSRunAlertPanel(@"Save Session", @"The session could not be saved under that name (it needs a name without a slash or a leading dot, and at least one window that shows a file).", @"OK", nil, nil);
+}
+
+- (void)saveSession:(id)sender
+{
+    if (![[self sessionController] save]) NSRunAlertPanel(@"Save Session", @"The session could not be saved.", @"OK", nil, nil);
+}
+
+- (void)afterSessionOpen:(NSString *)name ok:(BOOL)ok
+{
+    unsigned int miss = [[self sessionController] missingCount];
+
+    [[self sessionController] recordLast];
+    if (!ok && miss == 0) return;                                /* cancelled while closing windows */
+    if (miss > 0) NSRunAlertPanel(@"Open Session", @"%u of the files in the session %@ could not be found.", @"OK", nil, nil, miss, name);
+}
+
+- (void)openSavedSession:(id)sender
+{
+    NSArray *names = [[self sessionController] savedNames];
+    int i = [sender tag];
+
+    if (i < 0 || i >= (int)[names count]) return;
+    [self afterSessionOpen:[names objectAtIndex:i] ok:[[self sessionController] open:[names objectAtIndex:i] replace:NO]];
+    [self rebuildSessionMenus];
+}
+
+- (void)switchToSavedSession:(id)sender
+{
+    NSArray *names = [[self sessionController] savedNames];
+    int i = [sender tag];
+
+    if (i < 0 || i >= (int)[names count]) return;
+    [self afterSessionOpen:[names objectAtIndex:i] ok:[[self sessionController] open:[names objectAtIndex:i] replace:YES]];
+    [self rebuildSessionMenus];
+}
+
+- (void)deleteSavedSession:(id)sender
+{
+    NSArray *names = [[self sessionController] savedNames];
+    int i = [sender tag];
+
+    if (i < 0 || i >= (int)[names count]) return;
+    if (NSRunAlertPanel(@"Delete Session", @"Delete the saved session %@?", @"Delete", @"Cancel", nil, [names objectAtIndex:i]) != NSAlertDefaultReturn) return;
+    [[self sessionController] deleteNamed:[names objectAtIndex:i]];
+    [self rebuildSessionMenus];
+}
+
+- (void)reopenLastSession:(id)sender
+{
+    BOOL ok = [[self sessionController] openLast];
+
+    [self afterSessionOpen:@"(last)" ok:ok];
+}
+
 - (void)showFiles:(id)sender
 {
     if (filesFinder == nil) filesFinder = [[FilesController alloc] initWithOwner:self];
@@ -951,6 +1089,11 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
     [self buildFullMenu];
     for (i = 0; i < (int)[startupFiles count]; i++) [self openPath:[startupFiles objectAtIndex:i]];
     [startupFiles release]; startupFiles = nil;
+    if ([docs count] == 0 && [Appearance reopenLastSession] && [[self sessionController] hasLast]) {
+        BOOL ok = [[self sessionController] openLast];
+
+        SSTrace("reopening the last session: %s, %u missing", ok ? "done" : "nothing opened", [[self sessionController] missingCount]);
+    }
     if ([docs count] == 0) [self newDocument];
 }
 
@@ -963,11 +1106,13 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
 {
     unsigned int i;
 
+    [[self sessionController] recordLast];                       /* the windows as they are now, before any is closed */
+    [[self sessionController] setQuiet:YES];
     for (i = 0; i < [docs count]; i++) {
         EditorDoc *d = [docs objectAtIndex:i];
         if ([d isDirty]) {
             [d showWindow];
-            if (![d closeWindow]) return NO;
+            if (![d closeWindow]) { [[self sessionController] setQuiet:NO]; return NO; }
             i = 0;
             continue;
         }

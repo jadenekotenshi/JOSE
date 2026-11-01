@@ -20,6 +20,7 @@ static const int font_sizes[] = { 8, 9, 10, 11, 12, 13, 14, 16, 18, 20, 24 };
 - (void)pathChanged:(id)sender;
 - (void)tipsChanged:(id)sender;
 - (void)marginChanged:(id)sender;
+- (void)sessionChanged:(id)sender;
 - (void)closePanel:(id)sender;
 - (void)showModes:(id)sender;
 - (void)buildModePanel;
@@ -68,64 +69,69 @@ static const int font_sizes[] = { 8, 9, 10, 11, 12, 13, 14, 16, 18, 20, 24 };
     NSArray *fonts = [self fixedPitchFonts];
     unsigned int i;
 
-    panel = [[NSPanel alloc] initWithContentRect:NSMakeRect(0, 0, 440, 292)
+    panel = [[NSPanel alloc] initWithContentRect:NSMakeRect(0, 0, 440, 318)
                                        styleMask:(NSTitledWindowMask | NSClosableWindowMask)
                                          backing:NSBackingStoreBuffered defer:NO];
     [panel setTitle:@"Preferences"];
     [panel setReleasedWhenClosed:NO];
     cv = [panel contentView];
 
-    [cv addSubview:ui_label(@"Colours:", NSMakeRect(16, 254, 90, 18))];
-    schemePopup = [[[NSPopUpButton alloc] initWithFrame:NSMakeRect(110, 250, 110, 24) pullsDown:NO] autorelease];
+    [cv addSubview:ui_label(@"Colours:", NSMakeRect(16, 280, 90, 18))];
+    schemePopup = [[[NSPopUpButton alloc] initWithFrame:NSMakeRect(110, 276, 110, 24) pullsDown:NO] autorelease];
     [schemePopup addItemWithTitle:@"Light"];
     [schemePopup addItemWithTitle:@"Dark"];
     [schemePopup setTarget:self];
     [schemePopup setAction:@selector(schemeChanged:)];
     [cv addSubview:schemePopup];
-    [cv addSubview:ui_button(@"Reset Colours", NSMakeRect(300, 250, 124, 26), self, @selector(resetColors:))];
+    [cv addSubview:ui_button(@"Reset Colours", NSMakeRect(300, 276, 124, 26), self, @selector(resetColors:))];
 
-    [cv addSubview:ui_label(@"Background:", NSMakeRect(16, 218, 90, 18))];
-    backgroundWell = [[[NSColorWell alloc] initWithFrame:NSMakeRect(110, 212, 44, 28)] autorelease];
+    [cv addSubview:ui_label(@"Background:", NSMakeRect(16, 244, 90, 18))];
+    backgroundWell = [[[NSColorWell alloc] initWithFrame:NSMakeRect(110, 238, 44, 28)] autorelease];
     [backgroundWell setTarget:self];
     [backgroundWell setAction:@selector(backgroundChanged:)];
     [cv addSubview:backgroundWell];
-    [cv addSubview:ui_label(@"Text:", NSMakeRect(190, 218, 40, 18))];
-    textWell = [[[NSColorWell alloc] initWithFrame:NSMakeRect(234, 212, 44, 28)] autorelease];
+    [cv addSubview:ui_label(@"Text:", NSMakeRect(190, 244, 40, 18))];
+    textWell = [[[NSColorWell alloc] initWithFrame:NSMakeRect(234, 238, 44, 28)] autorelease];
     [textWell setTarget:self];
     [textWell setAction:@selector(textChanged:)];
     [cv addSubview:textWell];
 
-    [cv addSubview:ui_label(@"Font:", NSMakeRect(16, 180, 90, 18))];
-    fontPopup = [[[NSPopUpButton alloc] initWithFrame:NSMakeRect(110, 176, 214, 24) pullsDown:NO] autorelease];
+    [cv addSubview:ui_label(@"Font:", NSMakeRect(16, 206, 90, 18))];
+    fontPopup = [[[NSPopUpButton alloc] initWithFrame:NSMakeRect(110, 202, 214, 24) pullsDown:NO] autorelease];
     [fontPopup addItemWithTitle:DEFAULT_ITEM];
     for (i = 0; i < [fonts count]; i++) [fontPopup addItemWithTitle:[fonts objectAtIndex:i]];
     [fontPopup setTarget:self];
     [fontPopup setAction:@selector(fontChanged:)];
     [cv addSubview:fontPopup];
-    [cv addSubview:ui_label(@"Size:", NSMakeRect(334, 180, 36, 18))];
-    sizePopup = [[[NSPopUpButton alloc] initWithFrame:NSMakeRect(372, 176, 56, 24) pullsDown:NO] autorelease];
+    [cv addSubview:ui_label(@"Size:", NSMakeRect(334, 206, 36, 18))];
+    sizePopup = [[[NSPopUpButton alloc] initWithFrame:NSMakeRect(372, 202, 56, 24) pullsDown:NO] autorelease];
     [sizePopup addItemWithTitle:@"-"];
     for (i = 0; i < N_FONT_SIZES; i++) [sizePopup addItemWithTitle:[NSString stringWithFormat:@"%d", font_sizes[i]]];
     [sizePopup setTarget:self];
     [sizePopup setAction:@selector(fontChanged:)];
     [cv addSubview:sizePopup];
 
-    [cv addSubview:ui_label(@"Include path:", NSMakeRect(16, 142, 90, 18))];
-    pathField = ui_field(NSMakeRect(110, 140, 314, 22));
+    [cv addSubview:ui_label(@"Include path:", NSMakeRect(16, 168, 90, 18))];
+    pathField = ui_field(NSMakeRect(110, 166, 314, 22));
     [pathField setTarget:self];
     [pathField setAction:@selector(pathChanged:)];
     [cv addSubview:pathField];
     [cv addSubview:ui_wrapping_label(@"Folders searched, after the file's own, by Open Included File (separate them with colons).",
-                                     NSMakeRect(110, 100, 314, 34), NO)];
+                                     NSMakeRect(110, 126, 314, 34), NO)];
 
-    tipsSwitch = ui_switch(@"Show a call tip when typing '(' after a tagged name", NSMakeRect(16, 72, 408, 20));
+    tipsSwitch = ui_switch(@"Show a call tip when typing '(' after a tagged name", NSMakeRect(16, 98, 408, 20));
     [tipsSwitch setTarget:self];
     [tipsSwitch setAction:@selector(tipsChanged:)];
     [cv addSubview:tipsSwitch];
-    marginSwitch = ui_switch(@"Fold margin (+/-) beside the code", NSMakeRect(16, 46, 408, 20));
+    marginSwitch = ui_switch(@"Fold margin (+/-) beside the code", NSMakeRect(16, 72, 408, 20));
     [marginSwitch setTarget:self];
     [marginSwitch setAction:@selector(marginChanged:)];
     [cv addSubview:marginSwitch];
+
+    sessionSwitch = ui_switch(@"Reopen the last session's files when JOSE starts", NSMakeRect(16, 46, 408, 20));
+    [sessionSwitch setTarget:self];
+    [sessionSwitch setAction:@selector(sessionChanged:)];
+    [cv addSubview:sessionSwitch];
 
     [cv addSubview:ui_button(@"Language Modes...", NSMakeRect(16, 8, 140, 28), self, @selector(showModes:))];
     [cv addSubview:ui_button(@"Close", NSMakeRect(354, 8, 70, 28), self, @selector(closePanel:))];
@@ -149,6 +155,7 @@ static const int font_sizes[] = { 8, 9, 10, 11, 12, 13, 14, 16, 18, 20, 24 };
     [pathField setStringValue:[Appearance includePath]];
     [tipsSwitch setState:[Appearance callTips] ? NSOnState : NSOffState];
     [marginSwitch setState:[Appearance foldMargin] ? NSOnState : NSOffState];
+    [sessionSwitch setState:[Appearance reopenLastSession] ? NSOnState : NSOffState];
 }
 
 - (void)showPanel
@@ -214,6 +221,12 @@ static const int font_sizes[] = { 8, 9, 10, 11, 12, 13, 14, 16, 18, 20, 24 };
 - (void)marginChanged:(id)sender
 {
     [Appearance setFoldMargin:[marginSwitch state] == NSOnState];
+    [self changed];
+}
+
+- (void)sessionChanged:(id)sender
+{
+    [Appearance setReopenLastSession:[sessionSwitch state] == NSOnState];
     [self changed];
 }
 

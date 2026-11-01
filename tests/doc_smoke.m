@@ -6,6 +6,7 @@
 #import "FindController.h"
 #import "MacroController.h"
 #import "FilesController.h"
+#import "SessionController.h"
 #import "AppController.h"
 #import "UIHelpers.h"
 #import "HKSyntaxDefinition.h"
@@ -27,6 +28,32 @@
 @end
 
 /* Stands in for the AppController: the macro recorder and the Find panel only ask it a few things. */
+/* Stands in for the AppController for sessions: a list of documents, and opening a file makes one. */
+@interface SessionOwner : NSObject
+{
+    NSMutableArray *docs;
+}
+- (NSMutableArray *)docs;
+@end
+
+@implementation SessionOwner
+- (id)init { self = [super init]; docs = [[NSMutableArray alloc] init]; return self; }
+- (NSMutableArray *)docs { return docs; }
+- (NSArray *)documents { return [NSArray arrayWithArray:docs]; }
+- (EditorDoc *)openPath:(NSString *)path
+{
+    EditorDoc *d = [[[EditorDoc alloc] initWithOwner:self] autorelease];
+    unsigned int i;
+
+    for (i = 0; i < [docs count]; i++) if ([[[docs objectAtIndex:i] path] isEqualToString:path]) return [docs objectAtIndex:i];
+    if (![d openFile:path]) return nil;
+    [docs addObject:d];
+    return d;
+}
+- (void)documentDidClose:(id)d { [docs removeObject:d]; }
+- (void)noteRecentFile:(NSString *)p { }
+@end
+
 @interface MacroOwner : NSObject
 {
     EditorDoc *doc;
@@ -899,6 +926,67 @@ int main(void)
         [b undo];
         CHECK([[[b textView] string] isEqualToString:@"a foo, another foo\n"]);
         search_free(se);
+    }
+    {   /* sessions: save the open files with their carets, reopen them in a new "program", the last session, replace, delete */
+        SessionOwner *o1 = [[[SessionOwner alloc] init] autorelease], *o2 = [[[SessionOwner alloc] init] autorelease];
+        SessionController *sc1 = [[[SessionController alloc] initWithOwner:o1] autorelease], *sc2 = [[[SessionController alloc] initWithOwner:o2] autorelease];
+        NSString *sdir = [dir stringByAppendingPathComponent:@"sessions"];
+        NSString *f1 = [dir stringByAppendingPathComponent:@"s one.txt"], *f2 = [dir stringByAppendingPathComponent:@"s2.c"], *gone = [dir stringByAppendingPathComponent:@"gone.c"];
+        EditorDoc *d1, *d2;
+
+        [[NSFileManager defaultManager] removeItemAtPath:sdir error:NULL];               /* from an earlier, interrupted run */
+        [@"line one\nline two\nline three\n" writeToFile:f1 atomically:YES];
+        [@"int main(void) { return 0; }\n" writeToFile:f2 atomically:YES];
+        [@"x\n" writeToFile:gone atomically:YES];
+        [sc1 setFolderPath:sdir];
+        [sc2 setFolderPath:sdir];
+        CHECK(![sc1 saveAs:@"work"]);                                            /* no windows with files yet */
+        d1 = [o1 openPath:f1];
+        d2 = [o1 openPath:f2];
+        [[o1 docs] addObject:[[[EditorDoc alloc] initWithOwner:o1] autorelease]];  /* a window without a file is left out */
+        [[d1 textView] setSelectedRange:NSMakeRange(9, 3)];
+        [d2 setWrap:YES];
+        CHECK([sc1 saveAs:@"work"] && [[sc1 currentName] isEqualToString:@"work"]);
+        CHECK(![sc1 saveAs:@"a/b"] && ![sc1 saveAs:@".hidden"] && ![sc1 saveAs:@"  "]);
+        CHECK([[sc1 savedNames] isEqualToArray:[NSArray arrayWithObject:@"work"]]);
+        [sc1 recordLast];
+        CHECK([sc1 hasLast] && ![[sc1 savedNames] containsObject:@".last"]);
+        {
+            NSString *txt = [NSString stringWithContentsOfFile:[sdir stringByAppendingPathComponent:@"work"]];
+            CHECK([txt hasPrefix:@"# JOSE session\n"] && [txt rangeOfString:@"path="].length > 0 && [txt rangeOfString:@"s one.txt"].length > 0);
+        }
+
+        CHECK([sc2 open:@"work" replace:NO]);                                    /* "another run" of the program */
+        CHECK([[o2 docs] count] == 2);
+        CHECK([[[o2 docs] objectAtIndex:0] path] != nil && [[[[o2 docs] objectAtIndex:0] path] isEqualToString:f1]);
+        CHECK([[[[o2 docs] objectAtIndex:0] textView] selectedRange].location == 9 && [[[[o2 docs] objectAtIndex:0] textView] selectedRange].length == 3);
+        CHECK([[[o2 docs] objectAtIndex:1] wrap]);
+        CHECK([sc2 missingCount] == 0);
+
+        [[NSFileManager defaultManager] removeItemAtPath:gone error:NULL];
+        {   /* a file that has gone is skipped and counted */
+            SessionOwner *o3 = [[[SessionOwner alloc] init] autorelease];
+            SessionController *sc3 = [[[SessionController alloc] initWithOwner:o3] autorelease];
+            NSString *txt = [NSString stringWithFormat:@"file caret=0 path=%@\nfile caret=2 path=%@\n", gone, f2];
+            [sc3 setFolderPath:sdir];
+            [txt writeToFile:[sdir stringByAppendingPathComponent:@"partial"] atomically:YES];
+            CHECK([sc3 open:@"partial" replace:NO] && [sc3 missingCount] == 1 && [[o3 docs] count] == 1);
+        }
+        {   /* replace: windows that are not in the session go (clean ones without asking), the ones that are stay */
+            SessionOwner *o4 = [[[SessionOwner alloc] init] autorelease];
+            SessionController *sc4 = [[[SessionController alloc] initWithOwner:o4] autorelease];
+            EditorDoc *keep;
+            [sc4 setFolderPath:sdir];
+            keep = [o4 openPath:f2];
+            [@"extra\n" writeToFile:[dir stringByAppendingPathComponent:@"s3.txt"] atomically:YES];
+            [o4 openPath:[dir stringByAppendingPathComponent:@"s3.txt"]];
+            CHECK([[o4 docs] count] == 2);
+            CHECK([sc4 open:@"work" replace:YES]);
+            CHECK([[o4 docs] count] == 2 && [[o4 docs] containsObject:keep]);   /* s3 went; f2 stayed; f1 came */
+        }
+        CHECK([sc1 deleteNamed:@"work"] && [[sc1 currentName] isEqualToString:@"work"] == NO);
+        CHECK(![[sc1 savedNames] containsObject:@"work"]);
+        (void)d2;
     }
     [[NSFileManager defaultManager] removeItemAtPath:dir error:NULL];
     printf(failures ? "doc: FAILED\n" : "doc: ok\n");

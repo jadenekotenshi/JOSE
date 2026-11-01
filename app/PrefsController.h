@@ -14,6 +14,7 @@
     NSTextField     *pathField;
     NSButton        *tipsSwitch;
     NSButton        *marginSwitch;
+    NSButton        *sessionSwitch;
     NSPanel         *modePanel;           /* Language Modes...: what each mode overrides */
     NSPopUpButton   *modePopup;
     NSPopUpButton   *modeIndentPopup;

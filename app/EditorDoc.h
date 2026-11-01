@@ -135,6 +135,8 @@
 - (BOOL)editNearEnd:(NSRange)r with:(NSString *)str;   /* replace a range that lies in the last few lines by hand: YES if it was done (see EditTextView) */
 - (BOOL)cutNearEnd;                        /* Cut of a selection in the last few lines, by hand */
 - (BOOL)deleteNearEnd:(BOOL)forward;        /* Backspace/Delete in the last few lines, done by hand: YES if it was (see EditTextView) */
+- (int)scrollY;                            /* how far the text is scrolled, in points */
+- (void)restoreSelection:(NSRange)sel scrollY:(int)y;   /* a saved caret and scroll position (the selection is cut to the text) */
 - (void)splitPane;                          /* a second view of the same text under (or over) the first */
 - (void)closePane;                         /* closes the pane with the insertion point; the other one fills the window */
 - (BOOL)hasSplit;

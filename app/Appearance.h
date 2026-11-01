@@ -23,6 +23,8 @@
 + (void)setIncludePath:(NSString *)path;
 + (BOOL)callTips;
 + (void)setCallTips:(BOOL)flag;
++ (BOOL)reopenLastSession;                /* open the previous session's files at launch */
++ (void)setReopenLastSession:(BOOL)flag;
 + (BOOL)foldMargin;
 + (void)setFoldMargin:(BOOL)flag;
 @end

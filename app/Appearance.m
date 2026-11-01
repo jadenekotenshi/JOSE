@@ -9,6 +9,7 @@ static NSString *fontName = nil;
 static float fontSize = 0.0;
 static NSString *includePath = nil;
 static BOOL callTips = YES;
+static BOOL reopenLast = NO;
 static BOOL foldMargin = YES;
 
 #define DEFAULT_INCLUDE_PATH @"/usr/include:/usr/local/include:/NextDeveloper/Headers:/LocalDeveloper/Headers:/NextLibrary/Frameworks:/LocalLibrary/Frameworks"
@@ -65,6 +66,7 @@ static BOOL get_bool(NSUserDefaults *ud, NSString *key, BOOL def)
     [includePath release];
     includePath = [[ud stringForKey:@"IncludePath"] copy];
     callTips = get_bool(ud, @"CallTips", YES);
+    reopenLast = get_bool(ud, @"ReopenLastSession", NO);
     foldMargin = get_bool(ud, @"FoldMargin", YES);
     [self push];
 }
@@ -84,6 +86,7 @@ static BOOL get_bool(NSUserDefaults *ud, NSString *key, BOOL def)
     if (includePath != nil) [ud setObject:includePath forKey:@"IncludePath"];
     else [ud removeObjectForKey:@"IncludePath"];
     [ud setObject:callTips ? @"YES" : @"NO" forKey:@"CallTips"];
+    [ud setObject:reopenLast ? @"YES" : @"NO" forKey:@"ReopenLastSession"];
     [ud setObject:foldMargin ? @"YES" : @"NO" forKey:@"FoldMargin"];
     [ud synchronize];
 }
@@ -166,6 +169,8 @@ static BOOL get_bool(NSUserDefaults *ud, NSString *key, BOOL def)
 
 + (BOOL)callTips { return callTips; }
 + (void)setCallTips:(BOOL)flag { callTips = flag; }
++ (BOOL)reopenLastSession { return reopenLast; }
++ (void)setReopenLastSession:(BOOL)flag { reopenLast = flag; }
 + (BOOL)foldMargin { return foldMargin; }
 + (void)setFoldMargin:(BOOL)flag { foldMargin = flag; }
 

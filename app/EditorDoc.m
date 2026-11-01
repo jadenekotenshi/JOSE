@@ -2161,6 +2161,27 @@ static NSString *rect_clip;                 /* what Copy last took from a rectan
     return [self editNearEnd:r with:@""];
 }
 
+- (int)scrollY
+{
+    return (int)[[scroll contentView] bounds].origin.y;
+}
+
+- (void)restoreSelection:(NSRange)sel scrollY:(int)y
+{
+    unsigned int n = [[textView string] length];
+    NSClipView *cv = [scroll contentView];
+
+    if (sel.location > n) sel.location = n;
+    if (NSMaxRange(sel) > n) sel.length = n - sel.location;
+    [textView setSelectedRange:sel];
+    if (y > 0) {
+        [cv scrollToPoint:NSMakePoint([cv bounds].origin.x, (float)y)];
+        [scroll reflectScrolledClipView:cv];
+    } else {
+        [textView scrollRangeToVisible:sel];
+    }
+}
+
 - (void)splitPane
 {
     NSRect b;
