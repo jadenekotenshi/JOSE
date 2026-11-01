@@ -201,6 +201,7 @@
     if (rectOn) [(EditorDoc *)editor rectCopyAndCut:NO];
     else if (![(EditorDoc *)editor copyExpandedSelectionAndCut:NO]) [super copy:sender];
     macroSuppress--;
+    [(EditorDoc *)editor clipboardTouched];
 }
 
 - (void)cut:(id)sender
@@ -211,6 +212,7 @@
     else if ([(EditorDoc *)editor cutNearEnd]) {}
     else if (![(EditorDoc *)editor copyExpandedSelectionAndCut:YES]) [super cut:sender];
     macroSuppress--;
+    [(EditorDoc *)editor clipboardTouched];
 }
 
 - (void)delete:(id)sender
@@ -1537,6 +1539,17 @@ static NSString *rect_clip;                 /* what Copy last took from a rectan
 
     if ([[pb types] indexOfObject:NSStringPboardType] == NSNotFound) return nil;
     return [pb stringForType:NSStringPboardType];
+}
+
++ (void)setRectClip:(NSString *)text
+{
+    [rect_clip release];
+    rect_clip = [text copy];
+}
+
+- (void)clipboardTouched
+{
+    if ([owner respondsToSelector:@selector(noteClipboard)]) [owner noteClipboard];
 }
 
 - (BOOL)pasteIsRectangle

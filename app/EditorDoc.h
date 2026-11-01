@@ -110,7 +110,9 @@
 - (void)rectType:(NSString *)str;          /* typed text goes into every line of the rectangle */
 - (void)rectDeleteBackward:(BOOL)backward; /* the rectangle's text, or the column before/after a zero-width one */
 - (BOOL)rectPaste;                         /* the pasteboard as a block at the rectangle or the insertion point; NO if it is not */
-- (BOOL)pasteIsRectangle;                  /* the pasteboard holds what Copy last took from a rectangle */
+- (BOOL)pasteIsRectangle;
++ (void)setRectClip:(NSString *)text;      /* the clipboard holds this text and it came from a rectangle (see the clipboard history) */
+- (void)clipboardTouched;                  /* Copy or Cut was done: the clipboard history looks at the clipboard */                  /* the pasteboard holds what Copy last took from a rectangle */
 - (NSString *)workingDirectory;            /* the file's folder, or the home folder */
 - (BOOL)hasFolds;                          /* some code is folded */
 - (void)toggleFold;                        /* fold the block at the insertion point, or unfold the marker on its line */

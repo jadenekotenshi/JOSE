@@ -7,6 +7,7 @@
 #import "MacroController.h"
 #import "FilesController.h"
 #import "SessionController.h"
+#import "ClipboardController.h"
 #import "Appearance.h"
 #import "UIHelpers.h"
 #import "HKSyntaxDefinition.h"
@@ -22,6 +23,7 @@
 - (void)macroNote:(NSString *)name;
 - (void)rebuildMacroMenus;
 - (void)rebuildSessionMenus;
+- (void)rebuildClipboardMenu;
 - (NSString *)askName:(NSString *)title;
 - (void)loadRecent;
 - (void)saveRecent;
@@ -277,6 +279,9 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
     [self addItem:@"Cut" action:@selector(cut:) key:@"x" target:nil toMenu:m];
     [self addItem:@"Copy" action:@selector(copy:) key:@"c" target:nil toMenu:m];
     [self addItem:@"Paste" action:@selector(paste:) key:@"v" target:nil toMenu:m];
+    clipMenu = [self submenuNamed:@"Paste from History" inMenu:m];
+    [self addItem:@"Clipboard History..." action:@selector(showClipboardHistory:) key:@"V" target:self toMenu:m];
+    [self rebuildClipboardMenu];
     [self addItem:@"Delete" action:@selector(delete:) key:@"" target:nil toMenu:m];
     [self addItem:@"Select All" action:@selector(selectAll:) key:@"a" target:nil toMenu:m];
     [self addItem:@"Shift Left" action:@selector(shiftLeft:) key:@"[" target:self toMenu:m];
@@ -398,6 +403,7 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
         || a == @selector(findUnmatched:) || a == @selector(gotoBracket:) || a == @selector(selectBracket:) || a == @selector(shiftLeft:) || a == @selector(shiftRight:) || a == @selector(commentLines:) || a == @selector(uncommentLines:)
         || a == @selector(fillParagraph:) || a == @selector(toggleFold:) || a == @selector(foldAll:) || a == @selector(expandAll:) || a == @selector(filterSelection:) || a == @selector(executeCommand:) || a == @selector(sortLines:))
         if (d == nil) return NO;
+    if (a == @selector(pasteFromHistory:)) return d != nil;
     if (a == @selector(saveSession:)) return [[self sessionController] currentName] != nil;
     if (a == @selector(reopenLastSession:)) return [[self sessionController] hasLast];
     if (a == @selector(splitPane:)) return d != nil && ![d hasSplit];
@@ -866,6 +872,48 @@ static void set_pref_bool(NSUserDefaults *ud, NSString *key, BOOL value)
 
 - (void)splitPane:(id)sender { [[self frontDocument] splitPane]; }
 - (void)closePane:(id)sender { [[self frontDocument] closePane]; }
+
+/* ---- clipboard history ---- */
+
+- (ClipboardController *)clipboardController
+{
+    if (clipboard == nil) clipboard = [[ClipboardController alloc] initWithOwner:self];
+    return clipboard;
+}
+
+- (void)noteClipboard { [[self clipboardController] note]; }
+
+- (void)clipboardHistoryChanged { [self rebuildClipboardMenu]; }
+
+- (void)rebuildClipboardMenu
+{
+    ClipboardController *cc;
+    unsigned int old_i;
+    int i, n;
+    NSArray *old;
+
+    if (clipMenu == nil) return;
+    cc = [self clipboardController];
+    n = [cc count];
+    NS_DURING
+        old = [NSArray arrayWithArray:[clipMenu itemArray]];
+        for (old_i = 0; old_i < [old count]; old_i++) [clipMenu removeItem:[old objectAtIndex:old_i]];
+        for (i = 0; i < n && i < 15; i++)
+            [[self addItem:[NSString stringWithFormat:@"%d  %@", i + 1, [cc previewAt:i]] action:@selector(pasteFromHistory:) key:@"" target:self toMenu:clipMenu] setTag:i];
+        if (n == 0) [[self addItem:@"(nothing copied yet)" action:NULL key:@"" target:self toMenu:clipMenu] setEnabled:NO];
+        if ([clipMenu respondsToSelector:@selector(sizeToFit)]) [clipMenu sizeToFit];
+    NS_HANDLER
+        SSTrace("clipboard menu: %s -- %s", SSCS([localException name]), SSCS([localException reason]));
+    NS_ENDHANDLER
+}
+
+- (void)pasteFromHistory:(id)sender { [[self clipboardController] pasteEntry:[sender tag]]; }
+- (void)showClipboardHistory:(id)sender { [[self clipboardController] showPanel]; }
+
+- (void)applicationDidBecomeActive:(NSNotification *)notification
+{
+    if (launched) [self noteClipboard];                          /* something may have been copied in another program */
+}
 
 /* ---- sessions ---- */
 

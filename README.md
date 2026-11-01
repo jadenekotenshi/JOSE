@@ -59,6 +59,12 @@ Status: **prototype (0.0.1)** -- nothing here has been run on OPENSTEP yet.
   and comments are skipped in the C-like modes.  When there are problems, the first `}` that starts its line but is not indented
   like the line that opened its block is listed too, because an extra or missing brace shows up there long before the place where
   the counts finally run out.  If everything is paired it says so.
+* **Clipboard history** (Edit > Paste from History; Edit > Clipboard History..., shift-cmd-V): the last thirty things cut or copied in JOSE --
+  and, whenever JOSE becomes the active program again, what was copied elsewhere -- newest first.  Choosing one from the submenu makes it
+  the current clipboard (so cmd-V pastes it too) and pastes it at once; the panel lists them with a longer look at the selected one and
+  can paste, make current, delete or clear.  Something copied from a rectangle stays a rectangle.  Anything over 400,000 bytes is not kept,
+  and the history lives in memory only.  (Several copies made one after another in another program, without JOSE becoming active
+  between, are seen only as the last.)
 * **Sessions** (File > Sessions): *Save Session As...* keeps the windows that show files -- with each caret, scroll position, window
   frame and wrap setting -- as a named set in `~/.JOSE.sessions`; *Save Session* writes it again under the current name.  *Open
   Session* adds a saved set to what is open; *Switch to Session* first closes the windows that are not in it (asking about unsaved

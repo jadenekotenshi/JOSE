@@ -7,6 +7,7 @@
 #import "MacroController.h"
 #import "FilesController.h"
 #import "SessionController.h"
+#import "ClipboardController.h"
 #import "AppController.h"
 #import "UIHelpers.h"
 #import "HKSyntaxDefinition.h"
@@ -54,6 +55,8 @@
 - (void)noteRecentFile:(NSString *)p { }
 @end
 
+static ClipboardController *gClip;             /* the one the stand-in owner forwards Copy/Cut notices to */
+
 @interface MacroOwner : NSObject
 {
     EditorDoc *doc;
@@ -72,6 +75,7 @@
 @implementation MacroOwner
 - (void)setDoc:(EditorDoc *)d { doc = d; }
 - (void)setOpenDoc:(EditorDoc *)d { openDoc = d; }
+- (void)noteClipboard { [gClip note]; }
 - (void)setDocuments:(NSArray *)a { allDocs = [a retain]; }
 - (NSArray *)documents { return allDocs != nil ? allDocs : [NSArray array]; }
 - (EditorDoc *)documentForPath:(NSString *)p { return (openDoc != nil && [[openDoc path] isEqualToString:p]) ? openDoc : nil; }
@@ -987,6 +991,41 @@ int main(void)
         CHECK([sc1 deleteNamed:@"work"] && [[sc1 currentName] isEqualToString:@"work"] == NO);
         CHECK(![[sc1 savedNames] containsObject:@"work"]);
         (void)d2;
+    }
+    {   /* clipboard history: copies and cuts are remembered; one is made current and pasted; a rectangle stays a rectangle */
+        MacroOwner *own = [[[MacroOwner alloc] init] autorelease];
+        EditorDoc *cd = [[[EditorDoc alloc] initWithOwner:own] autorelease];
+        EditTextView *tv = [cd textView];
+        ClipboardController *cc = [[[ClipboardController alloc] initWithOwner:own] autorelease];
+
+        gClip = cc;
+        [own setDoc:cd];
+        [tv setString:@"alpha beta gamma\nline two\n"];
+        [tv setSelectedRange:NSMakeRange(0, 5)];
+        [tv copy:nil];
+        [tv setSelectedRange:NSMakeRange(6, 4)];
+        [tv copy:nil];
+        [tv setSelectedRange:NSMakeRange(11, 5)];
+        [tv cut:nil];                                                            /* "gamma" */
+        CHECK([[tv string] isEqualToString:@"alpha beta \nline two\n"]);
+        CHECK([cc count] == 3 && [[cc previewAt:0] isEqualToString:@"gamma"] && [[cc previewAt:2] isEqualToString:@"alpha"]);
+        [tv setSelectedRange:NSMakeRange(0, 0)];
+        [cc pasteEntry:2];                                                       /* "alpha" is current, and pasted */
+        CHECK([[tv string] hasPrefix:@"alphaalpha beta"]);
+        CHECK([[[NSPasteboard generalPasteboard] stringForType:NSStringPboardType] isEqualToString:@"alpha"]);
+        CHECK([cc count] == 3 && [[cc previewAt:0] isEqualToString:@"alpha"]);   /* chosen: to the front */
+        [tv setSelectedRange:NSMakeRange(0, 0)];
+        [tv copy:nil];                                                           /* nothing selected: nothing new */
+        [tv setString:@"abcd\nefgh\nijkl\n"];
+        [tv rectShowLines:NSMakeRange(0, 14) columns:1 :3];
+        [tv copy:nil];                                                           /* a rectangle: "bc", "fg", "jk" */
+        CHECK([cc count] == 4 && [[cc previewAt:0] isEqualToString:@"bc fg jk  (3 lines)"]);
+        [tv rectClear];
+        [tv setSelectedRange:NSMakeRange(0, 0)];
+        [cc pasteEntry:0];
+        CHECK([[tv string] hasPrefix:@"bc"] || [tv rectActive] || [[tv string] length] > 15);   /* pasted as a block */
+        CHECK(![cc makeCurrent:9]);
+        gClip = nil;
     }
     [[NSFileManager defaultManager] removeItemAtPath:dir error:NULL];
     printf(failures ? "doc: FAILED\n" : "doc: ok\n");

@@ -8,6 +8,7 @@
 @class TagsController;
 @class MacroController;
 @class SessionController;
+@class ClipboardController;
 @class FilesController;
 @class FindController;
 @class ShellController;
@@ -27,6 +28,8 @@
     MacroController *macros;
     FilesController *filesFinder;
     SessionController *sessions;
+    ClipboardController *clipboard;
+    NSMenu         *clipMenu;           /* Edit > Paste from History */
     NSMenu         *sessionOpenMenu;    /* File > Sessions > Open / Switch to / Delete */
     NSMenu         *sessionSwitchMenu;
     NSMenu         *sessionDeleteMenu;
@@ -52,6 +55,9 @@
 - (EditorDoc *)openPath:(NSString *)path;
 - (EditorDoc *)frontDocument;
 - (SessionController *)sessionController;
+- (ClipboardController *)clipboardController;
+- (void)noteClipboard;                  /* Copy or Cut was done: the history looks at the clipboard */
+- (void)clipboardHistoryChanged;        /* an entry came or went: the menu is made again */
 - (NSArray *)documents;                 /* every open document, oldest first */
 - (EditorDoc *)documentForPath:(NSString *)path;   /* the window showing this file, or nil */
 - (void)documentDidClose:(EditorDoc *)doc;
