@@ -62,7 +62,8 @@ Status: **prototype (0.0.1)** -- nothing here has been run on OPENSTEP yet.
 * **Split panes** (Windows > Split Pane, cmd-2; Close Pane, cmd-1): the window shows the same text in two panes, one above the
   other, each with its own scroll position, selection, line numbers and fold margin.  Edits, undo, folds and highlighting are
   shared; the commands act on the pane with the insertion point.  Close Pane closes that one and the other fills the window.
-* **Find in Files** (Search > Find in Files..., shift-cmd-F): looks for text in the files of a folder, with the same case, regular
+* **Find in Files** (Search > Find in Files..., shift-cmd-F): looks for text in the files of a folder -- or, with *Search in: Open files*, in the open windows, saved
+  or not, matched by file name and replaced in the windows with Undo -- with the same case, regular
   expression and whole-word options as Find, a list of file-name patterns (`*.c *.h`; `*` and `?`), and subfolders on or off
   (`.`-folders and `CVS` are skipped).  The matching lines are listed as `file:line: text`; double-click one to open the file
   there.  *Replace All...* replaces in every file with a match, after asking.  A file open in a window is searched as it stands
