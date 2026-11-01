@@ -79,14 +79,93 @@ static int classify_sh(const u16 *t, unsigned s, unsigned e, int csh, int *after
     return 0;
 }
 
+/* ---- here-documents ---- */
+
+#define HD_MAX 8
+typedef struct { unsigned s, e; int strip; } HereDoc;       /* the delimiter t[s, e) and whether <<- (leading tabs may precede it) */
+
+/* A here-document operator at t[i] (the `<<`): reads its delimiter.  Returns the index after the operator and delimiter, with
+ * *s, *e the delimiter and *strip set; 0 if this is not a here-document (a `<<<` here-string, a shift such as 1<<3, `class << self`). */
+static unsigned heredoc_operator(const u16 *t, unsigned n, unsigned i, int ruby, unsigned *s, unsigned *e, int *strip)
+{
+    unsigned j = i + 2;
+    int dash = 0;
+
+    if (j < n && t[j] == '<') return 0;
+    if (j < n && (t[j] == '-' || (ruby && t[j] == '~'))) { dash = 1; j++; }
+    if (!ruby) while (j < n && (t[j] == ' ' || t[j] == '\t')) j++;
+    if (j >= n) return 0;
+    if (t[j] == '\'' || t[j] == '"') {
+        unsigned q = j++;
+
+        *s = j;
+        while (j < n && t[j] != t[q] && t[j] != '\n') j++;
+        if (j >= n || t[j] != t[q] || j == *s) return 0;
+        *e = j;
+        *strip = dash;
+        return j + 1;
+    }
+    if (t[j] == '\\' && !ruby) j++;
+    *s = j;
+    if (ruby) {
+        if (!((t[j] >= 'A' && t[j] <= 'Z') || t[j] == '_')) return 0;       /* an upper-case word: `a <<b` is not one */
+        while (j < n && ((t[j] >= 'A' && t[j] <= 'Z') || (t[j] >= '0' && t[j] <= '9') || t[j] == '_')) j++;
+    } else {
+        if (j >= n || !(is_wc(t[j]) && !(t[j] >= '0' && t[j] <= '9'))) return 0;     /* 1<<3 is arithmetic */
+        while (j < n && (is_wc(t[j]) || t[j] == '.' || t[j] == '-')) j++;
+    }
+    if (j == *s) return 0;
+    *e = j;
+    *strip = dash;
+    return j;
+}
+
+/* t[i] is the start of the first line of a here-document body: returns the index just after its last line (the line that holds the
+ * delimiter), or n if there is none. */
+static unsigned heredoc_skip(const u16 *t, unsigned n, unsigned i, const HereDoc *h, int ruby)
+{
+    while (i < n) {
+        unsigned ls = i, le = i, k, m;
+
+        while (le < n && t[le] != '\n') le++;
+        k = ls;
+        if (h->strip) while (k < le && (t[k] == '\t' || (ruby && t[k] == ' '))) k++;
+        m = le;
+        if (m > k && t[m - 1] == '\r') m--;
+        if (m - k == h->e - h->s) {
+            unsigned q;
+
+            for (q = 0; q < h->e - h->s && t[k + q] == t[h->s + q]; q++) ;
+            if (q == h->e - h->s) return le < n ? le + 1 : n;
+        }
+        i = le < n ? le + 1 : n;
+    }
+    return n;
+}
+
 static int scan_sh(const u16 *t, unsigned n, int csh, TokList *l)
 {
-    unsigned i = 0, j, end, lines, id;
-    int cmd = 1, prev_else = 0;
+    unsigned i = 0, j, end, lines, id, hs, he, after_op;
+    int cmd = 1, prev_else = 0, hstrip;
+    HereDoc pend[HD_MAX];
+    unsigned npend = 0, k;
 
     while (i < n) {
         u16 c = t[i];
-        if (c == '\n') { cmd = 1; i++; continue; }
+        if (c == '\n') {
+            cmd = 1;
+            i++;
+            for (k = 0; k < npend; k++) i = heredoc_skip(t, n, i, &pend[k], 0);       /* the bodies start on the next line */
+            npend = 0;
+            continue;
+        }
+        if (c == '<' && i + 1 < n && t[i + 1] == '<') {
+            after_op = heredoc_operator(t, n, i, 0, &hs, &he, &hstrip);
+            if (after_op != 0 && npend < HD_MAX) { pend[npend].s = hs; pend[npend].e = he; pend[npend].strip = hstrip; npend++; i = after_op; cmd = 0; continue; }
+            i += (i + 2 < n && t[i + 2] == '<') ? 3 : 2;
+            cmd = 0;
+            continue;
+        }
         if (c == ' ' && i + 5 < n && t[i + 1] == '.' && fold_token_at(t, n, i, &end, &lines, &id)) { i = end; cmd = 1; prev_else = 0; continue; }
         if (c == ' ' || c == '\t' || c == '\r') { i++; continue; }
         if (c == '\\') { i += (i + 1 < n) ? 2 : 1; continue; }
@@ -150,12 +229,22 @@ static int scan_ruby(const u16 *t, unsigned n, TokList *l)
     static const char *const open_any[] = { "def", "class", "module", NULL };           /* openers wherever they stand */
     static const char *const open_cmd[] = { "if", "unless", "while", "until", "case", "begin", "for", NULL };    /* ... only at the start of a statement */
     static const char *const mids[] = { "else", "elsif", "when", "rescue", "ensure", "then", "in", NULL };
-    unsigned i = 0, j, end, lines, id, k;
-    int cmd = 1, loop_stmt = 0, bol = 1;
+    static const char *const rx_words[] = { "if", "unless", "while", "until", "and", "or", "not", "return", "when", "then", "else",
+                                            "elsif", "in", "do", "puts", "print", "p", NULL };       /* a `/` after these starts a regular expression */
+    unsigned i = 0, j, end, lines, id, k, hs, he, after_op;
+    int cmd = 1, loop_stmt = 0, bol = 1, rx = 1, hstrip;
+    HereDoc pend[HD_MAX];
+    unsigned npend = 0;
 
     while (i < n) {
         u16 c = t[i];
-        if (c == '\n') { cmd = 1; loop_stmt = 0; bol = 1; i++; continue; }
+        if (c == '\n') {
+            cmd = 1; loop_stmt = 0; bol = 1; rx = 1;
+            i++;
+            for (k = 0; k < npend; k++) i = heredoc_skip(t, n, i, &pend[k], 1);
+            npend = 0;
+            continue;
+        }
         if (c == ' ' && i + 5 < n && t[i + 1] == '.' && fold_token_at(t, n, i, &end, &lines, &id)) { i = end; cmd = 1; continue; }
         if (c == ' ' || c == '\t' || c == '\r') { i++; continue; }
         if (bol && c == '=' && word_is(t, i + 1, i + 6, "begin")) {            /* =begin ... =end */
@@ -173,9 +262,44 @@ static int scan_ruby(const u16 *t, unsigned n, TokList *l)
             for (j = i + 1; j < n && t[j] != c; j++) if (t[j] == '\\') j++;
             i = j + 1;
             cmd = 0;
+            rx = 0;
             continue;
         }
-        if (c == ';' || c == '(' || c == '{' || c == '=') { cmd = 1; i++; continue; }
+        if (c == '<' && i + 1 < n && t[i + 1] == '<') {                      /* <<~EOS, <<-EOS, <<EOS, <<'EOS' */
+            after_op = heredoc_operator(t, n, i, 1, &hs, &he, &hstrip);
+            if (after_op != 0 && npend < HD_MAX) { pend[npend].s = hs; pend[npend].e = he; pend[npend].strip = hstrip; npend++; i = after_op; cmd = 0; rx = 0; continue; }
+            i += 2;
+            cmd = 0;
+            rx = 1;
+            continue;
+        }
+        if (c == '/' && rx) {                                                /* a regular expression: to the closing slash on this line */
+            for (j = i + 1; j < n && t[j] != '/' && t[j] != '\n'; j++) {
+                if (t[j] == '\\') j++;
+                else if (t[j] == '[') { while (j + 1 < n && t[j + 1] != ']' && t[j + 1] != '\n') j++; }       /* a slash in [...] */
+            }
+            i = (j < n && t[j] == '/') ? j + 1 : j;
+            cmd = 0;
+            rx = 0;
+            continue;
+        }
+        if (c == '%' && rx && i + 2 < n && ((t[i + 1] == 'r' || t[i + 1] == 'w' || t[i + 1] == 'W' || t[i + 1] == 'q' || t[i + 1] == 'Q' ||
+                                             t[i + 1] == 'i' || t[i + 1] == 'I' || t[i + 1] == 's' || t[i + 1] == 'x') &&
+                                            !is_wc(t[i + 2]) && t[i + 2] != ' ' && t[i + 2] != '\n')) {     /* %r{...}, %w[...] */
+            u16 open = t[i + 2], close = open == '(' ? ')' : (open == '[' ? ']' : (open == '{' ? '}' : (open == '<' ? '>' : open)));
+            int depth = 1;
+
+            for (j = i + 3; j < n && depth > 0; j++) {
+                if (t[j] == '\\') j++;
+                else if (t[j] == close) depth--;
+                else if (t[j] == open && close != open) depth++;
+            }
+            i = j;
+            cmd = 0;
+            rx = 0;
+            continue;
+        }
+        if (c == ';' || c == '(' || c == '{' || c == '=') { cmd = 1; rx = 1; i++; continue; }
         if (is_wc(c)) {
             u16 prev = i > 0 ? t[i - 1] : 0, next, next2;
             int bad, type = 0, after = 0;
@@ -201,10 +325,14 @@ static int scan_ruby(const u16 *t, unsigned n, TokList *l)
                 if (type != 0 && !add_tok(l, i, j, type)) return 0;
             }
             cmd = (type == T_MID || after) ? 1 : 0;
+            rx = 0;
+            for (k = 0; rx_words[k]; k++) if (word_is(t, i, j, rx_words[k]) && !bad) rx = 1;
             i = j;
             continue;
         }
         cmd = 0;
+        rx = (c == ',' || c == '!' || c == '|' || c == '&' || c == '~' || c == '<' || c == '>' || c == '^' || c == '*' || c == '+' ||
+              c == '-' || c == '?' || c == ':' || c == '[' || c == '%') ? 1 : 0;
         i++;
     }
     return 1;

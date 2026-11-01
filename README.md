@@ -32,7 +32,8 @@ Status: **prototype (0.0.1)** -- nothing here has been run on OPENSTEP yet.
   shell `if`/`fi`, `case`/`esac`, `for`/`while`/`until`/`select`/`done`, and `then`, `elif`, `else`, `do` (which go to the end of
   their block); csh `if (...) then`/`endif`, `foreach`/`while`/`end`, `switch`/`endsw`; C-family `#if`, `#ifdef`, `#ifndef`/`#endif`,
   with `#else` and `#elif`.  A word only counts where a command can start, so `echo if` is left alone; comments and quoted text are
-  skipped.  (Not understood: here-documents, which may hide a keyword at the start of a line.)
+  skipped, and so are here-documents (`<<EOF`, `<<-EOF`, `<<'EOF'`, several on one line; Ruby `<<~EOS`) and, in Ruby, `/regexp/`,
+  `%w[...]` and `%r{...}` literals, which could hide a keyword.
 * **Code folding** (Edit > Fold/Unfold Block, cmd-K; Fold All Blocks; Expand All Blocks): collapses the block between matching
   braces, the one that opens on the insertion point's line, closes on it, or surrounds it, into `{ ... 12 lines ~7 }`.
   How a block is found depends on the mode: braces for the C family and most others; **indentation for Python** (the line with
@@ -122,8 +123,8 @@ text.  The mode is chosen from the file name, a `#!` line, or by hand from *Pref
 taken to be GNU make.  Switch by hand from *Language Mode* where that is wrong.  Ruby folds and matches
 `def`/`class`/`if`/`do`...`end`; JSON and JavaScript fold arrays as well as objects; Imake files use the C preprocessor rules for
 matching and `XCOMM` for comment/uncomment.  The Ruby, JavaScript, JSON, BSD make, Imake and zsh syntax files are written by
-`tools/gen_syntax.py`; change that, not the files.  Not understood: Ruby and shell here-documents, JavaScript regular expression
-literals, and Ruby `%w[]`-style literals.
+`tools/gen_syntax.py`; change that, not the files.  Not understood: JavaScript regular expression literals, and the bracket matcher still counts brackets
+inside here-documents, Ruby regular expressions and `%w[]`-style literals.
 
 ## Syntax files
 

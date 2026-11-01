@@ -146,5 +146,35 @@ int main(void)
         CHECK(b.nlone == 0 && b.npairs == 1);
         words_free(&b);
     }
+    {   /* here-documents and Ruby regular expressions / %-literals */
+        struct { const char *text; int kind; unsigned pairs, lone; } c[] = {
+            { "cat <<EOF\nif\nEOF\nif a; then\n b\nfi\n", WORDS_SH, 1, 0 },                          /* the if in the body is text */
+            { "cat <<-EOF\n\tfi\n\tEOF\nif a; then\n b\nfi\n", WORDS_SH, 1, 0 },                 /* <<- lets the end word be indented */
+            { "cat <<'EOF'\nesac\nEOF\nwhile x; do\n y\ndone\n", WORDS_SH, 1, 0 },
+            { "cat <<\"A B\"\nfi\nA B\nif a; then\n b\nfi\n", WORDS_SH, 1, 0 },
+            { "cat <<ONE <<TWO\nfi\nONE\ndone\nTWO\nif a; then\n b\nfi\n", WORDS_SH, 1, 0 },     /* two on one line, in order */
+            { "x=$((1<<3))\nif a; then\n b\nfi\n", WORDS_SH, 1, 0 },                              /* a shift is not one */
+            { "cat <<<word\nif a; then\n b\nfi\n", WORDS_SH, 1, 0 },                             /* here-string */
+            { "cat <<EOF\nif\nnever ended\nif a; then\n b\nfi\n", WORDS_SH, 0, 0 },            /* no end word: the rest is the body */
+            { "cat <<EOF >out\nfi\nEOF\nforeach x (a)\n y\nend\n", WORDS_CSH, 1, 0 },
+            { "puts <<~EOS\n  end\n  def\nEOS\nif x\n y\nend\n", WORDS_RUBY, 1, 0 },
+            { "x = <<EOS\nend\nEOS\nclass A\nend\n", WORDS_RUBY, 1, 0 },
+            { "class << self\n  def f; end\nend\n", WORDS_RUBY, 2, 0 },                           /* not a here-document */
+            { "if s =~ /end|if/\n  y\nend\n", WORDS_RUBY, 1, 0 },                                  /* words in a regexp */
+            { "x = a / 2\nif b / 3 > 1\n y\nend\n", WORDS_RUBY, 1, 0 },                          /* division is not a regexp */
+            { "s.split(/[\\/]end/)\nif x\n y\nend\n", WORDS_RUBY, 1, 0 },                        /* a slash in a class */
+            { "w = %w[end if def]\nr = %r{end/if}\nif x\n y\nend\n", WORDS_RUBY, 1, 0 },
+            { "if x\n y\n", WORDS_RUBY, 0, 1 }
+        };
+        unsigned ci;
+
+        for (ci = 0; ci < sizeof c / sizeof c[0]; ci++) {
+            n = widen(c[ci].text, t);
+            words_scan(t, n, c[ci].kind, &b);
+            if (!(b.npairs == c[ci].pairs && b.nlone == c[ci].lone)) printf("  case %u: %u pairs, %u lone (wanted %u, %u)\n", ci, b.npairs, b.nlone, c[ci].pairs, c[ci].lone);
+            CHECK(b.npairs == c[ci].pairs && b.nlone == c[ci].lone);
+            words_free(&b);
+        }
+    }
     TEST_DONE("words");
 }
