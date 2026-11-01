@@ -1,6 +1,7 @@
 #import "Appearance.h"
 #import "HKSyntaxDefinition.h"
 #import "HKSyntaxHighlighter.h"
+#import "UIHelpers.h"
 
 static BOOL dark = NO;
 static NSColor *customBackground = nil;
@@ -58,10 +59,32 @@ static BOOL get_bool(NSUserDefaults *ud, NSString *key, BOOL def)
 
 @implementation Appearance
 
+/* A font the system lists can still be unusable (an incomplete install, a composite font), and laying text out in one has crashed the editor.
+   So ask for the things drawing needs, and put the font in the editor only if they all make sense. */
++ (BOOL)fontUsable:(NSString *)name
+{
+    NSFont *f;
+    float asc, desc, w;
+
+    if (name == nil) return YES;
+    f = [NSFont fontWithName:name size:12.0];
+    if (f == nil) return NO;
+    asc = [f ascender];
+    desc = [f descender];
+    w = [f widthOfString:@"Mi"];
+    return asc - desc > 0.0 && asc - desc < 200.0 && w > 0.0 && w < 400.0;
+}
+
 + (void)push
 {
+    NSString *use = fontName;
+
+    if (use != nil && ![self fontUsable:use]) {
+        SSTrace("font %s has no usable metrics; using the default font", SSCS(use));
+        use = nil;
+    }
     [HKSyntaxDefinition setDarkMode:dark];
-    [HKSyntaxHighlighter setFontName:fontName size:fontSize];
+    [HKSyntaxHighlighter setFontName:use size:fontSize];
 }
 
 + (void)loadSettings

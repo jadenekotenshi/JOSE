@@ -250,6 +250,12 @@ static const int font_sizes[] = { 8, 9, 10, 11, 12, 13, 14, 16, 18, 20, 24 };
     NSString *name = [fontPopup titleOfSelectedItem];
     NSString *size = [sizePopup titleOfSelectedItem];
 
+    if (![name isEqualToString:DEFAULT_ITEM] && ![Appearance fontUsable:name]) {
+        NSRunAlertPanel(@"Pilcrow", @"The system cannot give metrics for the font %@ (it may not be installed completely), so it will not be used.", @"OK", nil, nil, name);
+        [self fillFontPopup];
+        [self syncControls];
+        return;
+    }
     [Appearance setFontName:[name isEqualToString:DEFAULT_ITEM] ? nil : name size:[size isEqualToString:@"-"] ? 0.0 : (float)[size intValue]];
     [self changed];
 }

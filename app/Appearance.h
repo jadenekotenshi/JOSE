@@ -16,6 +16,7 @@
 + (NSColor *)gutterBackground;                 /* the line-number margin */
 + (NSColor *)gutterText;
 + (NSColor *)foldMarkerColor;
++ (BOOL)fontUsable:(NSString *)name;          /* can the system give metrics for it?  (a font that cannot is never put in the editor) */
 + (NSString *)fontName;                        /* nil: the user's fixed-pitch font */
 + (float)fontSize;                             /* 0: the font's own */
 + (void)setFontName:(NSString *)name size:(float)size;
